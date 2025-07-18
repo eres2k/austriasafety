@@ -8,6 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/lucide@latest/dist/lucide.css">
     <style>
         [v-cloak] { display: none; }
@@ -43,10 +44,42 @@
             border-color: #FF9900;
             background-color: #fef3e2;
         }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #FF9900;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
     <div id="app" v-cloak>
+        <!-- Loading Overlay -->
+        <div v-if="isLoading" class="loading-overlay">
+            <div class="bg-white rounded-lg p-6 text-center">
+                <div class="loading-spinner mx-auto mb-4"></div>
+                <p class="text-gray-700">{{ loadingMessage }}</p>
+            </div>
+        </div>
+
         <!-- Login Page -->
         <div v-if="currentView === 'login'" class="min-h-screen bg-gradient-to-br from-gray-900 via-amazon-blue to-gray-800 flex items-center justify-center p-4">
             <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
@@ -287,7 +320,7 @@
                                     <tbody class="bg-white divide-y divide-gray-200">
                                         <tr v-for="audit in recentAudits" :key="audit.id">
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ audit.date }}</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ audit.location || 'N/A' }}</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ getDisplayLocation(audit) }}</td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ audit.auditor }}</td>
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <span :class="getScoreClass(audit.score)" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium">
@@ -423,12 +456,20 @@
                     <div v-else-if="currentView === 'audits'" class="space-y-6">
                         <div class="flex justify-between items-center">
                             <h2 class="text-2xl font-bold text-gray-900">Safety Audits</h2>
-                            <button v-if="currentUser.role !== 'viewer'" @click="startNewAudit" class="inline-flex items-center px-4 py-2 amazon-orange text-white rounded-lg amazon-orange-hover transition-colors">
-                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                                </svg>
-                                New Audit
-                            </button>
+                            <div class="flex space-x-3">
+                                <button v-if="audits.length > 0" @click="exportAllAuditsAsZip" class="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M7 13l3 3 7-7"></path>
+                                    </svg>
+                                    Export All as ZIP
+                                </button>
+                                <button v-if="currentUser.role !== 'viewer'" @click="startNewAudit" class="inline-flex items-center px-4 py-2 amazon-orange text-white rounded-lg amazon-orange-hover transition-colors">
+                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                    </svg>
+                                    New Audit
+                                </button>
+                            </div>
                         </div>
 
                         <div class="bg-white rounded-lg shadow">
@@ -452,7 +493,7 @@
                                         <tr v-for="audit in audits" :key="audit.id">
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ audit.date }}</td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ audit.time || 'N/A' }}</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ audit.location || 'N/A' }}</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ getDisplayLocation(audit) }}</td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ audit.area || 'N/A' }}</td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ audit.shift || 'N/A' }}</td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ audit.auditor }}</td>
@@ -966,7 +1007,15 @@
 
                     <!-- Reports View -->
                     <div v-else-if="currentView === 'reports'" class="space-y-6">
-                        <h2 class="text-2xl font-bold text-gray-900">WHS Reports</h2>
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-2xl font-bold text-gray-900">WHS Reports</h2>
+                            <button v-if="audits.length > 0" @click="exportAllAuditsAsZip" class="inline-flex items-center px-4 py-2 amazon-orange text-white rounded-lg amazon-orange-hover transition-colors">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M7 13l3 3 7-7"></path>
+                                </svg>
+                                Export All as ZIP
+                            </button>
+                        </div>
                         
                         <div class="bg-white rounded-lg shadow p-6">
                             <h3 class="text-lg font-semibold text-gray-900 mb-4">Monthly Summary</h3>
@@ -1208,6 +1257,8 @@
                     selectedFile: null,
                     uploadError: '',
                     previewingQuestionnaire: null,
+                    isLoading: false,
+                    loadingMessage: '',
                     loginForm: {
                         email: '',
                         password: ''
@@ -1875,6 +1926,369 @@
                     this.currentView = 'audits';
                 },
 
+                // ZIP Export functionality
+                async exportAllAuditsAsZip() {
+                    if (this.audits.length === 0) {
+                        alert('No audits to export!');
+                        return;
+                    }
+
+                    this.isLoading = true;
+                    this.loadingMessage = 'Generating PDF reports and creating ZIP file...';
+
+                    try {
+                        const zip = new JSZip();
+                        const timestamp = new Date().toISOString().split('T')[0];
+                        
+                        // Create summary Excel file
+                        const summaryData = this.audits.map(audit => ({
+                            'Audit ID': audit.id,
+                            'Date': audit.date,
+                            'Time': audit.time || 'N/A',
+                            'Location': this.getDisplayLocation(audit),
+                            'Area': audit.area || 'N/A',
+                            'Shift': audit.shift || 'N/A',
+                            'Auditor': audit.auditor,
+                            'Score (%)': audit.score,
+                            'Total Items': audit.totalItems,
+                            'Passed Items': audit.passedItems,
+                            'Critical Failures': audit.criticalFails || 0,
+                            'Status': audit.status,
+                            'Overall Condition': audit.overallCondition || 'N/A',
+                            'Overall Result': audit.overallResult || 'N/A',
+                            'Immediate Actions Required': audit.immediateActions ? 'Yes' : 'No',
+                            'Number of Deficiencies': audit.deficiencies?.length || 0,
+                            'Completed Date': audit.completedDate ? new Date(audit.completedDate).toLocaleDateString('de-AT') : 'N/A'
+                        }));
+                        
+                        const summaryWorksheet = XLSX.utils.json_to_sheet(summaryData);
+                        const summaryWorkbook = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(summaryWorkbook, summaryWorksheet, 'Audit Summary');
+                        const summaryBuffer = XLSX.write(summaryWorkbook, { type: 'array', bookType: 'xlsx' });
+                        zip.file(`Audit_Summary_${timestamp}.xlsx`, summaryBuffer);
+
+                        // Generate PDF for each audit
+                        for (let i = 0; i < this.audits.length; i++) {
+                            const audit = this.audits[i];
+                            this.loadingMessage = `Generating PDF ${i + 1} of ${this.audits.length}...`;
+                            
+                            const pdfBlob = await this.generatePDFBlob(audit);
+                            const locationName = this.getDisplayLocation(audit).replace(/\s+/g, '_');
+                            const fileName = `WHS_Audit_Report_${locationName}_${audit.date}.pdf`;
+                            zip.file(fileName, pdfBlob);
+                            
+                            // Small delay to prevent browser freezing
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                        }
+
+                        this.loadingMessage = 'Creating ZIP file...';
+                        const zipBlob = await zip.generateAsync({ type: 'blob' });
+                        
+                        // Download the ZIP file
+                        const url = URL.createObjectURL(zipBlob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `WHS_Safety_Audits_Export_${timestamp}.zip`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                        
+                    } catch (error) {
+                        console.error('Error creating ZIP export:', error);
+                        alert('Error creating ZIP export: ' + error.message);
+                    } finally {
+                        this.isLoading = false;
+                        this.loadingMessage = '';
+                    }
+                },
+
+                // Generate PDF Blob for ZIP export
+                async generatePDFBlob(audit) {
+                    return new Promise((resolve) => {
+                        const { jsPDF } = window.jspdf;
+                        const doc = new jsPDF();
+                        
+                        // Set up fonts and colors
+                        doc.setFont('helvetica');
+                        
+                        // Header with logo area and title
+                        doc.setFillColor(255, 153, 0); // Amazon orange
+                        doc.rect(0, 0, 210, 30, 'F');
+                        
+                        doc.setTextColor(255, 255, 255);
+                        doc.setFontSize(20);
+                        doc.text('AMAZON AUSTRIA', 20, 15);
+                        doc.setFontSize(14);
+                        doc.text('Workplace Health & Safety', 20, 22);
+                        
+                        doc.setTextColor(0, 0, 0);
+                        doc.setFontSize(18);
+                        doc.text('SAFETY AUDIT REPORT', 20, 45);
+                        
+                        // Audit Information
+                        let yPos = 60;
+                        doc.setFontSize(12);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text('AUDIT INFORMATION', 20, yPos);
+                        yPos += 10;
+                        
+                        doc.setFont('helvetica', 'normal');
+                        doc.text(`Date/Time: ${audit.date} ${audit.time || ''}`, 20, yPos);
+                        yPos += 7;
+                        doc.text(`Location: ${this.getDisplayLocation(audit)}`, 20, yPos);
+                        yPos += 7;
+                        doc.text(`Area: ${audit.area || 'N/A'}`, 20, yPos);
+                        yPos += 7;
+                        doc.text(`Shift: ${audit.shift || 'N/A'}`, 20, yPos);
+                        yPos += 7;
+                        doc.text(`Auditor: ${audit.auditor}`, 20, yPos);
+                        yPos += 7;
+                        doc.text(`Status: ${audit.status}`, 20, yPos);
+                        yPos += 7;
+                        doc.text(`Questionnaire: ${this.getQuestionnaireNameById(audit.questionnaireId) || 'Standard WHS Safety Audit'}`, 20, yPos);
+                        yPos += 15;
+                        
+                        // Score Summary
+                        doc.setFont('helvetica', 'bold');
+                        doc.text('AUDIT SCORE SUMMARY', 20, yPos);
+                        yPos += 10;
+                        
+                        doc.setFont('helvetica', 'normal');
+                        doc.text(`Overall Score: ${audit.score}%`, 20, yPos);
+                        yPos += 7;
+                        doc.text(`Items Passed: ${audit.passedItems}/${audit.totalItems}`, 20, yPos);
+                        yPos += 7;
+                        doc.text(`Critical Failures: ${audit.criticalFails || 0}`, 20, yPos);
+                        yPos += 15;
+                        
+                        // Overall Assessment
+                        if (audit.overallCondition || audit.overallResult) {
+                            doc.setFont('helvetica', 'bold');
+                            doc.text('OVERALL ASSESSMENT', 20, yPos);
+                            yPos += 10;
+                            
+                            doc.setFont('helvetica', 'normal');
+                            if (audit.overallCondition) {
+                                doc.text(`Workplace Condition: ${audit.overallCondition}`, 20, yPos);
+                                yPos += 7;
+                            }
+                            if (audit.overallResult) {
+                                doc.text(`Overall Result: ${audit.overallResult}`, 20, yPos);
+                                yPos += 7;
+                            }
+                            yPos += 8;
+                        }
+                        
+                        // Check if we need a new page
+                        if (yPos > 250) {
+                            doc.addPage();
+                            yPos = 20;
+                        }
+                        
+                        // Detailed Audit Questions and Responses
+                        doc.setFont('helvetica', 'bold');
+                        doc.text('DETAILED AUDIT RESULTS', 20, yPos);
+                        yPos += 15;
+                        
+                        const template = this.getQuestionnaireById(audit.questionnaireId) || this.getActiveQuestionnaire();
+                        template.sections.forEach(section => {
+                            // Check if we need a new page
+                            if (yPos > 270) {
+                                doc.addPage();
+                                yPos = 20;
+                            }
+                            
+                            doc.setFont('helvetica', 'bold');
+                            doc.setFontSize(11);
+                            const sectionText = doc.splitTextToSize(section.title, 170);
+                            doc.text(sectionText, 20, yPos);
+                            yPos += sectionText.length * 5 + 5;
+                            
+                            section.subsections.forEach(subsection => {
+                                if (subsection.title) {
+                                    doc.setFont('helvetica', 'bold');
+                                    doc.setFontSize(10);
+                                    doc.text(subsection.title, 25, yPos);
+                                    yPos += 8;
+                                }
+                                
+                                subsection.items.forEach(item => {
+                                    // Check if we need a new page
+                                    if (yPos > 270) {
+                                        doc.addPage();
+                                        yPos = 20;
+                                    }
+                                    
+                                    const response = audit.responses[item.id] || 'No response';
+                                    const responseColor = response === 'yes' ? [0, 128, 0] : response === 'no' ? [255, 0, 0] : [128, 128, 128];
+                                    
+                                    doc.setFont('helvetica', 'normal');
+                                    doc.setFontSize(9);
+                                    
+                                    // Question ID and response
+                                    doc.text(`${item.id}:`, 30, yPos);
+                                    doc.setTextColor(...responseColor);
+                                    doc.text(response.toUpperCase(), 45, yPos);
+                                    doc.setTextColor(0, 0, 0);
+                                    
+                                    // Critical indicator
+                                    if (item.critical) {
+                                        doc.setTextColor(255, 0, 0);
+                                        doc.text('[CRITICAL]', 70, yPos);
+                                        doc.setTextColor(0, 0, 0);
+                                    }
+                                    
+                                    yPos += 5;
+                                    
+                                    // Question text
+                                    const questionText = doc.splitTextToSize(item.text, 160);
+                                    doc.text(questionText, 30, yPos);
+                                    yPos += questionText.length * 4;
+                                    
+                                    // Legal basis
+                                    if (item.basis) {
+                                        doc.setTextColor(100, 100, 100);
+                                        doc.text(`Basis: ${item.basis}`, 30, yPos);
+                                        doc.setTextColor(0, 0, 0);
+                                        yPos += 4;
+                                    }
+                                    
+                                    // Notes
+                                    if (audit.notes && audit.notes[item.id]) {
+                                        doc.setTextColor(200, 0, 0);
+                                        const noteText = doc.splitTextToSize(`Note: ${audit.notes[item.id]}`, 160);
+                                        doc.text(noteText, 30, yPos);
+                                        doc.setTextColor(0, 0, 0);
+                                        yPos += noteText.length * 4;
+                                    }
+                                    
+                                    yPos += 3;
+                                });
+                                yPos += 5;
+                            });
+                            yPos += 5;
+                        });
+                        
+                        // Immediate Actions
+                        if (audit.immediateActions) {
+                            if (yPos > 250) {
+                                doc.addPage();
+                                yPos = 20;
+                            }
+                            
+                            doc.setFont('helvetica', 'bold');
+                            doc.setFontSize(12);
+                            doc.setTextColor(255, 0, 0);
+                            doc.text('IMMEDIATE ACTIONS REQUIRED', 20, yPos);
+                            doc.setTextColor(0, 0, 0);
+                            yPos += 10;
+                            
+                            doc.setFont('helvetica', 'normal');
+                            if (audit.immediateActionsDesc) {
+                                const actionText = doc.splitTextToSize(audit.immediateActionsDesc, 170);
+                                doc.text(actionText, 20, yPos);
+                                yPos += actionText.length * 5 + 10;
+                            }
+                        }
+                        
+                        // Deficiencies
+                        if (audit.deficiencies && audit.deficiencies.length > 0) {
+                            if (yPos > 230) {
+                                doc.addPage();
+                                yPos = 20;
+                            }
+                            
+                            doc.setFont('helvetica', 'bold');
+                            doc.setFontSize(12);
+                            doc.text('DEFICIENCIES AND CORRECTIVE ACTIONS', 20, yPos);
+                            yPos += 15;
+                            
+                            audit.deficiencies.forEach((def, index) => {
+                                if (yPos > 250) {
+                                    doc.addPage();
+                                    yPos = 20;
+                                }
+                                
+                                doc.setFont('helvetica', 'bold');
+                                doc.setFontSize(10);
+                                doc.text(`Deficiency ${index + 1}:`, 20, yPos);
+                                yPos += 7;
+                                
+                                doc.setFont('helvetica', 'normal');
+                                doc.setFontSize(9);
+                                
+                                if (def.description) {
+                                    const descText = doc.splitTextToSize(`Description: ${def.description}`, 170);
+                                    doc.text(descText, 25, yPos);
+                                    yPos += descText.length * 4 + 3;
+                                }
+                                
+                                doc.text(`Priority: ${def.priority || 'Not set'}`, 25, yPos);
+                                yPos += 5;
+                                doc.text(`Responsible: ${def.responsible || 'Not assigned'}`, 25, yPos);
+                                yPos += 5;
+                                doc.text(`Due Date: ${def.dueDate || 'Not set'}`, 25, yPos);
+                                yPos += 10;
+                            });
+                        }
+                        
+                        // Positive Observations
+                        if (audit.positiveObservations) {
+                            if (yPos > 250) {
+                                doc.addPage();
+                                yPos = 20;
+                            }
+                            
+                            doc.setFont('helvetica', 'bold');
+                            doc.setFontSize(12);
+                            doc.setTextColor(0, 128, 0);
+                            doc.text('POSITIVE OBSERVATIONS', 20, yPos);
+                            doc.setTextColor(0, 0, 0);
+                            yPos += 10;
+                            
+                            doc.setFont('helvetica', 'normal');
+                            const positiveText = doc.splitTextToSize(audit.positiveObservations, 170);
+                            doc.text(positiveText, 20, yPos);
+                            yPos += positiveText.length * 5 + 10;
+                        }
+                        
+                        // General Comments
+                        if (audit.generalComments) {
+                            if (yPos > 250) {
+                                doc.addPage();
+                                yPos = 20;
+                            }
+                            
+                            doc.setFont('helvetica', 'bold');
+                            doc.setFontSize(12);
+                            doc.text('GENERAL COMMENTS', 20, yPos);
+                            yPos += 10;
+                            
+                            doc.setFont('helvetica', 'normal');
+                            const commentsText = doc.splitTextToSize(audit.generalComments, 170);
+                            doc.text(commentsText, 20, yPos);
+                            yPos += commentsText.length * 5 + 15;
+                        }
+                        
+                        // Footer
+                        const pageCount = doc.internal.getNumberOfPages();
+                        for (let i = 1; i <= pageCount; i++) {
+                            doc.setPage(i);
+                            doc.setFontSize(8);
+                            doc.setTextColor(128, 128, 128);
+                            doc.text('Generated by WHS Safety Audit System - Amazon Austria', 20, 285);
+                            doc.text(`by Erwin Esener - WHS Austria`, 20, 290);
+                            doc.text(`Page ${i} of ${pageCount}`, 180, 290);
+                            doc.text(`Generated: ${new Date().toLocaleString('de-AT')}`, 180, 285);
+                        }
+                        
+                        // Return blob
+                        const pdfBlob = doc.output('blob');
+                        resolve(pdfBlob);
+                    });
+                },
+
                 // Professional PDF Report Generator
                 downloadProfessionalReport(audit) {
                     const { jsPDF } = window.jspdf;
@@ -2204,21 +2618,75 @@
                     return 'needs improvement';
                 },
                 
-                // Storage methods
+                // Storage methods with real localStorage persistence
                 saveToStorage() {
-                    // Store in memory for demo
-                    // In a real application, this would save to a database
+                    try {
+                        // Store all data in localStorage
+                        const dataToSave = {
+                            users: this.users,
+                            audits: this.audits,
+                            questionnaires: this.questionnaires,
+                            activeQuestionnaireId: this.activeQuestionnaireId
+                        };
+                        
+                        Object.keys(dataToSave).forEach(key => {
+                            localStorage.setItem(`whs_audit_${key}`, JSON.stringify(dataToSave[key]));
+                        });
+                        
+                        console.log('Data saved to localStorage successfully');
+                    } catch (error) {
+                        console.error('Error saving to localStorage:', error);
+                        alert('Error saving data. Please check browser storage settings.');
+                    }
                 },
+                
                 loadFromStorage() {
-                    // Initialize with default users
-                    this.users = [
-                        { id: 1, name: 'Admin User', email: 'admin@amazon.at', password: 'admin123', role: 'admin' },
-                        { id: 2, name: 'Safety Officer', email: 'safety@amazon.at', password: 'safety123', role: 'auditor' },
-                        { id: 3, name: 'Area Manager', email: 'manager@amazon.at', password: 'manager123', role: 'viewer' }
-                    ];
-                    
-                    // Initialize questionnaires array
-                    this.questionnaires = [];
+                    try {
+                        // Load users
+                        const savedUsers = localStorage.getItem('whs_audit_users');
+                        if (savedUsers) {
+                            this.users = JSON.parse(savedUsers);
+                        } else {
+                            // Initialize with default users if none exist
+                            this.users = [
+                                { id: 1, name: 'Admin User', email: 'admin@amazon.at', password: 'admin123', role: 'admin' },
+                                { id: 2, name: 'Safety Officer', email: 'safety@amazon.at', password: 'safety123', role: 'auditor' },
+                                { id: 3, name: 'Area Manager', email: 'manager@amazon.at', password: 'manager123', role: 'viewer' }
+                            ];
+                            this.saveToStorage();
+                        }
+                        
+                        // Load audits
+                        const savedAudits = localStorage.getItem('whs_audit_audits');
+                        if (savedAudits) {
+                            this.audits = JSON.parse(savedAudits);
+                        }
+                        
+                        // Load questionnaires
+                        const savedQuestionnaires = localStorage.getItem('whs_audit_questionnaires');
+                        if (savedQuestionnaires) {
+                            this.questionnaires = JSON.parse(savedQuestionnaires);
+                        }
+                        
+                        // Load active questionnaire ID
+                        const savedActiveId = localStorage.getItem('whs_audit_activeQuestionnaireId');
+                        if (savedActiveId) {
+                            this.activeQuestionnaireId = JSON.parse(savedActiveId);
+                        }
+                        
+                        console.log('Data loaded from localStorage successfully');
+                    } catch (error) {
+                        console.error('Error loading from localStorage:', error);
+                        // Initialize with defaults if loading fails
+                        this.users = [
+                            { id: 1, name: 'Admin User', email: 'admin@amazon.at', password: 'admin123', role: 'admin' },
+                            { id: 2, name: 'Safety Officer', email: 'safety@amazon.at', password: 'safety123', role: 'auditor' },
+                            { id: 3, name: 'Area Manager', email: 'manager@amazon.at', password: 'manager123', role: 'viewer' }
+                        ];
+                        this.audits = [];
+                        this.questionnaires = [];
+                        this.activeQuestionnaireId = 'default';
+                    }
                 }
             },
             mounted() {
