@@ -8,30 +8,11 @@
   <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/babel-standalone@7.22.5/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
 </head>
 <body>
   <div id="root"></div>
   <script type="text/babel">
     const { useState, useEffect } = React;
-
-    // Firebase configuration
-    const firebaseConfig = {
-      // Replace with your Firebase project config
-      apiKey: "AIzaSyD1pmAoHfsao3zjXHOWuR8c3Ygc6YGWGDc",
-      authDomain: "austriasafety-92889.firebaseapp.com",
-      projectId: "austriasafety-92889",
-      storageBucket: "austriasafety-92889.firebasestorage.app",
-      messagingSenderId: "379561395091",
-      appId: "1:379561395091:web:758864cd86bf8c67d85e66"
-    };
-
-    // Initialize Firebase
-    const app = firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.firestore();
 
     // Questionnaire data based on provided document
     const questionnaire = [
@@ -134,20 +115,27 @@
 
     // Authentication Component
     const Auth = ({ setUser }) => {
-      const [email, setEmail] = useState('');
+      const [username, setUsername] = useState('');
       const [password, setPassword] = useState('');
       const [isRegister, setIsRegister] = useState(false);
       const [error, setError] = useState('');
 
       const handleAuth = async () => {
         try {
-          if (isRegister) {
-            await auth.createUserWithEmailAndPassword(email, password);
+          const response = await fetch(`/.netlify/functions/auth`, {
+            method: 'POST',
+            body: JSON.stringify({ username, password, isRegister }),
+            headers: { 'Content-Type': 'application/json' }
+          });
+          const data = await response.json();
+          if (data.error) {
+            setError(data.error);
           } else {
-            await auth.signInWithEmailAndPassword(email, password);
+            setUser({ username });
+            setError('');
           }
         } catch (err) {
-          setError(err.message);
+          setError('Failed to connect to server');
         }
       };
 
@@ -156,10 +144,10 @@
           <div className="p-6 bg-white rounded shadow-md">
             <h2 className="text-2xl font-bold mb-4">{isRegister ? 'Register' : 'Login'}</h2>
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Username"
               className="w-full p-2 mb-4 border rounded"
             />
             <input
@@ -191,7 +179,7 @@
     const AuditForm = ({ user, setAuditId }) => {
       const [auditData, setAuditData] = useState({
         vertelizerentrum: '',
-        auditor: user.email,
+        auditor: user.username,
         date: new Date().toISOString().split('T')[0],
         bereich: '',
         schicht: ''
@@ -214,18 +202,32 @@
 
       const handleSubmit = async () => {
         const audit = {
+          id: Date.now().toString(),
           ...auditData,
           answers,
           deficiencies,
           positiveObservations,
           overallAssessment,
           score: calculateScore(),
-          createdAt: new Date(),
-          userId: user.uid
+          createdAt: new Date().toISOString(),
+          username: user.username
         };
-        const docRef = await db.collection('audits').add(audit);
-        setAuditId(docRef.id);
-        alert('Audit submitted successfully!');
+        try {
+          const response = await fetch(`/.netlify/functions/save-audit`, {
+            method: 'POST',
+            body: JSON.stringify(audit),
+            headers: { 'Content-Type': 'application/json' }
+          });
+          const data = await response.json();
+          if (data.error) {
+            alert(data.error);
+          } else {
+            setAuditId(audit.id);
+            alert('Audit submitted successfully!');
+          }
+        } catch (err) {
+          alert('Failed to save audit');
+        }
       };
 
       return (
@@ -304,16 +306,23 @@
     };
 
     // Audit Report Component
-    const AuditReport = ({ auditId }) => {
+    const AuditReport = ({ auditId, user }) => {
       const [audit, setAudit] = useState(null);
 
       useEffect(() => {
         if (auditId) {
-          db.collection('audits').doc(auditId).get().then(doc => {
-            if (doc.exists) setAudit(doc.data());
-          });
+          fetch(`/.netlify/functions/get-audit?auditId=${auditId}&username=${user.username}`)
+            .then(response => response.json())
+            .then(data => {
+              if (data.error) {
+                alert(data.error);
+              } else {
+                setAudit(data);
+              }
+            })
+            .catch(() => alert('Failed to load audit'));
         }
-      }, [auditId]);
+      }, [auditId, user]);
 
       if (!audit) return <div>Loading...</div>;
 
@@ -344,26 +353,26 @@
       const [user, setUser] = useState(null);
       const [auditId, setAuditId] = useState(null);
 
-      useEffect(() => {
-        auth.onAuthStateChanged((user) => {
-          setUser(user);
-        });
-      }, []);
-
-      if (!user) return <Auth setUser={setUser} />;
-
       return (
         <div className="min-h-screen bg-gray-100">
-          <div className="flex justify-between p-4 bg-blue-500 text-white">
-            <h1 className="text-xl font-bold">AMZL Safety Audit</h1>
-            <button
-              onClick={() => auth.signOut()}
-              className="p-2 bg-red-500 rounded hover:bg-red-600"
-            >
-              Logout
-            </button>
-          </div>
-          {auditId ? <AuditReport auditId={auditId} /> : <AuditForm user={user} setAuditId={setAuditId} />}
+          {user && (
+            <div className="flex justify-between p-4 bg-blue-500 text-white">
+              <h1 className="text-xl font-bold">AMZL Safety Audit</h1>
+              <button
+                onClick={() => setUser(null)}
+                className="p-2 bg-red-500 rounded hover:bg-red-600"
+              >
+                Logout
+              </button>
+            </div>
+          )}
+          {!user ? (
+            <Auth setUser={setUser} />
+          ) : auditId ? (
+            <AuditReport auditId={auditId} user={user} />
+          ) : (
+            <AuditForm user={user} setAuditId={setAuditId} />
+          )}
         </div>
       );
     };
