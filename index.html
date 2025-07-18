@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AMZL Safety Audit</title>
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/babel-standalone@7.22.5/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Firebase configuration
+    const firebaseConfig = {
+      // Replace with your Firebase project config
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_STORAGE_BUCKET",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    // Initialize Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    // Questionnaire data based on provided document
+    const questionnaire = [
+      {
+        section: "1. Allgemeine Sicherheit",
+        questions: [
+          { id: "1.1", text: "Sind Sicherheitshinweise und Fluchtwegpläne deutlich sichtbar?", basis: "" },
+          { id: "1.2", text: "Sind alle Notausgänge frei und gut gekennzeichnet?", basis: "" },
+          { id: "1.3", text: "Ist die Erste-Hilfe-Ausstattung vollständig und erreichbar?", basis: "" },
+          { id: "1.4", text: "Ist die Notfallausrüstung (Augenspülung, Feuerlöscher) zugänglich?", basis: "" },
+          { id: "1.7", text: "Entsprechen Frisur/Kleidung den Sicherheitsvorschriften? (max Schulterhöhe)", basis: "" },
+          { id: "1.8", text: "Sind aktuelle Arbeitsanweisungen verfügbar?", basis: "ASchG § 2" }
+        ]
+      },
+      {
+        section: "2. Arbeitsplatz und Umgebung",
+        questions: [
+          { id: "2.1", text: "Ist die Lagerhalle sauber und aufgeräumt?", basis: "AStV § 4" },
+          { id: "2.2", text: "Sind die Böden rutschfest und eben?", basis: "AStV § 5" },
+          { id: "2.3", text: "Ist ausreichend Bewegungsfreiheit vorhanden? (min. 1,5 m² pro Person)", basis: "" },
+          { id: "2.4", text: "Entspricht die Beleuchtung den Anforderungen? (min. 200 Lux)", basis: "AStV § 22" },
+          { id: "2.5", text: "Ist die Raumtemperatur angemessen? (18-25°C)", basis: "AStV § 23" },
+          { id: "2.6", text: "Ist die Lüftung ausreichend?", basis: "" },
+          { id: "2.7", text: "Liegt der Lärmpegel im zulässigen Bereich? (≤ 85 dB(A))", basis: "" },
+          { id: "2.8", text: "Sind die Arbeitsplätze ergonomisch gestaltet?", basis: "AStV § 21" }
+        ]
+      },
+      {
+        section: "3. Lagerung und Transport",
+        questions: [
+          { id: "3.1", text: "Werden die 5S-Markierungen respektiert?", basis: "" },
+          { id: "3.2", text: "Sind die Lagerbereiche sicher organisiert?", basis: "" },
+          { id: "3.3", text: "Werden Lagerungen über Kopf vermieden?", basis: "" },
+          { id: "3.4", text: "Sind Regale ordnungsgemäß befestigt?", basis: "" },
+          { id: "3.5", text: "Sind die maximalen Stapelhöhen eingehalten?", basis: "" },
+          { id: "3.6", text: "Sind Fußgängerwege klar gekennzeichnet? (min. 1.2 m breit)", basis: "" },
+          { id: "3.7", text: "Sind alle Transportwege frei von Hindernissen?", basis: "" },
+          { id: "3.8", text: "Sind Gefahrenbereiche deutlich markiert?", basis: "" },
+          { id: "3.9", text: "Sind alle Flurförderzeuge in gutem Zustand?", basis: "" },
+          { id: "3.10", text: "Sind die Wartungsprotokolle aktuell? (jährliche Prüfung)", basis: "" },
+          { id: "3.11", text: "Sind Ladehilfsmittel unbeschädigt?", basis: "" }
+        ]
+      },
+      {
+        section: "4. Gefahrstoffe",
+        questions: [
+          { id: "4.1", text: "Sind Gefahrstoffe korrekt gelagert?", basis: "ChemG" },
+          { id: "4.2", text: "Sind alle Gefahrstoffe ordnungsgemäß gekennzeichnet?", basis: "" },
+          { id: "4.3", text: "Sind Sicherheitsdatenblätter verfügbar?", basis: "" },
+          { id: "4.4", text: "Sind Gefahrstoffbereiche abgesperrt?", basis: "" }
+        ]
+      },
+      {
+        section: "5. Ergonomie und Arbeitsverhalten",
+        questions: [
+          { id: "5.1", text: "Vermeiden Mitarbeiter ungünstige Körperhaltungen?", basis: "" },
+          { id: "5.2", text: "Werden Transportwagen kontrolliert bewegt?", basis: "" },
+          { id: "5.3", text: "Werden Handläufe verwendet (wo vorhanden)?", basis: "" },
+          { id: "5.4", text: "Werden Hebehilfen bei schweren Lasten eingesetzt? (ab 25 kg Männer, 15 kg Frauen)", basis: "" },
+          { id: "5.5", text: "Werden Pausenzeiten eingehalten?", basis: "" },
+          { id: "5.6", text: "Ist der Arbeitsrhythmus angemessen?", basis: "" }
+        ]
+      },
+      {
+        section: "6. Notfallvorsorge",
+        questions: [
+          { id: "6.1", text: "Sind genügend Ersthelfer verfügbar? (1 pro 19 Mitarbeiter)", basis: "" },
+          { id: "6.2", text: "Sind Brandschutzwarte ernannt und geschult?", basis: "" },
+          { id: "6.3", text: "Sind die Notfallpläne aktuell und bekannt?", basis: "" },
+          { id: "6.4", text: "Werden regelmäßig Notfallübungen durchgeführt?", basis: "" },
+          { id: "6.5", text: "Sind Sammelplätze bekannt und gekennzeichnet?", basis: "" },
+          { id: "6.6", text: "Funktioniert das Alarmsystem ordnungsgemäß?", basis: "" }
+        ]
+      },
+      {
+        section: "7. Wartung und Instandhaltung",
+        questions: [
+          { id: "7.1", text: "Werden Wartungsintervalle bei Toren eingehalten?", basis: "" },
+          { id: "7.2", text: "Sind Feuerlöscher-Prüffristen aktuell? (alle 2 Jahre)", basis: "" },
+          { id: "7.3", text: "Sind elektrische Anlagen ordnungsgemäß geprüft?", basis: "" },
+          { id: "7.4", text: "Erfolgt regelmäßige Wartung der Lüftungsanlagen?", basis: "" },
+          { id: "7.5", text: "Sind alle Wartungsprotokolle verfügbar?", basis: "" }
+        ]
+      },
+      {
+        section: "8. Höhenarbeiten",
+        questions: [
+          { id: "8.1", text: "Sind Absturzsicherungen vorhanden?", basis: "" },
+          { id: "8.2", text: "Ist spezielle Schutzausrüstung verfügbar?", basis: "" },
+          { id: "8.3", text: "Sind Arbeiten in der Höhe genehmigt?", basis: "" }
+        ]
+      },
+      {
+        section: "9. Sofortmaßnahmen",
+        questions: [
+          { id: "9.1", text: "Sind sofortige Sicherheitsmaßnahmen erforderlich?", basis: "" }
+        ]
+      }
+    ];
+
+    // Authentication Component
+    const Auth = ({ setUser }) => {
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
+      const [isRegister, setIsRegister] = useState(false);
+      const [error, setError] = useState('');
+
+      const handleAuth = async () => {
+        try {
+          if (isRegister) {
+            await auth.createUserWithEmailAndPassword(email, password);
+          } else {
+            await auth.signInWithEmailAndPassword(email, password);
+          }
+        } catch (err) {
+          setError(err.message);
+        }
+      };
+
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-gray-100">
+          <div className="p-6 bg-white rounded shadow-md">
+            <h2 className="text-2xl font-bold mb-4">{isRegister ? 'Register' : 'Login'}</h2>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email"
+              className="w-full p-2 mb-4 border rounded"
+            />
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              className="w-full p-2 mb-4 border rounded"
+            />
+            <button
+              onClick={handleAuth}
+              className="w-full p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              {isRegister ? 'Register' : 'Login'}
+            </button>
+            <button
+              onClick={() => setIsRegister(!isRegister)}
+              className="w-full p-2 mt-2 text-blue-500 hover:underline"
+            >
+              {isRegister ? 'Switch to Login' : 'Switch to Register'}
+            </button>
+            {error && <p className="text-red-500 mt-2">{error}</p>}
+          </div>
+        </div>
+      );
+    };
+
+    // Audit Form Component
+    const AuditForm = ({ user, setAuditId }) => {
+      const [auditData, setAuditData] = useState({
+        vertelizerentrum: '',
+        auditor: user.email,
+        date: new Date().toISOString().split('T')[0],
+        bereich: '',
+        schicht: ''
+      });
+      const [answers, setAnswers] = useState({});
+      const [deficiencies, setDeficiencies] = useState('');
+      const [positiveObservations, setPositiveObservations] = useState('');
+      const [overallAssessment, setOverallAssessment] = useState('Befriedigend');
+
+      const calculateScore = () => {
+        let total = 0;
+        let maxScore = 0;
+        Object.values(answers).forEach(answer => {
+          if (answer === 'Ja') total += 2;
+          else if (answer === 'N/A') total += 1;
+          maxScore += 2;
+        });
+        return Math.round((total / maxScore) * 100);
+      };
+
+      const handleSubmit = async () => {
+        const audit = {
+          ...auditData,
+          answers,
+          deficiencies,
+          positiveObservations,
+          overallAssessment,
+          score: calculateScore(),
+          createdAt: new Date(),
+          userId: user.uid
+        };
+        const docRef = await db.collection('audits').add(audit);
+        setAuditId(docRef.id);
+        alert('Audit submitted successfully!');
+      };
+
+      return (
+        <div className="p-6">
+          <h2 className="text-2xl font-bold mb-4">AMZL Safety Audit</h2>
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="Vertelizerentrum"
+              value={auditData.vertelizerentrum}
+              onChange={(e) => setAuditData({ ...auditData, vertelizerentrum: e.target.value })}
+              className="w-full p-2 mb-2 border rounded"
+            />
+            <input
+              type="text"
+              placeholder="Bereich"
+              value={auditData.bereich}
+              onChange={(e) => setAuditData({ ...auditData, bereich: e.target.value })}
+              className="w-full p-2 mb-2 border rounded"
+            />
+            <input
+              type="text"
+              placeholder="Schicht"
+              value={auditData.schicht}
+              onChange={(e) => setAuditData({ ...auditData, schicht: e.target.value })}
+              className="w-full p-2 mb-2 border rounded"
+            />
+          </div>
+          {questionnaire.map((section, index) => (
+            <div key={index} className="mb-6">
+              <h3 className="text-xl font-semibold mb-2">{section.section}</h3>
+              {section.questions.map((question) => (
+                <div key={question.id} className="mb-2">
+                  <p>{question.id} {question.text} {question.basis && <span>({question.basis})</span>}</p>
+                  <div className="flex gap-2">
+                    <label><input type="radio" name={question.id} value="Ja" onChange={() => setAnswers({ ...answers, [question.id]: 'Ja' })} /> Ja</label>
+                    <label><input type="radio" name={question.id} value="Nein" onChange={() => setAnswers({ ...answers, [question.id]: 'Nein' })} /> Nein</label>
+                    <label><input type="radio" name={question.id} value="N/A" onChange={() => setAnswers({ ...answers, [question.id]: 'N/A' })} /> N/A</label>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+          <div className="mb-4">
+            <textarea
+              placeholder="Gefundene Mängel"
+              value={deficiencies}
+              onChange={(e) => setDeficiencies(e.target.value)}
+              className="w-full p-2 border rounded"
+            />
+            <textarea
+              placeholder="Positive Beobachtungen"
+              value={positiveObservations}
+              onChange={(e) => setPositiveObservations(e.target.value)}
+              className="w-full p-2 mt-2 border rounded"
+            />
+            <select
+              value={overallAssessment}
+              onChange={(e) => setOverallAssessment(e.target.value)}
+              className="w-full p-2 mt-2 border rounded"
+            >
+              <option>Sehr gut</option>
+              <option>Gut</option>
+              <option>Befriedigend</option>
+              <option>Mangelhaft</option>
+            </select>
+          </div>
+          <button
+            onClick={handleSubmit}
+            className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Submit Audit
+          </button>
+        </div>
+      );
+    };
+
+    // Audit Report Component
+    const AuditReport = ({ auditId }) => {
+      const [audit, setAudit] = useState(null);
+
+      useEffect(() => {
+        if (auditId) {
+          db.collection('audits').doc(auditId).get().then(doc => {
+            if (doc.exists) setAudit(doc.data());
+          });
+        }
+      }, [auditId]);
+
+      if (!audit) return <div>Loading...</div>;
+
+      return (
+        <div className="p-6">
+          <h2 className="text-2xl font-bold mb-4">Audit Report</h2>
+          <p><strong>Vertelizerentrum:</strong> {audit.vertelizerentrum}</p>
+          <p><strong>Auditor:</strong> {audit.auditor}</p>
+          <p><strong>Date:</strong> {audit.date}</p>
+          <p><strong>Bereich:</strong> {audit.bereich}</p>
+          <p><strong>Schicht:</strong> {audit.schicht}</p>
+          <p><strong>Score:</strong> {audit.score}%</p>
+          <p><strong>Overall Assessment:</strong> {audit.overallAssessment}</p>
+          <h3 className="text-xl font-semibold mt-4">Answers</h3>
+          {Object.entries(audit.answers).map(([id, answer]) => (
+            <p key={id}>{id}: {answer}</p>
+          ))}
+          <h3 className="text-xl font-semibold mt-4">Deficiencies</h3>
+          <p>{audit.deficiencies}</p>
+          <h3 className="text-xl font-semibold mt-4">Positive Observations</h3>
+          <p>{audit.positiveObservations}</p>
+        </div>
+      );
+    };
+
+    // Main App Component
+    const App = () => {
+      const [user, setUser] = useState(null);
+      const [auditId, setAuditId] = useState(null);
+
+      useEffect(() => {
+        auth.onAuthStateChanged((user) => {
+          setUser(user);
+        });
+      }, []);
+
+      if (!user) return <Auth setUser={setUser} />;
+
+      return (
+        <div className="min-h-screen bg-gray-100">
+          <div className="flex justify-between p-4 bg-blue-500 text-white">
+            <h1 className="text-xl font-bold">AMZL Safety Audit</h1>
+            <button
+              onClick={() => auth.signOut()}
+              className="p-2 bg-red-500 rounded hover:bg-red-600"
+            >
+              Logout
+            </button>
+          </div>
+          {auditId ? <AuditReport auditId={auditId} /> : <AuditForm user={user} setAuditId={setAuditId} />}
+        </div>
+      );
+    };
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
