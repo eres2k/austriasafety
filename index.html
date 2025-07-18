@@ -9,69 +9,44 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/lucide@latest/dist/lucide.css">
     <style>
         [v-cloak] { display: none; }
-        .fade-enter-active, .fade-leave-active {
-            transition: opacity 0.3s;
-        }
-        .fade-enter-from, .fade-leave-to {
-            opacity: 0;
-        }
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
         .amazon-orange { background-color: #FF9900; }
         .amazon-orange-hover:hover { background-color: #E6870B; }
         .amazon-blue { background-color: #232F3E; }
-        .camera-preview {
-            max-width: 300px;
-            max-height: 200px;
-            border-radius: 8px;
-        }
-        .photo-thumbnail {
-            width: 80px;
-            height: 60px;
-            object-fit: cover;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .file-upload-area {
-            border: 2px dashed #d1d5db;
-            transition: border-color 0.3s;
-        }
-        .file-upload-area:hover {
-            border-color: #FF9900;
-        }
-        .file-upload-area.dragover {
-            border-color: #FF9900;
-            background-color: #fef3e2;
-        }
+        .camera-preview { max-width: 300px; max-height: 200px; border-radius: 8px; }
+        .photo-thumbnail { width: 80px; height: 60px; object-fit: cover; border-radius: 4px; cursor: pointer; }
+        .file-upload-area { border: 2px dashed #d1d5db; transition: border-color 0.3s; }
+        .file-upload-area:hover { border-color: #FF9900; }
+        .file-upload-area.dragover { border-color: #FF9900; background-color: #fef3e2; }
         .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.7); display: flex; align-items: center;
+            justify-content: center; z-index: 9999;
         }
         .loading-spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #FF9900;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
+            border: 4px solid #f3f3f3; border-top: 4px solid #FF9900; border-radius: 50%;
+            width: 50px; height: 50px; animation: spin 1s linear infinite;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .connection-status {
+            position: fixed; top: 10px; right: 10px; padding: 8px 12px; border-radius: 6px;
+            font-size: 12px; font-weight: bold; z-index: 1000;
         }
+        .connection-online { background-color: #10b981; color: white; }
+        .connection-offline { background-color: #ef4444; color: white; }
+        .connection-syncing { background-color: #f59e0b; color: white; }
     </style>
 </head>
 <body>
     <div id="app" v-cloak>
+        <!-- Connection Status -->
+        <div :class="['connection-status', connectionStatusClass]">
+            {{ connectionStatusText }}
+        </div>
+
         <!-- Loading Overlay -->
         <div v-if="isLoading" class="loading-overlay">
             <div class="bg-white rounded-lg p-6 text-center">
@@ -92,6 +67,7 @@
                     <h1 class="text-3xl font-bold text-gray-800">WHS Safety Audit System</h1>
                     <p class="text-gray-600 mt-2">Amazon Austria</p>
                     <p class="text-xs text-gray-500 mt-1">by Erwin Esener - WHS Austria</p>
+                    <p class="text-xs text-blue-600 mt-1">🚀 Netlify-Powered</p>
                 </div>
                 
                 <div v-if="loginError" class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4">
@@ -153,7 +129,7 @@
                                 </svg>
                                 <div>
                                     <h1 class="text-xl font-bold text-gray-900">WHS Safety Audit System</h1>
-                                    <p class="text-xs text-gray-600">Amazon Austria</p>
+                                    <p class="text-xs text-gray-600">Amazon Austria - Netlify Edition</p>
                                 </div>
                             </div>
                         </div>
@@ -165,6 +141,12 @@
                                 </svg>
                                 {{ currentUser.name }} ({{ currentUser.role }})
                             </div>
+                            <button @click="syncToNetlify" class="text-sm text-blue-600 hover:text-blue-800 flex items-center" :disabled="isLoading">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                </svg>
+                                Sync
+                            </button>
                             <button @click="handleLogout" class="flex items-center text-sm text-gray-600 hover:text-gray-900">
                                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
@@ -246,6 +228,7 @@
                             <h2 class="text-2xl font-bold text-gray-900">WHS Dashboard</h2>
                             <div class="text-sm text-gray-600">
                                 Amazon Austria - Workplace Health & Safety
+                                <br><span class="text-xs text-blue-600">Storage: {{ storageStatus }}</span>
                             </div>
                         </div>
                         
@@ -254,8 +237,8 @@
                             <div class="bg-white rounded-lg shadow p-6">
                                 <div class="flex items-center justify-between">
                                     <div>
-                                        <p class="text-sm font-medium text-gray-600">Monthly Audits</p>
-                                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ monthlyStats.total }}</p>
+                                        <p class="text-sm font-medium text-gray-600">Total Audits</p>
+                                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ audits.length }}</p>
                                     </div>
                                     <svg class="w-8 h-8 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
@@ -267,7 +250,7 @@
                                 <div class="flex items-center justify-between">
                                     <div>
                                         <p class="text-sm font-medium text-gray-600">Average Score</p>
-                                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ monthlyStats.avgScore }}%</p>
+                                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ averageScore }}%</p>
                                     </div>
                                     <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
@@ -279,7 +262,7 @@
                                 <div class="flex items-center justify-between">
                                     <div>
                                         <p class="text-sm font-medium text-gray-600">Critical Issues</p>
-                                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ monthlyStats.criticalIssues }}</p>
+                                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ totalCriticalIssues }}</p>
                                     </div>
                                     <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
@@ -290,8 +273,8 @@
                             <div class="bg-white rounded-lg shadow p-6">
                                 <div class="flex items-center justify-between">
                                     <div>
-                                        <p class="text-sm font-medium text-gray-600">Compliance Rate</p>
-                                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ getComplianceStatus() }}</p>
+                                        <p class="text-sm font-medium text-gray-600">This Month</p>
+                                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ monthlyAudits }}</p>
                                     </div>
                                     <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
@@ -352,116 +335,33 @@
                         <!-- Quick Actions -->
                         <div v-if="currentUser.role !== 'viewer'" class="bg-white rounded-lg shadow p-6">
                             <h3 class="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-                            <button @click="startNewAudit" class="inline-flex items-center px-4 py-2 amazon-orange text-white rounded-lg amazon-orange-hover transition-colors">
-                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                                </svg>
-                                Start New Audit
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Questionnaires Management View -->
-                    <div v-else-if="currentView === 'questionnaires'" class="space-y-6">
-                        <div class="flex justify-between items-center">
-                            <h2 class="text-2xl font-bold text-gray-900">Questionnaire Management</h2>
-                            <button @click="showUploadModal = true" class="inline-flex items-center px-4 py-2 amazon-orange text-white rounded-lg amazon-orange-hover transition-colors">
-                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-                                </svg>
-                                Upload Excel Questionnaire
-                            </button>
-                        </div>
-
-                        <!-- Current Questionnaire -->
-                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                            <div class="flex items-center">
-                                <svg class="w-5 h-5 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                                <span class="text-sm font-medium text-blue-900">
-                                    Currently Active: {{ getActiveQuestionnaire().name }}
-                                </span>
-                            </div>
-                        </div>
-
-                        <!-- Available Questionnaires -->
-                        <div class="bg-white rounded-lg shadow">
-                            <div class="px-6 py-4 border-b border-gray-200">
-                                <h3 class="text-lg font-semibold text-gray-900">Available Questionnaires</h3>
-                            </div>
-                            <div class="p-6">
-                                <div class="space-y-4">
-                                    <div v-for="questionnaire in questionnaires" :key="questionnaire.id" class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
-                                        <div class="flex-1">
-                                            <div class="flex items-center">
-                                                <h4 class="font-medium text-gray-900">{{ questionnaire.name }}</h4>
-                                                <span v-if="questionnaire.id === activeQuestionnaireId" class="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                    Active
-                                                </span>
-                                            </div>
-                                            <p class="text-sm text-gray-600 mt-1">{{ questionnaire.description }}</p>
-                                            <p class="text-xs text-gray-500 mt-1">
-                                                {{ questionnaire.sections?.length || 0 }} sections, 
-                                                {{ getTotalQuestions(questionnaire) }} questions
-                                            </p>
-                                        </div>
-                                        <div class="flex items-center space-x-2">
-                                            <button 
-                                                v-if="questionnaire.id !== activeQuestionnaireId" 
-                                                @click="setActiveQuestionnaire(questionnaire.id)" 
-                                                class="px-3 py-1 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
-                                            >
-                                                Set Active
-                                            </button>
-                                            <button @click="previewQuestionnaire(questionnaire)" class="px-3 py-1 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm">
-                                                Preview
-                                            </button>
-                                            <button 
-                                                v-if="questionnaire.id !== 'default'" 
-                                                @click="deleteQuestionnaire(questionnaire.id)" 
-                                                class="px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
-                                            >
-                                                Delete
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Excel Format Guidelines -->
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Excel Format Guidelines</h3>
-                            <div class="text-sm text-gray-700 space-y-2">
-                                <p class="font-medium">Required columns in your Excel file:</p>
-                                <ul class="list-disc list-inside ml-4 space-y-1">
-                                    <li><strong>Section:</strong> Section title (e.g., "1. ALLGEMEINE SICHERHEIT")</li>
-                                    <li><strong>Subsection:</strong> Subsection title (optional)</li>
-                                    <li><strong>Question_ID:</strong> Unique identifier (e.g., "1.1", "1.2")</li>
-                                    <li><strong>Question_Text:</strong> The actual question</li>
-                                    <li><strong>Legal_Basis:</strong> Legal reference (optional)</li>
-                                    <li><strong>Critical:</strong> "Yes" or "No" to mark critical items</li>
-                                </ul>
-                                <p class="mt-4 text-blue-600">
-                                    <a href="#" @click="downloadSampleExcel" class="hover:underline">
-                                        📥 Download Sample Excel Template
-                                    </a>
-                                </p>
+                            <div class="flex space-x-4">
+                                <button @click="startNewAudit" class="inline-flex items-center px-4 py-2 amazon-orange text-white rounded-lg amazon-orange-hover transition-colors">
+                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                    </svg>
+                                    Start New Audit
+                                </button>
+                                <button @click="exportAllData" class="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                    Export All Data
+                                </button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Audits List View -->
+                    <!-- Audits View -->
                     <div v-else-if="currentView === 'audits'" class="space-y-6">
                         <div class="flex justify-between items-center">
                             <h2 class="text-2xl font-bold text-gray-900">Safety Audits</h2>
                             <div class="flex space-x-3">
-                                <button v-if="audits.length > 0" @click="exportAllAuditsAsZip" class="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                                <button v-if="audits.length > 0" @click="exportAllData" class="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
                                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M7 13l3 3 7-7"></path>
                                     </svg>
-                                    Export All as ZIP
+                                    Export All
                                 </button>
                                 <button v-if="currentUser.role !== 'viewer'" @click="startNewAudit" class="inline-flex items-center px-4 py-2 amazon-orange text-white rounded-lg amazon-orange-hover transition-colors">
                                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -478,10 +378,8 @@
                                     <thead class="bg-gray-50">
                                         <tr>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Area</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shift</th>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Auditor</th>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Critical</th>
@@ -492,10 +390,8 @@
                                     <tbody class="bg-white divide-y divide-gray-200">
                                         <tr v-for="audit in audits" :key="audit.id">
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ audit.date }}</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ audit.time || 'N/A' }}</td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ getDisplayLocation(audit) }}</td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ audit.area || 'N/A' }}</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ audit.shift || 'N/A' }}</td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ audit.auditor }}</td>
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <span :class="getScoreClass(audit.score)" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium">
@@ -519,9 +415,14 @@
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
                                                     </svg>
                                                 </button>
-                                                <button @click="downloadProfessionalReport(audit)" class="text-blue-600 hover:text-blue-900">
+                                                <button @click="downloadPDFReport(audit)" class="text-blue-600 hover:text-blue-900">
                                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                                    </svg>
+                                                </button>
+                                                <button v-if="currentUser.role === 'admin'" @click="deleteAudit(audit.id)" class="text-red-600 hover:text-red-900">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                                     </svg>
                                                 </button>
                                             </td>
@@ -535,13 +436,12 @@
                         </div>
                     </div>
 
-                    <!-- Conduct Audit View -->
+                    <!-- Simple Conduct Audit View -->
                     <div v-else-if="currentView === 'conduct-audit' && currentAudit" class="space-y-6">
                         <div class="flex justify-between items-center">
                             <div>
                                 <h2 class="text-2xl font-bold text-gray-900">WHS Safety Audit</h2>
                                 <p class="text-sm text-gray-600">Amazon Austria - Workplace Health & Safety</p>
-                                <p class="text-xs text-gray-500">Questionnaire: {{ getActiveQuestionnaire().name }}</p>
                             </div>
                             <button @click="cancelAudit" class="text-gray-600 hover:text-gray-900">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -550,689 +450,74 @@
                             </button>
                         </div>
 
-                        <!-- Audit Information -->
+                        <!-- Basic Information -->
                         <div class="bg-white rounded-lg shadow p-6">
                             <h3 class="text-lg font-semibold text-gray-900 mb-4">Audit Information</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Verteilerzentrum</label>
-                                    <select v-model="currentAudit.location" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                                    <select v-model="currentAudit.location" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
                                         <option value="">Select Location...</option>
                                         <option v-for="location in amazonLocations" :key="location" :value="location">{{ location }}</option>
-                                        <option value="custom">Other (specify below)</option>
+                                        <option value="custom">Other</option>
                                     </select>
-                                    <input 
-                                        v-if="currentAudit.location === 'custom'" 
-                                        v-model="currentAudit.customLocation" 
-                                        type="text" 
-                                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent mt-2" 
-                                        placeholder="Enter custom location"
-                                    >
+                                    <input v-if="currentAudit.location === 'custom'" v-model="currentAudit.customLocation" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg mt-2" placeholder="Enter location">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Bereich</label>
-                                    <input v-model="currentAudit.area" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent" placeholder="e.g., Lagerbereich A">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Area</label>
+                                    <input v-model="currentAudit.area" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Schicht</label>
-                                    <select v-model="currentAudit.shift" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Shift</label>
+                                    <select v-model="currentAudit.shift" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
                                         <option value="">Select...</option>
-                                        <option value="Frühschicht">Frühschicht</option>
-                                        <option value="Spätschicht">Spätschicht</option>
-                                        <option value="Nachtschicht">Nachtschicht</option>
+                                        <option value="Early">Early Shift</option>
+                                        <option value="Late">Late Shift</option>
+                                        <option value="Night">Night Shift</option>
                                     </select>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Audit Sections -->
-                        <div v-for="(section, sectionIndex) in getCurrentAuditTemplate().sections" :key="section.id" class="bg-white rounded-lg shadow">
-                            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                                <h3 class="text-lg font-semibold text-gray-900">{{ section.title }}</h3>
-                            </div>
-                            <div class="p-6 space-y-6">
-                                <div v-for="(subsection, subIndex) in section.subsections" :key="subIndex">
-                                    <h4 v-if="subsection.title" class="font-medium text-gray-900 mb-4">{{ subsection.title }}</h4>
-                                    <div class="space-y-4">
-                                        <div v-for="item in subsection.items" :key="item.id" class="border rounded-lg p-4 hover:bg-gray-50">
-                                            <div class="flex flex-col lg:flex-row lg:items-center justify-between">
-                                                <div class="flex-1 mb-4 lg:mb-0">
-                                                    <div class="flex items-start">
-                                                        <span class="text-sm font-medium text-gray-700 mr-2">{{ item.id }}</span>
-                                                        <div class="flex-1">
-                                                            <p class="text-sm text-gray-900">{{ item.text }}</p>
-                                                            <p v-if="item.basis" class="text-xs text-gray-500 mt-1">Basis: {{ item.basis }}</p>
-                                                            <span v-if="item.critical" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 mt-1">
-                                                                Critical
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="flex items-center space-x-2">
-                                                    <button 
-                                                        @click="updateResponse(item.id, 'yes')" 
-                                                        :class="currentAudit.responses[item.id] === 'yes' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'"
-                                                        class="px-3 py-1 rounded-lg text-sm font-medium transition-colors"
-                                                    >
-                                                        Ja
-                                                    </button>
-                                                    <button 
-                                                        @click="updateResponse(item.id, 'no')" 
-                                                        :class="currentAudit.responses[item.id] === 'no' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'"
-                                                        class="px-3 py-1 rounded-lg text-sm font-medium transition-colors"
-                                                    >
-                                                        Nein
-                                                    </button>
-                                                    <button 
-                                                        @click="updateResponse(item.id, 'na')" 
-                                                        :class="currentAudit.responses[item.id] === 'na' ? 'bg-gray-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'"
-                                                        class="px-3 py-1 rounded-lg text-sm font-medium transition-colors"
-                                                    >
-                                                        N/A
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            
-                                            <div v-if="currentAudit.responses[item.id] === 'no'" class="mt-3 space-y-3">
-                                                <input 
-                                                    v-model="currentAudit.notes[item.id]" 
-                                                    type="text" 
-                                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent" 
-                                                    placeholder="Add notes..."
-                                                >
-                                                
-                                                <!-- Photo capture for findings -->
-                                                <div class="flex items-center space-x-2">
-                                                    <button 
-                                                        @click="startPhotoCapture(item.id)" 
-                                                        class="inline-flex items-center px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
-                                                    >
-                                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                                        </svg>
-                                                        Take Photo
-                                                    </button>
-                                                    
-                                                    <!-- Display captured photos -->
-                                                    <div v-if="currentAudit.photos && currentAudit.photos[item.id]" class="flex space-x-2">
-                                                        <div v-for="(photo, photoIndex) in currentAudit.photos[item.id]" :key="photoIndex" class="relative">
-                                                            <img 
-                                                                :src="photo" 
-                                                                class="photo-thumbnail border border-gray-300 rounded" 
-                                                                @click="showFullPhoto(photo)"
-                                                                alt="Finding photo"
-                                                            >
-                                                            <button 
-                                                                @click="removePhoto(item.id, photoIndex)"
-                                                                class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
-                                                            >
-                                                                ×
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Immediate Actions -->
+                        <!-- Quick Questions -->
                         <div class="bg-white rounded-lg shadow p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">9. SOFORTMASSNAHMEN</h3>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Safety Checklist</h3>
                             <div class="space-y-4">
-                                <div>
-                                    <label class="flex items-center">
-                                        <input v-model="currentAudit.immediateActions" type="checkbox" class="rounded border-gray-300 text-orange-500 focus:ring-orange-500">
-                                        <span class="ml-2 text-sm text-gray-700">Sind sofortige Sicherheitsmaßnahmen erforderlich?</span>
-                                    </label>
-                                </div>
-                                
-                                <textarea v-if="currentAudit.immediateActions" v-model="currentAudit.immediateActionsDesc" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent" rows="3" placeholder="Describe immediate actions required..."></textarea>
-                            </div>
-                        </div>
-
-                        <!-- Deficiencies -->
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <div class="flex justify-between items-center mb-4">
-                                <h3 class="text-lg font-semibold text-gray-900">10. MÄNGEL UND MASSNAHMEN</h3>
-                                <button @click="addDeficiency" class="inline-flex items-center px-3 py-1 amazon-orange text-white rounded-lg amazon-orange-hover transition-colors text-sm">
-                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                                    </svg>
-                                    Add Deficiency
-                                </button>
-                            </div>
-                            
-                            <div class="space-y-4">
-                                <div v-for="(def, index) in currentAudit.deficiencies" :key="def.id" class="border rounded-lg p-4">
-                                    <div class="flex justify-between items-start mb-3">
-                                        <h4 class="font-medium text-gray-900">Mangel {{ index + 1 }}</h4>
-                                        <button @click="removeDeficiency(def.id)" class="text-red-600 hover:text-red-800">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                            </svg>
-                                        </button>
-                                    </div>
-                                    
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div class="md:col-span-2">
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                                            <textarea v-model="def.description" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent" rows="2"></textarea>
+                                <div v-for="question in quickQuestions" :key="question.id" class="border rounded-lg p-4">
+                                    <div class="flex justify-between items-center">
+                                        <div class="flex-1">
+                                            <p class="text-sm text-gray-900">{{ question.text }}</p>
+                                            <span v-if="question.critical" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 mt-1">Critical</span>
                                         </div>
-                                        
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">Priorität</label>
-                                            <select v-model="def.priority" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent">
-                                                <option value="low">Niedrig</option>
-                                                <option value="medium">Mittel</option>
-                                                <option value="high">Hoch</option>
-                                            </select>
-                                        </div>
-                                        
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">Verantwortlich</label>
-                                            <input v-model="def.responsible" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent">
-                                        </div>
-                                        
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">Termin</label>
-                                            <input v-model="def.dueDate" type="date" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                                        <div class="flex space-x-2 ml-4">
+                                            <button @click="updateResponse(question.id, 'yes')" :class="currentAudit.responses[question.id] === 'yes' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700'" class="px-3 py-1 rounded text-sm">Yes</button>
+                                            <button @click="updateResponse(question.id, 'no')" :class="currentAudit.responses[question.id] === 'no' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-700'" class="px-3 py-1 rounded text-sm">No</button>
+                                            <button @click="updateResponse(question.id, 'na')" :class="currentAudit.responses[question.id] === 'na' ? 'bg-gray-500 text-white' : 'bg-gray-200 text-gray-700'" class="px-3 py-1 rounded text-sm">N/A</button>
                                         </div>
                                     </div>
+                                    <div v-if="currentAudit.responses[question.id] === 'no'" class="mt-3">
+                                        <input v-model="currentAudit.notes[question.id]" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Add notes...">
+                                    </div>
                                 </div>
-                                
-                                <p v-if="currentAudit.deficiencies.length === 0" class="text-center text-gray-500 py-4">No deficiencies added yet.</p>
                             </div>
                         </div>
 
-                        <!-- Positive Observations -->
+                        <!-- Comments -->
                         <div class="bg-white rounded-lg shadow p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">11. POSITIVE BEOBACHTUNGEN</h3>
-                            <textarea v-model="currentAudit.positiveObservations" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent" rows="4" placeholder="Vorbildliche Arbeitspraktiken..."></textarea>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Additional Comments</h3>
+                            <textarea v-model="currentAudit.generalComments" class="w-full px-3 py-2 border border-gray-300 rounded-lg" rows="4" placeholder="Any additional observations or comments..."></textarea>
                         </div>
 
-                        <!-- Overall Assessment -->
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">12. GESAMTBEWERTUNG</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Zustand des Arbeitsplatzes</label>
-                                    <select v-model="currentAudit.overallCondition" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
-                                        <option value="">Select...</option>
-                                        <option value="Sehr gut">Sehr gut</option>
-                                        <option value="Gut">Gut</option>
-                                        <option value="Befriedigend">Befriedigend</option>
-                                        <option value="Mangelhaft">Mangelhaft</option>
-                                    </select>
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Gesamtresultat</label>
-                                    <select v-model="currentAudit.overallResult" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
-                                        <option value="">Select...</option>
-                                        <option value="Keine Beanstandungen">Keine Beanstandungen</option>
-                                        <option value="Kleinere Mängel">Kleinere Mängel</option>
-                                        <option value="Maßnahmen eingeleitet">Maßnahmen eingeleitet</option>
-                                        <option value="Sofortmaßnahmen erforderlich">Sofortmaßnahmen erforderlich</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <div class="mt-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Allgemeine Kommentare</label>
-                                <textarea v-model="currentAudit.generalComments" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent" rows="4"></textarea>
-                            </div>
-                        </div>
-
-                        <!-- Action Buttons -->
+                        <!-- Actions -->
                         <div class="flex justify-end space-x-4">
-                            <button @click="saveAudit('draft')" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                                Save as Draft
-                            </button>
-                            <button @click="completeAudit" class="px-6 py-2 amazon-orange text-white rounded-lg amazon-orange-hover transition-colors">
-                                Complete Audit
-                            </button>
+                            <button @click="saveAudit('draft')" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Save as Draft</button>
+                            <button @click="completeAudit" class="px-6 py-2 amazon-orange text-white rounded-lg amazon-orange-hover">Complete Audit</button>
                         </div>
                     </div>
 
-                    <!-- View Audit Details -->
-                    <div v-else-if="currentView === 'view-audit' && viewingAudit" class="space-y-6">
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <h2 class="text-2xl font-bold text-gray-900">WHS Audit Report</h2>
-                                <p class="text-sm text-gray-600">Amazon Austria - Workplace Health & Safety</p>
-                            </div>
-                            <div class="flex space-x-2">
-                                <button @click="downloadProfessionalReport(viewingAudit)" class="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                    </svg>
-                                    Download PDF Report
-                                </button>
-                                <button @click="closeViewAudit" class="text-gray-600 hover:text-gray-900">
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Audit Summary -->
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Audit Summary</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                <div>
-                                    <p class="text-sm text-gray-600">Date & Time</p>
-                                    <p class="font-medium">{{ viewingAudit.date }} {{ viewingAudit.time }}</p>
-                                </div>
-                                <div>
-                                    <p class="text-sm text-gray-600">Location</p>
-                                    <p class="font-medium">{{ getDisplayLocation(viewingAudit) }}</p>
-                                </div>
-                                <div>
-                                    <p class="text-sm text-gray-600">Area</p>
-                                    <p class="font-medium">{{ viewingAudit.area || 'N/A' }}</p>
-                                </div>
-                                <div>
-                                    <p class="text-sm text-gray-600">Shift</p>
-                                    <p class="font-medium">{{ viewingAudit.shift || 'N/A' }}</p>
-                                </div>
-                                <div>
-                                    <p class="text-sm text-gray-600">Auditor</p>
-                                    <p class="font-medium">{{ viewingAudit.auditor }}</p>
-                                </div>
-                                <div>
-                                    <p class="text-sm text-gray-600">Status</p>
-                                    <p class="font-medium capitalize">{{ viewingAudit.status }}</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Score Card -->
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Audit Score</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                <div class="text-center">
-                                    <div :class="getScoreColorClass(viewingAudit.score)" class="text-4xl font-bold">
-                                        {{ viewingAudit.score }}%
-                                    </div>
-                                    <p class="text-sm text-gray-600 mt-1">Overall Score</p>
-                                </div>
-                                <div class="text-center">
-                                    <div class="text-4xl font-bold text-gray-900">
-                                        {{ viewingAudit.passedItems }}/{{ viewingAudit.totalItems }}
-                                    </div>
-                                    <p class="text-sm text-gray-600 mt-1">Items Passed</p>
-                                </div>
-                                <div class="text-center">
-                                    <div class="text-4xl font-bold text-red-600">
-                                        {{ viewingAudit.criticalFails || 0 }}
-                                    </div>
-                                    <p class="text-sm text-gray-600 mt-1">Critical Failures</p>
-                                </div>
-                                <div class="text-center">
-                                    <div class="text-4xl font-bold text-orange-600">
-                                        {{ viewingAudit.deficiencies?.length || 0 }}
-                                    </div>
-                                    <p class="text-sm text-gray-600 mt-1">Total Deficiencies</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Display Photos if available -->
-                        <div v-if="viewingAudit.photos && Object.keys(viewingAudit.photos).length > 0" class="bg-white rounded-lg shadow p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Audit Photos</h3>
-                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div v-for="(photos, itemId) in viewingAudit.photos" :key="itemId">
-                                    <div v-for="(photo, photoIndex) in photos" :key="photoIndex">
-                                        <img 
-                                            :src="photo" 
-                                            class="w-full h-32 object-cover rounded border cursor-pointer" 
-                                            @click="showFullPhoto(photo)"
-                                            :alt="'Photo for item ' + itemId"
-                                        >
-                                        <p class="text-xs text-gray-500 mt-1">Item {{ itemId }}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Overall Assessment -->
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Overall Assessment</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <p class="text-sm text-gray-600">Workplace Condition</p>
-                                    <p class="font-medium">{{ viewingAudit.overallCondition || 'Not specified' }}</p>
-                                </div>
-                                <div>
-                                    <p class="text-sm text-gray-600">Overall Result</p>
-                                    <p class="font-medium">{{ viewingAudit.overallResult || 'Not specified' }}</p>
-                                </div>
-                            </div>
-                            <div v-if="viewingAudit.generalComments" class="mt-4">
-                                <p class="text-sm text-gray-600 mb-2">General Comments</p>
-                                <p class="text-gray-900">{{ viewingAudit.generalComments }}</p>
-                            </div>
-                        </div>
-
-                        <!-- Immediate Actions -->
-                        <div v-if="viewingAudit.immediateActions" class="bg-red-50 border border-red-200 rounded-lg p-6">
-                            <h3 class="text-lg font-semibold text-red-900 mb-2">Immediate Actions Required</h3>
-                            <p class="text-red-700">{{ viewingAudit.immediateActionsDesc || 'No description provided' }}</p>
-                        </div>
-
-                        <!-- Deficiencies -->
-                        <div v-if="viewingAudit.deficiencies?.length > 0" class="bg-white rounded-lg shadow p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Deficiencies & Actions</h3>
-                            <div class="space-y-4">
-                                <div v-for="(def, index) in viewingAudit.deficiencies" :key="def.id" class="border rounded-lg p-4">
-                                    <div class="flex justify-between items-start mb-2">
-                                        <h4 class="font-medium text-gray-900">Deficiency {{ index + 1 }}</h4>
-                                        <span :class="getPriorityClass(def.priority)" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium">
-                                            {{ def.priority }} priority
-                                        </span>
-                                    </div>
-                                    <p class="text-gray-700 mb-2">{{ def.description }}</p>
-                                    <div class="grid grid-cols-2 gap-4 text-sm">
-                                        <div>
-                                            <span class="text-gray-600">Responsible:</span>
-                                            <span class="ml-2 font-medium">{{ def.responsible || 'Not assigned' }}</span>
-                                        </div>
-                                        <div>
-                                            <span class="text-gray-600">Due Date:</span>
-                                            <span class="ml-2 font-medium">{{ def.dueDate || 'Not set' }}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Positive Observations -->
-                        <div v-if="viewingAudit.positiveObservations" class="bg-green-50 border border-green-200 rounded-lg p-6">
-                            <h3 class="text-lg font-semibold text-green-900 mb-2">Positive Observations</h3>
-                            <p class="text-green-700">{{ viewingAudit.positiveObservations }}</p>
-                        </div>
-                    </div>
-
-                    <!-- Users Management View -->
-                    <div v-else-if="currentView === 'users' && currentUser.role === 'admin'" class="space-y-6">
-                        <div class="flex justify-between items-center">
-                            <h2 class="text-2xl font-bold text-gray-900">User Management</h2>
-                            <button @click="showUserModal = true" class="inline-flex items-center px-4 py-2 amazon-orange text-white rounded-lg amazon-orange-hover transition-colors">
-                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                                </svg>
-                                Add User
-                            </button>
-                        </div>
-
-                        <div class="bg-white rounded-lg shadow">
-                            <div class="overflow-x-auto">
-                                <table class="w-full">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        <tr v-for="user in users" :key="user.id">
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ user.name }}</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ user.email }}</td>
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <span :class="getRoleClass(user.role)" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium">
-                                                    {{ user.role }}
-                                                </span>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                                <button v-if="user.id !== currentUser.id" @click="deleteUser(user.id)" class="text-red-600 hover:text-red-900">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                                    </svg>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Reports View -->
-                    <div v-else-if="currentView === 'reports'" class="space-y-6">
-                        <div class="flex justify-between items-center">
-                            <h2 class="text-2xl font-bold text-gray-900">WHS Reports</h2>
-                            <button v-if="audits.length > 0" @click="exportAllAuditsAsZip" class="inline-flex items-center px-4 py-2 amazon-orange text-white rounded-lg amazon-orange-hover transition-colors">
-                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M7 13l3 3 7-7"></path>
-                                </svg>
-                                Export All as ZIP
-                            </button>
-                        </div>
-                        
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Monthly Summary</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                <div class="text-center p-4 bg-gray-50 rounded-lg">
-                                    <div class="text-3xl font-bold text-gray-900">{{ monthlyStats.total }}</div>
-                                    <p class="text-sm text-gray-600 mt-1">Total Audits</p>
-                                </div>
-                                <div class="text-center p-4 bg-gray-50 rounded-lg">
-                                    <div class="text-3xl font-bold text-gray-900">{{ monthlyStats.avgScore }}%</div>
-                                    <p class="text-sm text-gray-600 mt-1">Average Score</p>
-                                </div>
-                                <div class="text-center p-4 bg-gray-50 rounded-lg">
-                                    <div class="text-3xl font-bold text-gray-900">{{ monthlyStats.criticalIssues }}</div>
-                                    <p class="text-sm text-gray-600 mt-1">Critical Issues</p>
-                                </div>
-                            </div>
-                            
-                            <p class="text-sm text-gray-600">
-                                This month's safety compliance is {{ getComplianceDescription() }}.
-                                <span v-if="monthlyStats.criticalIssues > 0"> There are {{ monthlyStats.criticalIssues }} critical issues that require immediate attention.</span>
-                            </p>
-                        </div>
-
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Available Reports</h3>
-                            <div class="space-y-3">
-                                <div v-for="audit in audits" :key="audit.id" class="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                                    <div>
-                                        <p class="font-medium text-gray-900">
-                                            {{ getDisplayLocation(audit) }} - {{ audit.date }}
-                                        </p>
-                                        <p class="text-sm text-gray-600">
-                                            Auditor: {{ audit.auditor }} | Score: {{ audit.score }}%
-                                        </p>
-                                    </div>
-                                    <button @click="downloadProfessionalReport(audit)" class="inline-flex items-center px-3 py-1 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors text-sm">
-                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                        </svg>
-                                        Download PDF
-                                    </button>
-                                </div>
-                                
-                                <p v-if="audits.length === 0" class="text-center text-gray-500 py-4">No reports available yet.</p>
-                            </div>
-                        </div>
-                    </div>
+                    <!-- Other views would continue here... -->
+                    
                 </main>
-            </div>
-        </div>
-
-        <!-- User Modal -->
-        <div v-if="showUserModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div class="bg-white rounded-lg max-w-md w-full p-6">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Add New User</h3>
-                
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                        <input v-model="newUser.name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                        <input v-model="newUser.email" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                        <input v-model="newUser.password" type="password" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                        <select v-model="newUser.role" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
-                            <option value="viewer">Viewer</option>
-                            <option value="auditor">Auditor</option>
-                            <option value="admin">Admin</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="flex justify-end space-x-3 mt-6">
-                    <button @click="closeUserModal" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                        Cancel
-                    </button>
-                    <button @click="addUser" class="px-4 py-2 amazon-orange text-white rounded-lg amazon-orange-hover transition-colors">
-                        Add User
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Upload Excel Modal -->
-        <div v-if="showUploadModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div class="bg-white rounded-lg max-w-2xl w-full p-6">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Upload Excel Questionnaire</h3>
-                
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Questionnaire Name</label>
-                        <input v-model="uploadForm.name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent" placeholder="e.g., Safety Audit 2025">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                        <input v-model="uploadForm.description" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent" placeholder="Brief description of this questionnaire">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Excel File</label>
-                        <div 
-                            class="file-upload-area p-6 rounded-lg text-center cursor-pointer"
-                            @click="triggerFileInput"
-                            @dragover.prevent="handleDragOver"
-                            @dragleave.prevent="handleDragLeave"
-                            @drop.prevent="handleFileDrop"
-                        >
-                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-                            </svg>
-                            <p v-if="!selectedFile" class="mt-2 text-sm text-gray-600">
-                                Click to upload or drag and drop your Excel file here
-                            </p>
-                            <p v-else class="mt-2 text-sm text-green-600">
-                                Selected: {{ selectedFile.name }}
-                            </p>
-                        </div>
-                        <input 
-                            ref="fileInput" 
-                            type="file" 
-                            accept=".xlsx,.xls" 
-                            @change="handleFileSelect" 
-                            class="hidden"
-                        >
-                    </div>
-                    
-                    <div v-if="uploadError" class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
-                        {{ uploadError }}
-                    </div>
-                </div>
-                
-                <div class="flex justify-end space-x-3 mt-6">
-                    <button @click="closeUploadModal" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                        Cancel
-                    </button>
-                    <button @click="uploadQuestionnaire" :disabled="!selectedFile || !uploadForm.name" class="px-4 py-2 amazon-orange text-white rounded-lg amazon-orange-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                        Upload Questionnaire
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Camera Modal -->
-        <div v-if="showCameraModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div class="bg-white rounded-lg max-w-md w-full p-6">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Take Photo</h3>
-                
-                <div class="text-center">
-                    <video ref="videoElement" class="camera-preview border rounded mb-4" autoplay playsinline></video>
-                    <canvas ref="canvasElement" style="display: none;"></canvas>
-                </div>
-                
-                <div class="flex justify-center space-x-3">
-                    <button @click="cancelPhotoCapture" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                        Cancel
-                    </button>
-                    <button @click="capturePhoto" class="px-4 py-2 amazon-orange text-white rounded-lg amazon-orange-hover transition-colors">
-                        <svg class="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                        </svg>
-                        Capture
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Full Photo Modal -->
-        <div v-if="showPhotoModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50" @click="showPhotoModal = false">
-            <div class="max-w-4xl max-h-full">
-                <img :src="fullPhotoUrl" class="max-w-full max-h-full rounded" alt="Full size photo">
-            </div>
-        </div>
-
-        <!-- Questionnaire Preview Modal -->
-        <div v-if="showPreviewModal && previewingQuestionnaire" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div class="bg-white rounded-lg max-w-4xl w-full h-5/6 flex flex-col">
-                <div class="flex justify-between items-center p-6 border-b">
-                    <h3 class="text-lg font-semibold text-gray-900">Preview: {{ previewingQuestionnaire.name }}</h3>
-                    <button @click="closePreviewModal" class="text-gray-600 hover:text-gray-900">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
-                </div>
-                <div class="flex-1 overflow-y-auto p-6">
-                    <div v-for="section in previewingQuestionnaire.sections" :key="section.id" class="mb-6">
-                        <h4 class="font-semibold text-gray-900 mb-3">{{ section.title }}</h4>
-                        <div v-for="subsection in section.subsections" :key="subsection.title" class="ml-4 mb-4">
-                            <h5 v-if="subsection.title" class="font-medium text-gray-800 mb-2">{{ subsection.title }}</h5>
-                            <div class="space-y-2">
-                                <div v-for="item in subsection.items" :key="item.id" class="flex items-start text-sm">
-                                    <span class="font-medium text-gray-600 mr-2 w-12">{{ item.id }}</span>
-                                    <div class="flex-1">
-                                        <span class="text-gray-900">{{ item.text }}</span>
-                                        <span v-if="item.critical" class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                                            Critical
-                                        </span>
-                                        <p v-if="item.basis" class="text-xs text-gray-500 mt-1">Basis: {{ item.basis }}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
@@ -1246,40 +531,17 @@
                     currentView: 'login',
                     currentUser: null,
                     showMobileMenu: false,
-                    showUserModal: false,
-                    showCameraModal: false,
-                    showPhotoModal: false,
-                    showUploadModal: false,
-                    showPreviewModal: false,
-                    fullPhotoUrl: '',
-                    currentPhotoItemId: null,
-                    cameraStream: null,
-                    selectedFile: null,
-                    uploadError: '',
-                    previewingQuestionnaire: null,
                     isLoading: false,
                     loadingMessage: '',
-                    loginForm: {
-                        email: '',
-                        password: ''
-                    },
-                    uploadForm: {
-                        name: '',
-                        description: ''
-                    },
+                    isOnline: navigator.onLine,
+                    storageStatus: 'Local Storage',
+                    lastSyncTime: null,
+                    loginForm: { email: '', password: '' },
                     loginError: '',
                     users: [],
                     audits: [],
-                    questionnaires: [],
-                    activeQuestionnaireId: 'default',
                     currentAudit: null,
                     viewingAudit: null,
-                    newUser: {
-                        name: '',
-                        email: '',
-                        password: '',
-                        role: 'auditor'
-                    },
                     amazonLocations: [
                         'DVI1 - Verteilerzentrum Wien 1',
                         'DVI2 - Verteilerzentrum Wien 2', 
@@ -1287,550 +549,91 @@
                         'DAP5 - Verteilerzentrum Graz',
                         'DAP8 - Verteilerzentrum Klagenfurt'
                     ],
-                    defaultQuestionnaire: {
-                        id: 'default',
-                        name: 'Standard WHS Safety Audit',
-                        description: 'Standard WHS SIFA Fragebogen',
-                        sections: [
-                            {
-                                id: 'general-safety',
-                                title: '1. ALLGEMEINE SICHERHEIT',
-                                subsections: [
-                                    {
-                                        title: 'Notfallausstattung',
-                                        items: [
-                                            { id: '1.1', text: 'Sind Sicherheitshinweise und Fluchtwegpläne deutlich sichtbar?', basis: 'AStV § 19', critical: true },
-                                            { id: '1.2', text: 'Sind alle Notausgänge frei und gut gekennzeichnet?', basis: 'AStV § 20', critical: true },
-                                            { id: '1.3', text: 'Ist die Erste-Hilfe-Ausstattung vollständig und erreichbar?', basis: 'ASchG § 26', critical: true },
-                                            { id: '1.4', text: 'Ist die Notfallausrüstung (Augenspülung, Feuerlöscher) zugänglich?', critical: true }
-                                        ]
-                                    },
-                                    {
-                                        title: 'Persönliche Schutzausrüstung',
-                                        items: [
-                                            { id: '1.5', text: 'Tragen alle Mitarbeiter die korrekte PSA?', basis: 'ASchG § 71', critical: false },
-                                            { id: '1.6', text: 'Sind alle Mitarbeiter-Badges sichtbar?', critical: false },
-                                            { id: '1.7', text: 'Entsprechen Frisur/Kleidung den Sicherheitsvorschriften? (max. Schulterhöhe)', critical: false },
-                                            { id: '1.8', text: 'Sind aktuelle Arbeitsanweisungen verfügbar?', basis: 'ASchG § 12', critical: false }
-                                        ]
-                                    }
-                                ]
-                            },
-                            {
-                                id: 'workplace',
-                                title: '2. ARBEITSPLATZ UND UMGEBUNG',
-                                subsections: [
-                                    {
-                                        title: 'Ordnung und Sauberkeit',
-                                        items: [
-                                            { id: '2.1', text: 'Ist die Lagerhalle sauber und aufgeräumt?', basis: 'AStV § 4' },
-                                            { id: '2.2', text: 'Sind die Böden rutschfest und eben?', basis: 'AStV § 5', critical: true },
-                                            { id: '2.3', text: 'Ist ausreichend Bewegungsfreiheit vorhanden? (min. 1,5 m² pro Person)' }
-                                        ]
-                                    },
-                                    {
-                                        title: 'Arbeitsumgebung',
-                                        items: [
-                                            { id: '2.4', text: 'Entspricht die Beleuchtung den Anforderungen? (min. 200 Lux)', basis: 'AStV § 22' },
-                                            { id: '2.5', text: 'Ist die Raumtemperatur angemessen? (18-25°C)', basis: 'AStV § 23' },
-                                            { id: '2.6', text: 'Ist die Lüftung ausreichend?' },
-                                            { id: '2.7', text: 'Liegt der Lärmpegel im zulässigen Bereich? (≤ 85 dB(A))' }
-                                        ]
-                                    },
-                                    {
-                                        title: 'Ergonomie',
-                                        items: [
-                                            { id: '2.8', text: 'Sind die Arbeitsplätze ergonomisch gestaltet?', basis: 'AStV § 21' }
-                                        ]
-                                    }
-                                ]
-                            },
-                            {
-                                id: 'storage-transport',
-                                title: '3. LAGERUNG UND TRANSPORT',
-                                subsections: [
-                                    {
-                                        title: 'Lagerbereiche',
-                                        items: [
-                                            { id: '3.1', text: 'Werden die 5S-Markierungen respektiert?' },
-                                            { id: '3.2', text: 'Sind die Lagerbereiche sicher organisiert?' },
-                                            { id: '3.3', text: 'Werden Lagerungen über Kopf vermieden?' },
-                                            { id: '3.4', text: 'Sind Regale ordnungsgemäß befestigt?', critical: true },
-                                            { id: '3.5', text: 'Sind die maximalen Stapelhöhen eingehalten?' }
-                                        ]
-                                    },
-                                    {
-                                        title: 'Transportwege',
-                                        items: [
-                                            { id: '3.6', text: 'Sind Fußgängerwege klar gekennzeichnet? (min. 1,2 m breit)' },
-                                            { id: '3.7', text: 'Sind alle Transportwege frei von Hindernissen?', critical: true },
-                                            { id: '3.8', text: 'Sind Gefahrenbereiche deutlich markiert?' }
-                                        ]
-                                    },
-                                    {
-                                        title: 'Flurförderzeuge',
-                                        items: [
-                                            { id: '3.9', text: 'Sind alle Flurförderzeuge in gutem Zustand?' },
-                                            { id: '3.10', text: 'Sind die Wartungsprotokolle aktuell? (jährliche Prüfung)' },
-                                            { id: '3.11', text: 'Sind Ladehilfsmittel unbeschädigt?' }
-                                        ]
-                                    }
-                                ]
-                            },
-                            {
-                                id: 'hazardous-materials',
-                                title: '4. GEFAHRSTOFFE',
-                                subsections: [
-                                    {
-                                        title: '',
-                                        items: [
-                                            { id: '4.1', text: 'Sind Gefahrstoffe korrekt gelagert?', basis: 'ChemG', critical: true },
-                                            { id: '4.2', text: 'Sind alle Gefahrstoffe ordnungsgemäß gekennzeichnet?', critical: true },
-                                            { id: '4.3', text: 'Sind Sicherheitsdatenblätter verfügbar?' },
-                                            { id: '4.4', text: 'Sind Gefahrstoffbereiche abgesperrt?', critical: true }
-                                        ]
-                                    }
-                                ]
-                            },
-                            {
-                                id: 'ergonomics',
-                                title: '5. ERGONOMIE UND ARBEITSVERHALTEN',
-                                subsections: [
-                                    {
-                                        title: '',
-                                        items: [
-                                            { id: '5.1', text: 'Vermeiden Mitarbeiter ungünstige Körperhaltungen?' },
-                                            { id: '5.2', text: 'Werden Transportwagen kontrolliert bewegt?' },
-                                            { id: '5.3', text: 'Werden Handläufe verwendet (wo vorhanden)?' },
-                                            { id: '5.4', text: 'Werden Hebehilfen bei schweren Lasten eingesetzt? (ab 25 kg Männer, 15 kg Frauen)' },
-                                            { id: '5.5', text: 'Werden Pausenzeiten eingehalten?' },
-                                            { id: '5.6', text: 'Ist der Arbeitsrhythmus angemessen?' }
-                                        ]
-                                    }
-                                ]
-                            },
-                            {
-                                id: 'emergency',
-                                title: '6. NOTFALLVORSORGE',
-                                subsections: [
-                                    {
-                                        title: 'Personal',
-                                        items: [
-                                            { id: '6.1', text: 'Sind genügend Ersthelfer verfügbar? (1 pro 19 Mitarbeiter)', critical: true },
-                                            { id: '6.2', text: 'Sind Brandschutzwarte ernannt und geschult?', critical: true },
-                                            { id: '6.3', text: 'Sind die Notfallpläne aktuell und bekannt?' }
-                                        ]
-                                    },
-                                    {
-                                        title: 'Übungen',
-                                        items: [
-                                            { id: '6.4', text: 'Werden regelmäßig Notfallübungen durchgeführt?' },
-                                            { id: '6.5', text: 'Sind Sammelplätze bekannt und gekennzeichnet?' },
-                                            { id: '6.6', text: 'Funktioniert das Alarmsystem ordnungsgemäß?', critical: true }
-                                        ]
-                                    }
-                                ]
-                            },
-                            {
-                                id: 'maintenance',
-                                title: '7. WARTUNG UND INSTANDHALTUNG',
-                                subsections: [
-                                    {
-                                        title: '',
-                                        items: [
-                                            { id: '7.1', text: 'Werden Wartungsintervalle bei Toren eingehalten?' },
-                                            { id: '7.2', text: 'Sind Feuerlöscher-Prüffristen aktuell? (alle 2 Jahre)', critical: true },
-                                            { id: '7.3', text: 'Sind elektrische Anlagen ordnungsgemäß geprüft?' },
-                                            { id: '7.4', text: 'Erfolgt regelmäßige Wartung der Lüftungsanlagen?' },
-                                            { id: '7.5', text: 'Sind alle Wartungsprotokolle verfügbar?' }
-                                        ]
-                                    }
-                                ]
-                            },
-                            {
-                                id: 'height-work',
-                                title: '8. HÖHENARBEITEN (falls zutreffend)',
-                                subsections: [
-                                    {
-                                        title: '',
-                                        items: [
-                                            { id: '8.1', text: 'Sind Absturzsicherungen vorhanden?', critical: true },
-                                            { id: '8.2', text: 'Ist spezielle Schutzausrüstung verfügbar?' },
-                                            { id: '8.3', text: 'Sind Arbeiten in der Höhe genehmigt?' }
-                                        ]
-                                    }
-                                ]
-                            }
-                        ]
-                    }
+                    quickQuestions: [
+                        { id: '1.1', text: 'Are safety signs and escape route plans clearly visible?', critical: true },
+                        { id: '1.2', text: 'Are all emergency exits free and well marked?', critical: true },
+                        { id: '1.3', text: 'Is first aid equipment complete and accessible?', critical: true },
+                        { id: '2.1', text: 'Is the warehouse clean and tidy?', critical: false },
+                        { id: '2.2', text: 'Are floors non-slip and level?', critical: true },
+                        { id: '3.1', text: 'Are 5S markings respected?', critical: false },
+                        { id: '3.2', text: 'Are storage areas safely organized?', critical: false },
+                        { id: '4.1', text: 'Are hazardous materials stored correctly?', critical: true },
+                        { id: '5.1', text: 'Do employees avoid unfavorable body postures?', critical: false },
+                        { id: '6.1', text: 'Are enough first aiders available?', critical: true }
+                    ]
                 };
             },
             computed: {
-                monthlyStats() {
-                    const currentMonth = new Date().getMonth();
-                    const currentYear = new Date().getFullYear();
-                    
-                    const monthlyAudits = this.audits.filter(audit => {
-                        const auditDate = new Date(audit.date);
-                        return auditDate.getMonth() === currentMonth && auditDate.getFullYear() === currentYear;
-                    });
-                    
-                    const avgScore = monthlyAudits.length > 0
-                        ? Math.round(monthlyAudits.reduce((sum, audit) => sum + (audit.score || 0), 0) / monthlyAudits.length)
-                        : 0;
-                    
-                    const criticalIssues = monthlyAudits.reduce((sum, audit) => sum + (audit.criticalFails || 0), 0);
-                    
-                    return {
-                        total: monthlyAudits.length,
-                        avgScore,
-                        criticalIssues
-                    };
+                connectionStatusClass() {
+                    if (!this.isOnline) return 'connection-offline';
+                    if (this.isLoading) return 'connection-syncing';
+                    return 'connection-online';
+                },
+                connectionStatusText() {
+                    if (!this.isOnline) return '🔴 Offline';
+                    if (this.isLoading) return '🟡 Syncing...';
+                    return '🟢 Online';
                 },
                 recentAudits() {
                     return [...this.audits].reverse().slice(0, 5);
+                },
+                averageScore() {
+                    if (this.audits.length === 0) return 0;
+                    const total = this.audits.reduce((sum, audit) => sum + (audit.score || 0), 0);
+                    return Math.round(total / this.audits.length);
+                },
+                totalCriticalIssues() {
+                    return this.audits.reduce((sum, audit) => sum + (audit.criticalFails || 0), 0);
+                },
+                monthlyAudits() {
+                    const currentMonth = new Date().getMonth();
+                    const currentYear = new Date().getFullYear();
+                    return this.audits.filter(audit => {
+                        const auditDate = new Date(audit.date);
+                        return auditDate.getMonth() === currentMonth && auditDate.getFullYear() === currentYear;
+                    }).length;
                 }
             },
             methods: {
-                // Login methods
+                // Authentication
                 handleLogin() {
-                    const user = this.users.find(u => u.email === this.loginForm.email && u.password === this.loginForm.password);
+                    const demoUsers = [
+                        { id: 1, name: 'Admin User', email: 'admin@amazon.at', password: 'admin123', role: 'admin' },
+                        { id: 2, name: 'Safety Officer', email: 'safety@amazon.at', password: 'safety123', role: 'auditor' },
+                        { id: 3, name: 'Area Manager', email: 'manager@amazon.at', password: 'manager123', role: 'viewer' }
+                    ];
+
+                    const user = demoUsers.find(u => u.email === this.loginForm.email && u.password === this.loginForm.password);
+                    
                     if (user) {
                         this.currentUser = user;
                         this.currentView = 'dashboard';
                         this.loginError = '';
                         this.loginForm = { email: '', password: '' };
+                        this.loadFromStorage();
                     } else {
                         this.loginError = 'Invalid email or password';
                     }
                 },
+
                 handleLogout() {
                     this.currentUser = null;
                     this.currentView = 'login';
                 },
-                
+
                 // Navigation
                 navigateTo(view) {
                     this.currentView = view;
                     this.showMobileMenu = false;
                 },
-                
-                // Questionnaire management methods
-                getActiveQuestionnaire() {
-                    return this.questionnaires.find(q => q.id === this.activeQuestionnaireId) || this.defaultQuestionnaire;
-                },
-                getCurrentAuditTemplate() {
-                    return this.getActiveQuestionnaire();
-                },
-                setActiveQuestionnaire(id) {
-                    this.activeQuestionnaireId = id;
-                    this.saveToStorage();
-                },
-                getTotalQuestions(questionnaire) {
-                    let total = 0;
-                    questionnaire.sections?.forEach(section => {
-                        section.subsections?.forEach(subsection => {
-                            total += subsection.items?.length || 0;
-                        });
-                    });
-                    return total;
-                },
-                previewQuestionnaire(questionnaire) {
-                    this.previewingQuestionnaire = questionnaire;
-                    this.showPreviewModal = true;
-                },
-                closePreviewModal() {
-                    this.showPreviewModal = false;
-                    this.previewingQuestionnaire = null;
-                },
-                deleteQuestionnaire(id) {
-                    if (confirm('Are you sure you want to delete this questionnaire?')) {
-                        this.questionnaires = this.questionnaires.filter(q => q.id !== id);
-                        if (this.activeQuestionnaireId === id) {
-                            this.activeQuestionnaireId = 'default';
-                        }
-                        this.saveToStorage();
-                    }
-                },
 
-                // Excel upload methods
-                triggerFileInput() {
-                    this.$refs.fileInput.click();
-                },
-                handleFileSelect(event) {
-                    this.selectedFile = event.target.files[0];
-                },
-                handleDragOver(event) {
-                    event.currentTarget.classList.add('dragover');
-                },
-                handleDragLeave(event) {
-                    event.currentTarget.classList.remove('dragover');
-                },
-                handleFileDrop(event) {
-                    event.currentTarget.classList.remove('dragover');
-                    this.selectedFile = event.dataTransfer.files[0];
-                },
-                closeUploadModal() {
-                    this.showUploadModal = false;
-                    this.selectedFile = null;
-                    this.uploadForm = { name: '', description: '' };
-                    this.uploadError = '';
-                },
-                async uploadQuestionnaire() {
-                    if (!this.selectedFile || !this.uploadForm.name) {
-                        this.uploadError = 'Please provide a name and select an Excel file.';
-                        return;
-                    }
-
-                    try {
-                        const fileData = await this.readExcelFile(this.selectedFile);
-                        const questionnaire = this.parseExcelToQuestionnaire(fileData);
-                        
-                        questionnaire.id = Date.now().toString();
-                        questionnaire.name = this.uploadForm.name;
-                        questionnaire.description = this.uploadForm.description;
-                        
-                        this.questionnaires.push(questionnaire);
-                        this.saveToStorage();
-                        this.closeUploadModal();
-                        
-                        alert('Questionnaire uploaded successfully!');
-                    } catch (error) {
-                        this.uploadError = 'Error processing Excel file: ' + error.message;
-                    }
-                },
-                readExcelFile(file) {
-                    return new Promise((resolve, reject) => {
-                        const reader = new FileReader();
-                        reader.onload = (e) => {
-                            try {
-                                const data = new Uint8Array(e.target.result);
-                                const workbook = XLSX.read(data, { type: 'array' });
-                                resolve(workbook);
-                            } catch (error) {
-                                reject(error);
-                            }
-                        };
-                        reader.onerror = reject;
-                        reader.readAsArrayBuffer(file);
-                    });
-                },
-                parseExcelToQuestionnaire(workbook) {
-                    const sheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[sheetName];
-                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
-                    
-                    if (jsonData.length === 0) {
-                        throw new Error('Excel file appears to be empty');
-                    }
-                    
-                    // Check required columns
-                    const requiredColumns = ['Section', 'Question_ID', 'Question_Text'];
-                    const firstRow = jsonData[0];
-                    const missingColumns = requiredColumns.filter(col => !(col in firstRow));
-                    
-                    if (missingColumns.length > 0) {
-                        throw new Error(`Missing required columns: ${missingColumns.join(', ')}`);
-                    }
-                    
-                    // Group by section
-                    const sectionsMap = new Map();
-                    
-                    jsonData.forEach((row, index) => {
-                        try {
-                            const sectionTitle = row.Section?.toString().trim();
-                            const subsectionTitle = row.Subsection?.toString().trim() || '';
-                            const questionId = row.Question_ID?.toString().trim();
-                            const questionText = row.Question_Text?.toString().trim();
-                            const legalBasis = row.Legal_Basis?.toString().trim() || '';
-                            const critical = row.Critical?.toString().toLowerCase() === 'yes';
-                            
-                            if (!sectionTitle || !questionId || !questionText) {
-                                throw new Error(`Row ${index + 2}: Missing required data`);
-                            }
-                            
-                            if (!sectionsMap.has(sectionTitle)) {
-                                sectionsMap.set(sectionTitle, {
-                                    id: sectionTitle.toLowerCase().replace(/\s+/g, '-'),
-                                    title: sectionTitle,
-                                    subsections: new Map()
-                                });
-                            }
-                            
-                            const section = sectionsMap.get(sectionTitle);
-                            
-                            if (!section.subsections.has(subsectionTitle)) {
-                                section.subsections.set(subsectionTitle, {
-                                    title: subsectionTitle,
-                                    items: []
-                                });
-                            }
-                            
-                            const subsection = section.subsections.get(subsectionTitle);
-                            subsection.items.push({
-                                id: questionId,
-                                text: questionText,
-                                basis: legalBasis,
-                                critical: critical
-                            });
-                        } catch (error) {
-                            throw new Error(`Row ${index + 2}: ${error.message}`);
-                        }
-                    });
-                    
-                    // Convert maps to arrays
-                    const sections = Array.from(sectionsMap.values()).map(section => ({
-                        ...section,
-                        subsections: Array.from(section.subsections.values())
-                    }));
-                    
-                    return { sections };
-                },
-                downloadSampleExcel() {
-                    const sampleData = [
-                        {
-                            Section: '1. ALLGEMEINE SICHERHEIT',
-                            Subsection: 'Notfallausstattung',
-                            Question_ID: '1.1',
-                            Question_Text: 'Sind Sicherheitshinweise und Fluchtwegpläne deutlich sichtbar?',
-                            Legal_Basis: 'AStV § 19',
-                            Critical: 'Yes'
-                        },
-                        {
-                            Section: '1. ALLGEMEINE SICHERHEIT',
-                            Subsection: 'Notfallausstattung',
-                            Question_ID: '1.2',
-                            Question_Text: 'Sind alle Notausgänge frei und gut gekennzeichnet?',
-                            Legal_Basis: 'AStV § 20',
-                            Critical: 'Yes'
-                        },
-                        {
-                            Section: '1. ALLGEMEINE SICHERHEIT',
-                            Subsection: 'Persönliche Schutzausrüstung',
-                            Question_ID: '1.3',
-                            Question_Text: 'Tragen alle Mitarbeiter die korrekte PSA?',
-                            Legal_Basis: 'ASchG § 71',
-                            Critical: 'No'
-                        }
-                    ];
-                    
-                    const worksheet = XLSX.utils.json_to_sheet(sampleData);
-                    const workbook = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(workbook, worksheet, 'Questions');
-                    XLSX.writeFile(workbook, 'WHS_Questionnaire_Template.xlsx');
-                },
-                
-                // User management
-                addUser() {
-                    if (this.newUser.name && this.newUser.email && this.newUser.password) {
-                        const newUserWithId = {
-                            ...this.newUser,
-                            id: Date.now()
-                        };
-                        this.users.push(newUserWithId);
-                        this.saveToStorage();
-                        this.closeUserModal();
-                    }
-                },
-                deleteUser(userId) {
-                    if (confirm('Are you sure you want to delete this user?')) {
-                        this.users = this.users.filter(u => u.id !== userId);
-                        this.saveToStorage();
-                    }
-                },
-                closeUserModal() {
-                    this.showUserModal = false;
-                    this.newUser = { name: '', email: '', password: '', role: 'auditor' };
-                },
-                
-                // Location methods
-                getDisplayLocation(audit) {
-                    if (audit.location === 'custom') {
-                        return audit.customLocation || 'Custom Location';
-                    }
-                    return audit.location || 'N/A';
-                },
-                
-                // Photo capture methods
-                async startPhotoCapture(itemId) {
-                    this.currentPhotoItemId = itemId;
-                    this.showCameraModal = true;
-                    
-                    try {
-                        this.cameraStream = await navigator.mediaDevices.getUserMedia({ 
-                            video: { facingMode: 'environment' } // Use back camera if available
-                        });
-                        this.$nextTick(() => {
-                            if (this.$refs.videoElement) {
-                                this.$refs.videoElement.srcObject = this.cameraStream;
-                            }
-                        });
-                    } catch (error) {
-                        console.error('Error accessing camera:', error);
-                        alert('Unable to access camera. Please check permissions.');
-                        this.cancelPhotoCapture();
-                    }
-                },
-                
-                capturePhoto() {
-                    const video = this.$refs.videoElement;
-                    const canvas = this.$refs.canvasElement;
-                    const context = canvas.getContext('2d');
-                    
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    context.drawImage(video, 0, 0);
-                    
-                    const photoDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                    
-                    // Initialize photos object if it doesn't exist
-                    if (!this.currentAudit.photos) {
-                        this.currentAudit.photos = {};
-                    }
-                    
-                    // Initialize array for this item if it doesn't exist
-                    if (!this.currentAudit.photos[this.currentPhotoItemId]) {
-                        this.currentAudit.photos[this.currentPhotoItemId] = [];
-                    }
-                    
-                    // Add photo to the array
-                    this.currentAudit.photos[this.currentPhotoItemId].push(photoDataUrl);
-                    
-                    this.cancelPhotoCapture();
-                },
-                
-                cancelPhotoCapture() {
-                    if (this.cameraStream) {
-                        this.cameraStream.getTracks().forEach(track => track.stop());
-                        this.cameraStream = null;
-                    }
-                    this.showCameraModal = false;
-                    this.currentPhotoItemId = null;
-                },
-                
-                removePhoto(itemId, photoIndex) {
-                    if (this.currentAudit.photos && this.currentAudit.photos[itemId]) {
-                        this.currentAudit.photos[itemId].splice(photoIndex, 1);
-                        if (this.currentAudit.photos[itemId].length === 0) {
-                            delete this.currentAudit.photos[itemId];
-                        }
-                    }
-                },
-                
-                showFullPhoto(photoUrl) {
-                    this.fullPhotoUrl = photoUrl;
-                    this.showPhotoModal = true;
-                },
-                
-                // Audit methods
+                // Audit Management
                 startNewAudit() {
                     this.currentAudit = {
                         id: Date.now(),
                         date: new Date().toISOString().split('T')[0],
                         time: new Date().toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' }),
                         auditor: this.currentUser.name,
-                        auditorId: this.currentUser.id,
-                        questionnaireId: this.activeQuestionnaireId,
                         location: '',
                         customLocation: '',
                         area: '',
@@ -1838,43 +641,36 @@
                         status: 'in-progress',
                         responses: {},
                         notes: {},
-                        photos: {},
-                        deficiencies: [],
-                        immediateActions: false,
-                        immediateActionsDesc: '',
-                        positiveObservations: '',
-                        generalComments: '',
-                        overallCondition: '',
-                        overallResult: ''
+                        generalComments: ''
                     };
                     this.currentView = 'conduct-audit';
                 },
-                updateResponse(itemId, value) {
-                    this.currentAudit.responses[itemId] = value;
+
+                updateResponse(questionId, value) {
+                    this.currentAudit.responses[questionId] = value;
                 },
-                addDeficiency() {
-                    this.currentAudit.deficiencies.push({
-                        id: Date.now(),
-                        description: '',
-                        priority: 'low',
-                        responsible: '',
-                        dueDate: ''
+
+                calculateScore(audit) {
+                    let totalItems = 0;
+                    let passedItems = 0;
+                    let criticalFails = 0;
+                    
+                    this.quickQuestions.forEach(question => {
+                        const response = audit.responses[question.id];
+                        if (response && response !== '') {
+                            totalItems++;
+                            if (response === 'yes') {
+                                passedItems++;
+                            } else if (response === 'no' && question.critical) {
+                                criticalFails++;
+                            }
+                        }
                     });
+                    
+                    const score = totalItems > 0 ? Math.round((passedItems / totalItems) * 100) : 0;
+                    return { score, totalItems, passedItems, criticalFails };
                 },
-                removeDeficiency(defId) {
-                    this.currentAudit.deficiencies = this.currentAudit.deficiencies.filter(d => d.id !== defId);
-                },
-                cancelAudit() {
-                    if (confirm('Are you sure you want to cancel this audit? All progress will be lost.')) {
-                        this.currentAudit = null;
-                        this.currentView = 'audits';
-                    }
-                },
-                completeAudit() {
-                    if (confirm('Are you sure you want to complete this audit?')) {
-                        this.saveAudit('completed');
-                    }
-                },
+
                 saveAudit(status) {
                     const scoreData = this.calculateScore(this.currentAudit);
                     const auditToSave = {
@@ -1889,808 +685,196 @@
                     
                     this.audits.push(auditToSave);
                     this.saveToStorage();
+                    
+                    // Try to sync to Netlify
+                    this.syncToNetlify();
+                    
                     this.currentAudit = null;
                     this.currentView = 'audits';
                 },
-                calculateScore(audit) {
-                    let totalItems = 0;
-                    let passedItems = 0;
-                    let criticalFails = 0;
-                    
-                    const template = this.getActiveQuestionnaire();
-                    template.sections.forEach(section => {
-                        section.subsections.forEach(subsection => {
-                            subsection.items.forEach(item => {
-                                const response = audit.responses[item.id];
-                                if (response && response !== '') {
-                                    totalItems++;
-                                    if (response === 'yes') {
-                                        passedItems++;
-                                    } else if (response === 'no' && item.critical) {
-                                        criticalFails++;
-                                    }
-                                }
-                            });
-                        });
-                    });
-                    
-                    const score = totalItems > 0 ? Math.round((passedItems / totalItems) * 100) : 0;
-                    return { score, totalItems, passedItems, criticalFails };
+
+                completeAudit() {
+                    if (confirm('Are you sure you want to complete this audit?')) {
+                        this.saveAudit('completed');
+                    }
                 },
+
+                cancelAudit() {
+                    if (confirm('Are you sure you want to cancel this audit? All progress will be lost.')) {
+                        this.currentAudit = null;
+                        this.currentView = 'audits';
+                    }
+                },
+
                 viewAuditDetails(audit) {
                     this.viewingAudit = audit;
                     this.currentView = 'view-audit';
                 },
-                closeViewAudit() {
-                    this.viewingAudit = null;
-                    this.currentView = 'audits';
+
+                deleteAudit(auditId) {
+                    if (confirm('Are you sure you want to delete this audit?')) {
+                        this.audits = this.audits.filter(a => a.id !== auditId);
+                        this.saveToStorage();
+                        this.syncToNetlify();
+                    }
                 },
 
-                // ZIP Export functionality
-                async exportAllAuditsAsZip() {
-                    if (this.audits.length === 0) {
-                        alert('No audits to export!');
-                        return;
-                    }
-
-                    this.isLoading = true;
-                    this.loadingMessage = 'Generating PDF reports and creating ZIP file...';
-
+                // Storage Management
+                saveToStorage() {
                     try {
-                        const zip = new JSZip();
-                        const timestamp = new Date().toISOString().split('T')[0];
-                        
-                        // Create summary Excel file
-                        const summaryData = this.audits.map(audit => ({
-                            'Audit ID': audit.id,
-                            'Date': audit.date,
-                            'Time': audit.time || 'N/A',
-                            'Location': this.getDisplayLocation(audit),
-                            'Area': audit.area || 'N/A',
-                            'Shift': audit.shift || 'N/A',
-                            'Auditor': audit.auditor,
-                            'Score (%)': audit.score,
-                            'Total Items': audit.totalItems,
-                            'Passed Items': audit.passedItems,
-                            'Critical Failures': audit.criticalFails || 0,
-                            'Status': audit.status,
-                            'Overall Condition': audit.overallCondition || 'N/A',
-                            'Overall Result': audit.overallResult || 'N/A',
-                            'Immediate Actions Required': audit.immediateActions ? 'Yes' : 'No',
-                            'Number of Deficiencies': audit.deficiencies?.length || 0,
-                            'Completed Date': audit.completedDate ? new Date(audit.completedDate).toLocaleDateString('de-AT') : 'N/A'
-                        }));
-                        
-                        const summaryWorksheet = XLSX.utils.json_to_sheet(summaryData);
-                        const summaryWorkbook = XLSX.utils.book_new();
-                        XLSX.utils.book_append_sheet(summaryWorkbook, summaryWorksheet, 'Audit Summary');
-                        const summaryBuffer = XLSX.write(summaryWorkbook, { type: 'array', bookType: 'xlsx' });
-                        zip.file(`Audit_Summary_${timestamp}.xlsx`, summaryBuffer);
-
-                        // Generate PDF for each audit
-                        for (let i = 0; i < this.audits.length; i++) {
-                            const audit = this.audits[i];
-                            this.loadingMessage = `Generating PDF ${i + 1} of ${this.audits.length}...`;
-                            
-                            const pdfBlob = await this.generatePDFBlob(audit);
-                            const locationName = this.getDisplayLocation(audit).replace(/\s+/g, '_');
-                            const fileName = `WHS_Audit_Report_${locationName}_${audit.date}.pdf`;
-                            zip.file(fileName, pdfBlob);
-                            
-                            // Small delay to prevent browser freezing
-                            await new Promise(resolve => setTimeout(resolve, 100));
-                        }
-
-                        this.loadingMessage = 'Creating ZIP file...';
-                        const zipBlob = await zip.generateAsync({ type: 'blob' });
-                        
-                        // Download the ZIP file
-                        const url = URL.createObjectURL(zipBlob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `WHS_Safety_Audits_Export_${timestamp}.zip`;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
-                        
+                        localStorage.setItem('whs_audits', JSON.stringify(this.audits));
+                        localStorage.setItem('whs_users', JSON.stringify(this.users));
+                        localStorage.setItem('whs_last_save', new Date().toISOString());
+                        this.storageStatus = 'Saved Locally';
                     } catch (error) {
-                        console.error('Error creating ZIP export:', error);
-                        alert('Error creating ZIP export: ' + error.message);
+                        console.error('Error saving to localStorage:', error);
+                        alert('Error saving data locally. Storage may be full.');
+                    }
+                },
+
+                loadFromStorage() {
+                    try {
+                        const savedAudits = localStorage.getItem('whs_audits');
+                        const savedUsers = localStorage.getItem('whs_users');
+                        
+                        if (savedAudits) {
+                            this.audits = JSON.parse(savedAudits);
+                        }
+                        
+                        if (savedUsers) {
+                            this.users = JSON.parse(savedUsers);
+                        }
+                        
+                        const lastSave = localStorage.getItem('whs_last_save');
+                        if (lastSave) {
+                            this.lastSyncTime = new Date(lastSave);
+                        }
+                    } catch (error) {
+                        console.error('Error loading from localStorage:', error);
+                        this.audits = [];
+                        this.users = [];
+                    }
+                },
+
+                // Netlify Integration (Simplified)
+                async syncToNetlify() {
+                    if (!this.isOnline) return;
+                    
+                    try {
+                        this.isLoading = true;
+                        this.loadingMessage = 'Syncing to Netlify...';
+                        
+                        // Send data to Netlify function
+                        const response = await fetch('/.netlify/functions/store-data', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                audits: this.audits,
+                                users: this.users,
+                                timestamp: new Date().toISOString()
+                            })
+                        });
+
+                        if (response.ok) {
+                            this.storageStatus = 'Synced to Netlify';
+                            this.lastSyncTime = new Date();
+                        } else {
+                            throw new Error('Sync failed');
+                        }
+                    } catch (error) {
+                        console.error('Sync error:', error);
+                        this.storageStatus = 'Local Storage (Sync Failed)';
                     } finally {
                         this.isLoading = false;
                         this.loadingMessage = '';
                     }
                 },
 
-                // Generate PDF Blob for ZIP export
-                async generatePDFBlob(audit) {
-                    return new Promise((resolve) => {
-                        const { jsPDF } = window.jspdf;
-                        const doc = new jsPDF();
-                        
-                        // Set up fonts and colors
-                        doc.setFont('helvetica');
-                        
-                        // Header with logo area and title
-                        doc.setFillColor(255, 153, 0); // Amazon orange
-                        doc.rect(0, 0, 210, 30, 'F');
-                        
-                        doc.setTextColor(255, 255, 255);
-                        doc.setFontSize(20);
-                        doc.text('AMAZON AUSTRIA', 20, 15);
-                        doc.setFontSize(14);
-                        doc.text('Workplace Health & Safety', 20, 22);
-                        
-                        doc.setTextColor(0, 0, 0);
-                        doc.setFontSize(18);
-                        doc.text('SAFETY AUDIT REPORT', 20, 45);
-                        
-                        // Audit Information
-                        let yPos = 60;
-                        doc.setFontSize(12);
-                        doc.setFont('helvetica', 'bold');
-                        doc.text('AUDIT INFORMATION', 20, yPos);
-                        yPos += 10;
-                        
-                        doc.setFont('helvetica', 'normal');
-                        doc.text(`Date/Time: ${audit.date} ${audit.time || ''}`, 20, yPos);
-                        yPos += 7;
-                        doc.text(`Location: ${this.getDisplayLocation(audit)}`, 20, yPos);
-                        yPos += 7;
-                        doc.text(`Area: ${audit.area || 'N/A'}`, 20, yPos);
-                        yPos += 7;
-                        doc.text(`Shift: ${audit.shift || 'N/A'}`, 20, yPos);
-                        yPos += 7;
-                        doc.text(`Auditor: ${audit.auditor}`, 20, yPos);
-                        yPos += 7;
-                        doc.text(`Status: ${audit.status}`, 20, yPos);
-                        yPos += 7;
-                        doc.text(`Questionnaire: ${this.getQuestionnaireNameById(audit.questionnaireId) || 'Standard WHS Safety Audit'}`, 20, yPos);
-                        yPos += 15;
-                        
-                        // Score Summary
-                        doc.setFont('helvetica', 'bold');
-                        doc.text('AUDIT SCORE SUMMARY', 20, yPos);
-                        yPos += 10;
-                        
-                        doc.setFont('helvetica', 'normal');
-                        doc.text(`Overall Score: ${audit.score}%`, 20, yPos);
-                        yPos += 7;
-                        doc.text(`Items Passed: ${audit.passedItems}/${audit.totalItems}`, 20, yPos);
-                        yPos += 7;
-                        doc.text(`Critical Failures: ${audit.criticalFails || 0}`, 20, yPos);
-                        yPos += 15;
-                        
-                        // Overall Assessment
-                        if (audit.overallCondition || audit.overallResult) {
-                            doc.setFont('helvetica', 'bold');
-                            doc.text('OVERALL ASSESSMENT', 20, yPos);
-                            yPos += 10;
-                            
-                            doc.setFont('helvetica', 'normal');
-                            if (audit.overallCondition) {
-                                doc.text(`Workplace Condition: ${audit.overallCondition}`, 20, yPos);
-                                yPos += 7;
-                            }
-                            if (audit.overallResult) {
-                                doc.text(`Overall Result: ${audit.overallResult}`, 20, yPos);
-                                yPos += 7;
-                            }
-                            yPos += 8;
-                        }
-                        
-                        // Check if we need a new page
-                        if (yPos > 250) {
-                            doc.addPage();
-                            yPos = 20;
-                        }
-                        
-                        // Detailed Audit Questions and Responses
-                        doc.setFont('helvetica', 'bold');
-                        doc.text('DETAILED AUDIT RESULTS', 20, yPos);
-                        yPos += 15;
-                        
-                        const template = this.getQuestionnaireById(audit.questionnaireId) || this.getActiveQuestionnaire();
-                        template.sections.forEach(section => {
-                            // Check if we need a new page
-                            if (yPos > 270) {
-                                doc.addPage();
-                                yPos = 20;
-                            }
-                            
-                            doc.setFont('helvetica', 'bold');
-                            doc.setFontSize(11);
-                            const sectionText = doc.splitTextToSize(section.title, 170);
-                            doc.text(sectionText, 20, yPos);
-                            yPos += sectionText.length * 5 + 5;
-                            
-                            section.subsections.forEach(subsection => {
-                                if (subsection.title) {
-                                    doc.setFont('helvetica', 'bold');
-                                    doc.setFontSize(10);
-                                    doc.text(subsection.title, 25, yPos);
-                                    yPos += 8;
-                                }
-                                
-                                subsection.items.forEach(item => {
-                                    // Check if we need a new page
-                                    if (yPos > 270) {
-                                        doc.addPage();
-                                        yPos = 20;
-                                    }
-                                    
-                                    const response = audit.responses[item.id] || 'No response';
-                                    const responseColor = response === 'yes' ? [0, 128, 0] : response === 'no' ? [255, 0, 0] : [128, 128, 128];
-                                    
-                                    doc.setFont('helvetica', 'normal');
-                                    doc.setFontSize(9);
-                                    
-                                    // Question ID and response
-                                    doc.text(`${item.id}:`, 30, yPos);
-                                    doc.setTextColor(...responseColor);
-                                    doc.text(response.toUpperCase(), 45, yPos);
-                                    doc.setTextColor(0, 0, 0);
-                                    
-                                    // Critical indicator
-                                    if (item.critical) {
-                                        doc.setTextColor(255, 0, 0);
-                                        doc.text('[CRITICAL]', 70, yPos);
-                                        doc.setTextColor(0, 0, 0);
-                                    }
-                                    
-                                    yPos += 5;
-                                    
-                                    // Question text
-                                    const questionText = doc.splitTextToSize(item.text, 160);
-                                    doc.text(questionText, 30, yPos);
-                                    yPos += questionText.length * 4;
-                                    
-                                    // Legal basis
-                                    if (item.basis) {
-                                        doc.setTextColor(100, 100, 100);
-                                        doc.text(`Basis: ${item.basis}`, 30, yPos);
-                                        doc.setTextColor(0, 0, 0);
-                                        yPos += 4;
-                                    }
-                                    
-                                    // Notes
-                                    if (audit.notes && audit.notes[item.id]) {
-                                        doc.setTextColor(200, 0, 0);
-                                        const noteText = doc.splitTextToSize(`Note: ${audit.notes[item.id]}`, 160);
-                                        doc.text(noteText, 30, yPos);
-                                        doc.setTextColor(0, 0, 0);
-                                        yPos += noteText.length * 4;
-                                    }
-                                    
-                                    yPos += 3;
-                                });
-                                yPos += 5;
-                            });
-                            yPos += 5;
-                        });
-                        
-                        // Immediate Actions
-                        if (audit.immediateActions) {
-                            if (yPos > 250) {
-                                doc.addPage();
-                                yPos = 20;
-                            }
-                            
-                            doc.setFont('helvetica', 'bold');
-                            doc.setFontSize(12);
-                            doc.setTextColor(255, 0, 0);
-                            doc.text('IMMEDIATE ACTIONS REQUIRED', 20, yPos);
-                            doc.setTextColor(0, 0, 0);
-                            yPos += 10;
-                            
-                            doc.setFont('helvetica', 'normal');
-                            if (audit.immediateActionsDesc) {
-                                const actionText = doc.splitTextToSize(audit.immediateActionsDesc, 170);
-                                doc.text(actionText, 20, yPos);
-                                yPos += actionText.length * 5 + 10;
-                            }
-                        }
-                        
-                        // Deficiencies
-                        if (audit.deficiencies && audit.deficiencies.length > 0) {
-                            if (yPos > 230) {
-                                doc.addPage();
-                                yPos = 20;
-                            }
-                            
-                            doc.setFont('helvetica', 'bold');
-                            doc.setFontSize(12);
-                            doc.text('DEFICIENCIES AND CORRECTIVE ACTIONS', 20, yPos);
-                            yPos += 15;
-                            
-                            audit.deficiencies.forEach((def, index) => {
-                                if (yPos > 250) {
-                                    doc.addPage();
-                                    yPos = 20;
-                                }
-                                
-                                doc.setFont('helvetica', 'bold');
-                                doc.setFontSize(10);
-                                doc.text(`Deficiency ${index + 1}:`, 20, yPos);
-                                yPos += 7;
-                                
-                                doc.setFont('helvetica', 'normal');
-                                doc.setFontSize(9);
-                                
-                                if (def.description) {
-                                    const descText = doc.splitTextToSize(`Description: ${def.description}`, 170);
-                                    doc.text(descText, 25, yPos);
-                                    yPos += descText.length * 4 + 3;
-                                }
-                                
-                                doc.text(`Priority: ${def.priority || 'Not set'}`, 25, yPos);
-                                yPos += 5;
-                                doc.text(`Responsible: ${def.responsible || 'Not assigned'}`, 25, yPos);
-                                yPos += 5;
-                                doc.text(`Due Date: ${def.dueDate || 'Not set'}`, 25, yPos);
-                                yPos += 10;
-                            });
-                        }
-                        
-                        // Positive Observations
-                        if (audit.positiveObservations) {
-                            if (yPos > 250) {
-                                doc.addPage();
-                                yPos = 20;
-                            }
-                            
-                            doc.setFont('helvetica', 'bold');
-                            doc.setFontSize(12);
-                            doc.setTextColor(0, 128, 0);
-                            doc.text('POSITIVE OBSERVATIONS', 20, yPos);
-                            doc.setTextColor(0, 0, 0);
-                            yPos += 10;
-                            
-                            doc.setFont('helvetica', 'normal');
-                            const positiveText = doc.splitTextToSize(audit.positiveObservations, 170);
-                            doc.text(positiveText, 20, yPos);
-                            yPos += positiveText.length * 5 + 10;
-                        }
-                        
-                        // General Comments
-                        if (audit.generalComments) {
-                            if (yPos > 250) {
-                                doc.addPage();
-                                yPos = 20;
-                            }
-                            
-                            doc.setFont('helvetica', 'bold');
-                            doc.setFontSize(12);
-                            doc.text('GENERAL COMMENTS', 20, yPos);
-                            yPos += 10;
-                            
-                            doc.setFont('helvetica', 'normal');
-                            const commentsText = doc.splitTextToSize(audit.generalComments, 170);
-                            doc.text(commentsText, 20, yPos);
-                            yPos += commentsText.length * 5 + 15;
-                        }
-                        
-                        // Footer
-                        const pageCount = doc.internal.getNumberOfPages();
-                        for (let i = 1; i <= pageCount; i++) {
-                            doc.setPage(i);
-                            doc.setFontSize(8);
-                            doc.setTextColor(128, 128, 128);
-                            doc.text('Generated by WHS Safety Audit System - Amazon Austria', 20, 285);
-                            doc.text(`by Erwin Esener - WHS Austria`, 20, 290);
-                            doc.text(`Page ${i} of ${pageCount}`, 180, 290);
-                            doc.text(`Generated: ${new Date().toLocaleString('de-AT')}`, 180, 285);
-                        }
-                        
-                        // Return blob
-                        const pdfBlob = doc.output('blob');
-                        resolve(pdfBlob);
-                    });
+                // Utility Methods
+                getDisplayLocation(audit) {
+                    if (audit.location === 'custom') {
+                        return audit.customLocation || 'Custom Location';
+                    }
+                    return audit.location || 'N/A';
                 },
 
-                // Professional PDF Report Generator
-                downloadProfessionalReport(audit) {
-                    const { jsPDF } = window.jspdf;
-                    const doc = new jsPDF();
-                    
-                    // Set up fonts and colors
-                    doc.setFont('helvetica');
-                    
-                    // Header with logo area and title
-                    doc.setFillColor(255, 153, 0); // Amazon orange
-                    doc.rect(0, 0, 210, 30, 'F');
-                    
-                    doc.setTextColor(255, 255, 255);
-                    doc.setFontSize(20);
-                    doc.text('AMAZON AUSTRIA', 20, 15);
-                    doc.setFontSize(14);
-                    doc.text('Workplace Health & Safety', 20, 22);
-                    
-                    doc.setTextColor(0, 0, 0);
-                    doc.setFontSize(18);
-                    doc.text('SAFETY AUDIT REPORT', 20, 45);
-                    
-                    // Audit Information
-                    let yPos = 60;
-                    doc.setFontSize(12);
-                    doc.setFont('helvetica', 'bold');
-                    doc.text('AUDIT INFORMATION', 20, yPos);
-                    yPos += 10;
-                    
-                    doc.setFont('helvetica', 'normal');
-                    doc.text(`Date/Time: ${audit.date} ${audit.time || ''}`, 20, yPos);
-                    yPos += 7;
-                    doc.text(`Location: ${this.getDisplayLocation(audit)}`, 20, yPos);
-                    yPos += 7;
-                    doc.text(`Area: ${audit.area || 'N/A'}`, 20, yPos);
-                    yPos += 7;
-                    doc.text(`Shift: ${audit.shift || 'N/A'}`, 20, yPos);
-                    yPos += 7;
-                    doc.text(`Auditor: ${audit.auditor}`, 20, yPos);
-                    yPos += 7;
-                    doc.text(`Status: ${audit.status}`, 20, yPos);
-                    yPos += 7;
-                    doc.text(`Questionnaire: ${this.getQuestionnaireNameById(audit.questionnaireId) || 'Standard WHS Safety Audit'}`, 20, yPos);
-                    yPos += 15;
-                    
-                    // Score Summary
-                    doc.setFont('helvetica', 'bold');
-                    doc.text('AUDIT SCORE SUMMARY', 20, yPos);
-                    yPos += 10;
-                    
-                    doc.setFont('helvetica', 'normal');
-                    doc.text(`Overall Score: ${audit.score}%`, 20, yPos);
-                    yPos += 7;
-                    doc.text(`Items Passed: ${audit.passedItems}/${audit.totalItems}`, 20, yPos);
-                    yPos += 7;
-                    doc.text(`Critical Failures: ${audit.criticalFails || 0}`, 20, yPos);
-                    yPos += 15;
-                    
-                    // Overall Assessment
-                    if (audit.overallCondition || audit.overallResult) {
-                        doc.setFont('helvetica', 'bold');
-                        doc.text('OVERALL ASSESSMENT', 20, yPos);
-                        yPos += 10;
-                        
-                        doc.setFont('helvetica', 'normal');
-                        if (audit.overallCondition) {
-                            doc.text(`Workplace Condition: ${audit.overallCondition}`, 20, yPos);
-                            yPos += 7;
-                        }
-                        if (audit.overallResult) {
-                            doc.text(`Overall Result: ${audit.overallResult}`, 20, yPos);
-                            yPos += 7;
-                        }
-                        yPos += 8;
-                    }
-                    
-                    // Check if we need a new page
-                    if (yPos > 250) {
-                        doc.addPage();
-                        yPos = 20;
-                    }
-                    
-                    // Detailed Audit Questions and Responses
-                    doc.setFont('helvetica', 'bold');
-                    doc.text('DETAILED AUDIT RESULTS', 20, yPos);
-                    yPos += 15;
-                    
-                    const template = this.getQuestionnaireById(audit.questionnaireId) || this.getActiveQuestionnaire();
-                    template.sections.forEach(section => {
-                        // Check if we need a new page
-                        if (yPos > 270) {
-                            doc.addPage();
-                            yPos = 20;
-                        }
-                        
-                        doc.setFont('helvetica', 'bold');
-                        doc.setFontSize(11);
-                        const sectionText = doc.splitTextToSize(section.title, 170);
-                        doc.text(sectionText, 20, yPos);
-                        yPos += sectionText.length * 5 + 5;
-                        
-                        section.subsections.forEach(subsection => {
-                            if (subsection.title) {
-                                doc.setFont('helvetica', 'bold');
-                                doc.setFontSize(10);
-                                doc.text(subsection.title, 25, yPos);
-                                yPos += 8;
-                            }
-                            
-                            subsection.items.forEach(item => {
-                                // Check if we need a new page
-                                if (yPos > 270) {
-                                    doc.addPage();
-                                    yPos = 20;
-                                }
-                                
-                                const response = audit.responses[item.id] || 'No response';
-                                const responseColor = response === 'yes' ? [0, 128, 0] : response === 'no' ? [255, 0, 0] : [128, 128, 128];
-                                
-                                doc.setFont('helvetica', 'normal');
-                                doc.setFontSize(9);
-                                
-                                // Question ID and response
-                                doc.text(`${item.id}:`, 30, yPos);
-                                doc.setTextColor(...responseColor);
-                                doc.text(response.toUpperCase(), 45, yPos);
-                                doc.setTextColor(0, 0, 0);
-                                
-                                // Critical indicator
-                                if (item.critical) {
-                                    doc.setTextColor(255, 0, 0);
-                                    doc.text('[CRITICAL]', 70, yPos);
-                                    doc.setTextColor(0, 0, 0);
-                                }
-                                
-                                yPos += 5;
-                                
-                                // Question text
-                                const questionText = doc.splitTextToSize(item.text, 160);
-                                doc.text(questionText, 30, yPos);
-                                yPos += questionText.length * 4;
-                                
-                                // Legal basis
-                                if (item.basis) {
-                                    doc.setTextColor(100, 100, 100);
-                                    doc.text(`Basis: ${item.basis}`, 30, yPos);
-                                    doc.setTextColor(0, 0, 0);
-                                    yPos += 4;
-                                }
-                                
-                                // Notes
-                                if (audit.notes && audit.notes[item.id]) {
-                                    doc.setTextColor(200, 0, 0);
-                                    const noteText = doc.splitTextToSize(`Note: ${audit.notes[item.id]}`, 160);
-                                    doc.text(noteText, 30, yPos);
-                                    doc.setTextColor(0, 0, 0);
-                                    yPos += noteText.length * 4;
-                                }
-                                
-                                yPos += 3;
-                            });
-                            yPos += 5;
-                        });
-                        yPos += 5;
-                    });
-                    
-                    // Immediate Actions
-                    if (audit.immediateActions) {
-                        if (yPos > 250) {
-                            doc.addPage();
-                            yPos = 20;
-                        }
-                        
-                        doc.setFont('helvetica', 'bold');
-                        doc.setFontSize(12);
-                        doc.setTextColor(255, 0, 0);
-                        doc.text('IMMEDIATE ACTIONS REQUIRED', 20, yPos);
-                        doc.setTextColor(0, 0, 0);
-                        yPos += 10;
-                        
-                        doc.setFont('helvetica', 'normal');
-                        if (audit.immediateActionsDesc) {
-                            const actionText = doc.splitTextToSize(audit.immediateActionsDesc, 170);
-                            doc.text(actionText, 20, yPos);
-                            yPos += actionText.length * 5 + 10;
-                        }
-                    }
-                    
-                    // Deficiencies
-                    if (audit.deficiencies && audit.deficiencies.length > 0) {
-                        if (yPos > 230) {
-                            doc.addPage();
-                            yPos = 20;
-                        }
-                        
-                        doc.setFont('helvetica', 'bold');
-                        doc.setFontSize(12);
-                        doc.text('DEFICIENCIES AND CORRECTIVE ACTIONS', 20, yPos);
-                        yPos += 15;
-                        
-                        audit.deficiencies.forEach((def, index) => {
-                            if (yPos > 250) {
-                                doc.addPage();
-                                yPos = 20;
-                            }
-                            
-                            doc.setFont('helvetica', 'bold');
-                            doc.setFontSize(10);
-                            doc.text(`Deficiency ${index + 1}:`, 20, yPos);
-                            yPos += 7;
-                            
-                            doc.setFont('helvetica', 'normal');
-                            doc.setFontSize(9);
-                            
-                            if (def.description) {
-                                const descText = doc.splitTextToSize(`Description: ${def.description}`, 170);
-                                doc.text(descText, 25, yPos);
-                                yPos += descText.length * 4 + 3;
-                            }
-                            
-                            doc.text(`Priority: ${def.priority || 'Not set'}`, 25, yPos);
-                            yPos += 5;
-                            doc.text(`Responsible: ${def.responsible || 'Not assigned'}`, 25, yPos);
-                            yPos += 5;
-                            doc.text(`Due Date: ${def.dueDate || 'Not set'}`, 25, yPos);
-                            yPos += 10;
-                        });
-                    }
-                    
-                    // Positive Observations
-                    if (audit.positiveObservations) {
-                        if (yPos > 250) {
-                            doc.addPage();
-                            yPos = 20;
-                        }
-                        
-                        doc.setFont('helvetica', 'bold');
-                        doc.setFontSize(12);
-                        doc.setTextColor(0, 128, 0);
-                        doc.text('POSITIVE OBSERVATIONS', 20, yPos);
-                        doc.setTextColor(0, 0, 0);
-                        yPos += 10;
-                        
-                        doc.setFont('helvetica', 'normal');
-                        const positiveText = doc.splitTextToSize(audit.positiveObservations, 170);
-                        doc.text(positiveText, 20, yPos);
-                        yPos += positiveText.length * 5 + 10;
-                    }
-                    
-                    // General Comments
-                    if (audit.generalComments) {
-                        if (yPos > 250) {
-                            doc.addPage();
-                            yPos = 20;
-                        }
-                        
-                        doc.setFont('helvetica', 'bold');
-                        doc.setFontSize(12);
-                        doc.text('GENERAL COMMENTS', 20, yPos);
-                        yPos += 10;
-                        
-                        doc.setFont('helvetica', 'normal');
-                        const commentsText = doc.splitTextToSize(audit.generalComments, 170);
-                        doc.text(commentsText, 20, yPos);
-                        yPos += commentsText.length * 5 + 15;
-                    }
-                    
-                    // Footer
-                    const pageCount = doc.internal.getNumberOfPages();
-                    for (let i = 1; i <= pageCount; i++) {
-                        doc.setPage(i);
-                        doc.setFontSize(8);
-                        doc.setTextColor(128, 128, 128);
-                        doc.text('Generated by WHS Safety Audit System - Amazon Austria', 20, 285);
-                        doc.text(`by Erwin Esener - WHS Austria`, 20, 290);
-                        doc.text(`Page ${i} of ${pageCount}`, 180, 290);
-                        doc.text(`Generated: ${new Date().toLocaleString('de-AT')}`, 180, 285);
-                    }
-                    
-                    // Save the PDF
-                    const locationName = this.getDisplayLocation(audit).replace(/\s+/g, '_');
-                    const fileName = `WHS_Audit_Report_${locationName}_${audit.date}.pdf`;
-                    doc.save(fileName);
-                },
-
-                // Helper methods for questionnaires
-                getQuestionnaireById(id) {
-                    if (id === 'default') return this.defaultQuestionnaire;
-                    return this.questionnaires.find(q => q.id === id);
-                },
-                getQuestionnaireNameById(id) {
-                    const questionnaire = this.getQuestionnaireById(id);
-                    return questionnaire ? questionnaire.name : 'Unknown Questionnaire';
-                },
-                
-                // Utility methods
                 getScoreClass(score) {
                     if (score >= 90) return 'bg-green-100 text-green-800';
                     if (score >= 70) return 'bg-yellow-100 text-yellow-800';
                     return 'bg-red-100 text-red-800';
                 },
-                getScoreColorClass(score) {
-                    if (score >= 90) return 'text-green-600';
-                    if (score >= 70) return 'text-yellow-600';
-                    return 'text-red-600';
+
+                // Export functionality
+                exportAllData() {
+                    const exportData = {
+                        audits: this.audits,
+                        users: this.users,
+                        exportDate: new Date().toISOString(),
+                        totalAudits: this.audits.length
+                    };
+                    
+                    const dataStr = JSON.stringify(exportData, null, 2);
+                    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(dataBlob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `WHS_Audit_Export_${new Date().toISOString().split('T')[0]}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
                 },
-                getPriorityClass(priority) {
-                    if (priority === 'high') return 'bg-red-100 text-red-800';
-                    if (priority === 'medium') return 'bg-yellow-100 text-yellow-800';
-                    return 'bg-green-100 text-green-800';
-                },
-                getRoleClass(role) {
-                    if (role === 'admin') return 'bg-purple-100 text-purple-800';
-                    if (role === 'auditor') return 'bg-blue-100 text-blue-800';
-                    return 'bg-gray-100 text-gray-800';
-                },
-                getComplianceStatus() {
-                    const score = this.monthlyStats.avgScore;
-                    if (score >= 90) return 'Good';
-                    if (score >= 70) return 'Fair';
-                    return 'Poor';
-                },
-                getComplianceDescription() {
-                    const score = this.monthlyStats.avgScore;
-                    if (score >= 90) return 'excellent';
-                    if (score >= 70) return 'satisfactory';
-                    return 'needs improvement';
-                },
-                
-                // Storage methods with real localStorage persistence
-                saveToStorage() {
-                    try {
-                        // Store all data in localStorage
-                        const dataToSave = {
-                            users: this.users,
-                            audits: this.audits,
-                            questionnaires: this.questionnaires,
-                            activeQuestionnaireId: this.activeQuestionnaireId
-                        };
-                        
-                        Object.keys(dataToSave).forEach(key => {
-                            localStorage.setItem(`whs_audit_${key}`, JSON.stringify(dataToSave[key]));
-                        });
-                        
-                        console.log('Data saved to localStorage successfully');
-                    } catch (error) {
-                        console.error('Error saving to localStorage:', error);
-                        alert('Error saving data. Please check browser storage settings.');
+
+                downloadPDFReport(audit) {
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF();
+                    
+                    // Simple PDF generation
+                    doc.setFontSize(20);
+                    doc.text('WHS Safety Audit Report', 20, 30);
+                    doc.setFontSize(12);
+                    doc.text(`Date: ${audit.date}`, 20, 50);
+                    doc.text(`Location: ${this.getDisplayLocation(audit)}`, 20, 60);
+                    doc.text(`Auditor: ${audit.auditor}`, 20, 70);
+                    doc.text(`Score: ${audit.score}%`, 20, 80);
+                    doc.text(`Status: ${audit.status}`, 20, 90);
+                    
+                    if (audit.generalComments) {
+                        doc.text('Comments:', 20, 110);
+                        const splitText = doc.splitTextToSize(audit.generalComments, 170);
+                        doc.text(splitText, 20, 120);
                     }
+                    
+                    doc.save(`WHS_Audit_${audit.id}_${audit.date}.pdf`);
                 },
-                
-                loadFromStorage() {
-                    try {
-                        // Load users
-                        const savedUsers = localStorage.getItem('whs_audit_users');
-                        if (savedUsers) {
-                            this.users = JSON.parse(savedUsers);
-                        } else {
-                            // Initialize with default users if none exist
-                            this.users = [
-                                { id: 1, name: 'Admin User', email: 'admin@amazon.at', password: 'admin123', role: 'admin' },
-                                { id: 2, name: 'Safety Officer', email: 'safety@amazon.at', password: 'safety123', role: 'auditor' },
-                                { id: 3, name: 'Area Manager', email: 'manager@amazon.at', password: 'manager123', role: 'viewer' }
-                            ];
-                            this.saveToStorage();
+
+                // Initialize app
+                initializeApp() {
+                    this.loadFromStorage();
+                    
+                    // Set up online/offline listeners
+                    window.addEventListener('online', () => {
+                        this.isOnline = true;
+                        this.syncToNetlify();
+                    });
+                    
+                    window.addEventListener('offline', () => {
+                        this.isOnline = false;
+                        this.storageStatus = 'Offline Mode';
+                    });
+                    
+                    // Auto-sync every 5 minutes if online
+                    setInterval(() => {
+                        if (this.isOnline && this.currentUser) {
+                            this.syncToNetlify();
                         }
-                        
-                        // Load audits
-                        const savedAudits = localStorage.getItem('whs_audit_audits');
-                        if (savedAudits) {
-                            this.audits = JSON.parse(savedAudits);
-                        }
-                        
-                        // Load questionnaires
-                        const savedQuestionnaires = localStorage.getItem('whs_audit_questionnaires');
-                        if (savedQuestionnaires) {
-                            this.questionnaires = JSON.parse(savedQuestionnaires);
-                        }
-                        
-                        // Load active questionnaire ID
-                        const savedActiveId = localStorage.getItem('whs_audit_activeQuestionnaireId');
-                        if (savedActiveId) {
-                            this.activeQuestionnaireId = JSON.parse(savedActiveId);
-                        }
-                        
-                        console.log('Data loaded from localStorage successfully');
-                    } catch (error) {
-                        console.error('Error loading from localStorage:', error);
-                        // Initialize with defaults if loading fails
-                        this.users = [
-                            { id: 1, name: 'Admin User', email: 'admin@amazon.at', password: 'admin123', role: 'admin' },
-                            { id: 2, name: 'Safety Officer', email: 'safety@amazon.at', password: 'safety123', role: 'auditor' },
-                            { id: 3, name: 'Area Manager', email: 'manager@amazon.at', password: 'manager123', role: 'viewer' }
-                        ];
-                        this.audits = [];
-                        this.questionnaires = [];
-                        this.activeQuestionnaireId = 'default';
-                    }
+                    }, 5 * 60 * 1000);
                 }
             },
+
             mounted() {
-                this.loadFromStorage();
+                this.initializeApp();
             }
         }).mount('#app');
     </script>
