@@ -1,383 +1,1599 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AMZL Safety Audit</title>
-  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/babel-standalone@7.22.5/babel.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body>
-  <div id="root"></div>
-  <script type="text/babel">
-    const { useState, useEffect } = React;
+import React, { useState, useEffect } from 'react';
+import { Shield, Users, FileText, BarChart3, Calendar, Download, Plus, Play, Save, Clock, Award, TrendingUp, User, LogOut, CheckCircle, XCircle, AlertTriangle, Menu, X, Eye, Edit2 } from 'lucide-react';
 
-    // Questionnaire data based on provided document
-    const questionnaire = [
+export default function AuditManagementSystem() {
+  // Initialize state from localStorage
+  const [currentUser, setCurrentUser] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [audits, setAudits] = useState([]);
+  const [view, setView] = useState('login');
+  const [currentAudit, setCurrentAudit] = useState(null);
+  const [showMenu, setShowMenu] = useState(false);
+  
+  // Login state
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  
+  // User management state
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'auditor' });
+
+  // Load data from localStorage on mount
+  useEffect(() => {
+    const savedUsers = localStorage.getItem('auditUsers');
+    const savedAudits = localStorage.getItem('audits');
+    const savedCurrentUser = localStorage.getItem('currentUser');
+    
+    if (savedUsers) {
+      setUsers(JSON.parse(savedUsers));
+    } else {
+      // Initialize with default users
+      const defaultUsers = [
+        { id: 1, name: 'Admin User', email: 'admin@amazon.at', password: 'admin123', role: 'admin' },
+        { id: 2, name: 'Safety Officer', email: 'safety@amazon.at', password: 'safety123', role: 'auditor' },
+        { id: 3, name: 'Area Manager', email: 'manager@amazon.at', password: 'manager123', role: 'viewer' }
+      ];
+      setUsers(defaultUsers);
+      localStorage.setItem('auditUsers', JSON.stringify(defaultUsers));
+    }
+    
+    if (savedAudits) {
+      setAudits(JSON.parse(savedAudits));
+    }
+    
+    if (savedCurrentUser) {
+      setCurrentUser(JSON.parse(savedCurrentUser));
+      setView('dashboard');
+    }
+  }, []);
+
+  // Save data to localStorage whenever it changes
+  useEffect(() => {
+    if (users.length > 0) {
+      localStorage.setItem('auditUsers', JSON.stringify(users));
+    }
+  }, [users]);
+
+  useEffect(() => {
+    if (audits.length > 0) {
+      localStorage.setItem('audits', JSON.stringify(audits));
+    }
+  }, [audits]);
+
+  // Login function
+  const handleLogin = () => {
+    const user = users.find(u => u.email === loginEmail && u.password === loginPassword);
+    if (user) {
+      setCurrentUser(user);
+      localStorage.setItem('currentUser', JSON.stringify(user));
+      setView('dashboard');
+      setLoginError('');
+    } else {
+      setLoginError('Invalid email or password');
+    }
+  };
+
+  // Logout function
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('currentUser');
+    setView('login');
+    setLoginEmail('');
+    setLoginPassword('');
+  };
+
+  // Add new user
+  const addUser = () => {
+    const newUserWithId = {
+      ...newUser,
+      id: Date.now()
+    };
+    setUsers([...users, newUserWithId]);
+    setShowUserModal(false);
+    setNewUser({ name: '', email: '', password: '', role: 'auditor' });
+  };
+
+  // Delete user
+  const deleteUser = (userId) => {
+    if (window.confirm('Are you sure you want to delete this user?')) {
+      setUsers(users.filter(u => u.id !== userId));
+    }
+  };
+
+  // Audit template based on the uploaded PDF
+  const auditTemplate = {
+    sections: [
       {
-        section: "1. Allgemeine Sicherheit",
-        questions: [
-          { id: "1.1", text: "Sind Sicherheitshinweise und Fluchtwegpläne deutlich sichtbar?", basis: "" },
-          { id: "1.2", text: "Sind alle Notausgänge frei und gut gekennzeichnet?", basis: "" },
-          { id: "1.3", text: "Ist die Erste-Hilfe-Ausstattung vollständig und erreichbar?", basis: "" },
-          { id: "1.4", text: "Ist die Notfallausrüstung (Augenspülung, Feuerlöscher) zugänglich?", basis: "" },
-          { id: "1.7", text: "Entsprechen Frisur/Kleidung den Sicherheitsvorschriften? (max Schulterhöhe)", basis: "" },
-          { id: "1.8", text: "Sind aktuelle Arbeitsanweisungen verfügbar?", basis: "ASchG § 2" }
+        id: 'general-safety',
+        title: '1. ALLGEMEINE SICHERHEIT',
+        subsections: [
+          {
+            title: 'Notfallausstattung',
+            items: [
+              { id: '1.1', text: 'Sind Sicherheitshinweise und Fluchtwegpläne deutlich sichtbar?', basis: 'AStV § 19', critical: true },
+              { id: '1.2', text: 'Sind alle Notausgänge frei und gut gekennzeichnet?', basis: 'AStV § 20', critical: true },
+              { id: '1.3', text: 'Ist die Erste-Hilfe-Ausstattung vollständig und erreichbar?', basis: 'ASchG § 26', critical: true },
+              { id: '1.4', text: 'Ist die Notfallausrüstung (Augenspülung, Feuerlöscher) zugänglich?', critical: true }
+            ]
+          },
+          {
+            title: 'Persönliche Schutzausrüstung',
+            items: [
+              { id: '1.5', text: 'Tragen alle Mitarbeiter die korrekte PSA?', basis: 'ASchG § 71', critical: false },
+              { id: '1.6', text: 'Sind alle Mitarbeiter-Badges sichtbar?', critical: false },
+              { id: '1.7', text: 'Entsprechen Frisur/Kleidung den Sicherheitsvorschriften? (max. Schulterhöhe)', critical: false },
+              { id: '1.8', text: 'Sind aktuelle Arbeitsanweisungen verfügbar?', basis: 'ASchG § 12', critical: false }
+            ]
+          }
         ]
       },
       {
-        section: "2. Arbeitsplatz und Umgebung",
-        questions: [
-          { id: "2.1", text: "Ist die Lagerhalle sauber und aufgeräumt?", basis: "AStV § 4" },
-          { id: "2.2", text: "Sind die Böden rutschfest und eben?", basis: "AStV § 5" },
-          { id: "2.3", text: "Ist ausreichend Bewegungsfreiheit vorhanden? (min. 1,5 m² pro Person)", basis: "" },
-          { id: "2.4", text: "Entspricht die Beleuchtung den Anforderungen? (min. 200 Lux)", basis: "AStV § 22" },
-          { id: "2.5", text: "Ist die Raumtemperatur angemessen? (18-25°C)", basis: "AStV § 23" },
-          { id: "2.6", text: "Ist die Lüftung ausreichend?", basis: "" },
-          { id: "2.7", text: "Liegt der Lärmpegel im zulässigen Bereich? (≤ 85 dB(A))", basis: "" },
-          { id: "2.8", text: "Sind die Arbeitsplätze ergonomisch gestaltet?", basis: "AStV § 21" }
+        id: 'workplace',
+        title: '2. ARBEITSPLATZ UND UMGEBUNG',
+        subsections: [
+          {
+            title: 'Ordnung und Sauberkeit',
+            items: [
+              { id: '2.1', text: 'Ist die Lagerhalle sauber und aufgeräumt?', basis: 'AStV § 4' },
+              { id: '2.2', text: 'Sind die Böden rutschfest und eben?', basis: 'AStV § 5', critical: true },
+              { id: '2.3', text: 'Ist ausreichend Bewegungsfreiheit vorhanden? (min. 1,5 m² pro Person)' }
+            ]
+          },
+          {
+            title: 'Arbeitsumgebung',
+            items: [
+              { id: '2.4', text: 'Entspricht die Beleuchtung den Anforderungen? (min. 200 Lux)', basis: 'AStV § 22' },
+              { id: '2.5', text: 'Ist die Raumtemperatur angemessen? (18-25°C)', basis: 'AStV § 23' },
+              { id: '2.6', text: 'Ist die Lüftung ausreichend?' },
+              { id: '2.7', text: 'Liegt der Lärmpegel im zulässigen Bereich? (≤ 85 dB(A))' }
+            ]
+          },
+          {
+            title: 'Ergonomie',
+            items: [
+              { id: '2.8', text: 'Sind die Arbeitsplätze ergonomisch gestaltet?', basis: 'AStV § 21' }
+            ]
+          }
         ]
       },
       {
-        section: "3. Lagerung und Transport",
-        questions: [
-          { id: "3.1", text: "Werden die 5S-Markierungen respektiert?", basis: "" },
-          { id: "3.2", text: "Sind die Lagerbereiche sicher organisiert?", basis: "" },
-          { id: "3.3", text: "Werden Lagerungen über Kopf vermieden?", basis: "" },
-          { id: "3.4", text: "Sind Regale ordnungsgemäß befestigt?", basis: "" },
-          { id: "3.5", text: "Sind die maximalen Stapelhöhen eingehalten?", basis: "" },
-          { id: "3.6", text: "Sind Fußgängerwege klar gekennzeichnet? (min. 1.2 m breit)", basis: "" },
-          { id: "3.7", text: "Sind alle Transportwege frei von Hindernissen?", basis: "" },
-          { id: "3.8", text: "Sind Gefahrenbereiche deutlich markiert?", basis: "" },
-          { id: "3.9", text: "Sind alle Flurförderzeuge in gutem Zustand?", basis: "" },
-          { id: "3.10", text: "Sind die Wartungsprotokolle aktuell? (jährliche Prüfung)", basis: "" },
-          { id: "3.11", text: "Sind Ladehilfsmittel unbeschädigt?", basis: "" }
+        id: 'storage-transport',
+        title: '3. LAGERUNG UND TRANSPORT',
+        subsections: [
+          {
+            title: 'Lagerbereiche',
+            items: [
+              { id: '3.1', text: 'Werden die 5S-Markierungen respektiert?' },
+              { id: '3.2', text: 'Sind die Lagerbereiche sicher organisiert?' },
+              { id: '3.3', text: 'Werden Lagerungen über Kopf vermieden?' },
+              { id: '3.4', text: 'Sind Regale ordnungsgemäß befestigt?', critical: true },
+              { id: '3.5', text: 'Sind die maximalen Stapelhöhen eingehalten?' }
+            ]
+          },
+          {
+            title: 'Transportwege',
+            items: [
+              { id: '3.6', text: 'Sind Fußgängerwege klar gekennzeichnet? (min. 1,2 m breit)' },
+              { id: '3.7', text: 'Sind alle Transportwege frei von Hindernissen?', critical: true },
+              { id: '3.8', text: 'Sind Gefahrenbereiche deutlich markiert?' }
+            ]
+          },
+          {
+            title: 'Flurförderzeuge',
+            items: [
+              { id: '3.9', text: 'Sind alle Flurförderzeuge in gutem Zustand?' },
+              { id: '3.10', text: 'Sind die Wartungsprotokolle aktuell? (jährliche Prüfung)' },
+              { id: '3.11', text: 'Sind Ladehilfsmittel unbeschädigt?' }
+            ]
+          }
         ]
       },
       {
-        section: "4. Gefahrstoffe",
-        questions: [
-          { id: "4.1", text: "Sind Gefahrstoffe korrekt gelagert?", basis: "ChemG" },
-          { id: "4.2", text: "Sind alle Gefahrstoffe ordnungsgemäß gekennzeichnet?", basis: "" },
-          { id: "4.3", text: "Sind Sicherheitsdatenblätter verfügbar?", basis: "" },
-          { id: "4.4", text: "Sind Gefahrstoffbereiche abgesperrt?", basis: "" }
+        id: 'hazardous-materials',
+        title: '4. GEFAHRSTOFFE',
+        subsections: [
+          {
+            title: '',
+            items: [
+              { id: '4.1', text: 'Sind Gefahrstoffe korrekt gelagert?', basis: 'ChemG', critical: true },
+              { id: '4.2', text: 'Sind alle Gefahrstoffe ordnungsgemäß gekennzeichnet?', critical: true },
+              { id: '4.3', text: 'Sind Sicherheitsdatenblätter verfügbar?' },
+              { id: '4.4', text: 'Sind Gefahrstoffbereiche abgesperrt?', critical: true }
+            ]
+          }
         ]
       },
       {
-        section: "5. Ergonomie und Arbeitsverhalten",
-        questions: [
-          { id: "5.1", text: "Vermeiden Mitarbeiter ungünstige Körperhaltungen?", basis: "" },
-          { id: "5.2", text: "Werden Transportwagen kontrolliert bewegt?", basis: "" },
-          { id: "5.3", text: "Werden Handläufe verwendet (wo vorhanden)?", basis: "" },
-          { id: "5.4", text: "Werden Hebehilfen bei schweren Lasten eingesetzt? (ab 25 kg Männer, 15 kg Frauen)", basis: "" },
-          { id: "5.5", text: "Werden Pausenzeiten eingehalten?", basis: "" },
-          { id: "5.6", text: "Ist der Arbeitsrhythmus angemessen?", basis: "" }
+        id: 'ergonomics',
+        title: '5. ERGONOMIE UND ARBEITSVERHALTEN',
+        subsections: [
+          {
+            title: '',
+            items: [
+              { id: '5.1', text: 'Vermeiden Mitarbeiter ungünstige Körperhaltungen?' },
+              { id: '5.2', text: 'Werden Transportwagen kontrolliert bewegt?' },
+              { id: '5.3', text: 'Werden Handläufe verwendet (wo vorhanden)?' },
+              { id: '5.4', text: 'Werden Hebehilfen bei schweren Lasten eingesetzt? (ab 25 kg Männer, 15 kg Frauen)' },
+              { id: '5.5', text: 'Werden Pausenzeiten eingehalten?' },
+              { id: '5.6', text: 'Ist der Arbeitsrhythmus angemessen?' }
+            ]
+          }
         ]
       },
       {
-        section: "6. Notfallvorsorge",
-        questions: [
-          { id: "6.1", text: "Sind genügend Ersthelfer verfügbar? (1 pro 19 Mitarbeiter)", basis: "" },
-          { id: "6.2", text: "Sind Brandschutzwarte ernannt und geschult?", basis: "" },
-          { id: "6.3", text: "Sind die Notfallpläne aktuell und bekannt?", basis: "" },
-          { id: "6.4", text: "Werden regelmäßig Notfallübungen durchgeführt?", basis: "" },
-          { id: "6.5", text: "Sind Sammelplätze bekannt und gekennzeichnet?", basis: "" },
-          { id: "6.6", text: "Funktioniert das Alarmsystem ordnungsgemäß?", basis: "" }
+        id: 'emergency',
+        title: '6. NOTFALLVORSORGE',
+        subsections: [
+          {
+            title: 'Personal',
+            items: [
+              { id: '6.1', text: 'Sind genügend Ersthelfer verfügbar? (1 pro 19 Mitarbeiter)', critical: true },
+              { id: '6.2', text: 'Sind Brandschutzwarte ernannt und geschult?', critical: true },
+              { id: '6.3', text: 'Sind die Notfallpläne aktuell und bekannt?' }
+            ]
+          },
+          {
+            title: 'Übungen',
+            items: [
+              { id: '6.4', text: 'Werden regelmäßig Notfallübungen durchgeführt?' },
+              { id: '6.5', text: 'Sind Sammelplätze bekannt und gekennzeichnet?' },
+              { id: '6.6', text: 'Funktioniert das Alarmsystem ordnungsgemäß?', critical: true }
+            ]
+          }
         ]
       },
       {
-        section: "7. Wartung und Instandhaltung",
-        questions: [
-          { id: "7.1", text: "Werden Wartungsintervalle bei Toren eingehalten?", basis: "" },
-          { id: "7.2", text: "Sind Feuerlöscher-Prüffristen aktuell? (alle 2 Jahre)", basis: "" },
-          { id: "7.3", text: "Sind elektrische Anlagen ordnungsgemäß geprüft?", basis: "" },
-          { id: "7.4", text: "Erfolgt regelmäßige Wartung der Lüftungsanlagen?", basis: "" },
-          { id: "7.5", text: "Sind alle Wartungsprotokolle verfügbar?", basis: "" }
+        id: 'maintenance',
+        title: '7. WARTUNG UND INSTANDHALTUNG',
+        subsections: [
+          {
+            title: '',
+            items: [
+              { id: '7.1', text: 'Werden Wartungsintervalle bei Toren eingehalten?' },
+              { id: '7.2', text: 'Sind Feuerlöscher-Prüffristen aktuell? (alle 2 Jahre)', critical: true },
+              { id: '7.3', text: 'Sind elektrische Anlagen ordnungsgemäß geprüft?' },
+              { id: '7.4', text: 'Erfolgt regelmäßige Wartung der Lüftungsanlagen?' },
+              { id: '7.5', text: 'Sind alle Wartungsprotokolle verfügbar?' }
+            ]
+          }
         ]
       },
       {
-        section: "8. Höhenarbeiten",
-        questions: [
-          { id: "8.1", text: "Sind Absturzsicherungen vorhanden?", basis: "" },
-          { id: "8.2", text: "Ist spezielle Schutzausrüstung verfügbar?", basis: "" },
-          { id: "8.3", text: "Sind Arbeiten in der Höhe genehmigt?", basis: "" }
-        ]
-      },
-      {
-        section: "9. Sofortmaßnahmen",
-        questions: [
-          { id: "9.1", text: "Sind sofortige Sicherheitsmaßnahmen erforderlich?", basis: "" }
+        id: 'height-work',
+        title: '8. HÖHENARBEITEN (falls zutreffend)',
+        subsections: [
+          {
+            title: '',
+            items: [
+              { id: '8.1', text: 'Sind Absturzsicherungen vorhanden?', critical: true },
+              { id: '8.2', text: 'Ist spezielle Schutzausrüstung verfügbar?' },
+              { id: '8.3', text: 'Sind Arbeiten in der Höhe genehmigt?' }
+            ]
+          }
         ]
       }
-    ];
+    ]
+  };
 
-    // Authentication Component
-    const Auth = ({ setUser }) => {
-      const [username, setUsername] = useState('');
-      const [password, setPassword] = useState('');
-      const [isRegister, setIsRegister] = useState(false);
-      const [error, setError] = useState('');
-
-      const handleAuth = async () => {
-        try {
-          const response = await fetch(`/.netlify/functions/auth`, {
-            method: 'POST',
-            body: JSON.stringify({ username, password, isRegister }),
-            headers: { 'Content-Type': 'application/json' }
-          });
-          const data = await response.json();
-          if (data.error) {
-            setError(data.error);
-          } else {
-            setUser({ username });
-            setError('');
-          }
-        } catch (err) {
-          setError('Failed to connect to server');
-        }
-      };
-
-      return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-100">
-          <div className="p-6 bg-white rounded shadow-md">
-            <h2 className="text-2xl font-bold mb-4">{isRegister ? 'Register' : 'Login'}</h2>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Username"
-              className="w-full p-2 mb-4 border rounded"
-            />
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
-              className="w-full p-2 mb-4 border rounded"
-            />
-            <button
-              onClick={handleAuth}
-              className="w-full p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-            >
-              {isRegister ? 'Register' : 'Login'}
-            </button>
-            <button
-              onClick={() => setIsRegister(!isRegister)}
-              className="w-full p-2 mt-2 text-blue-500 hover:underline"
-            >
-              {isRegister ? 'Switch to Login' : 'Switch to Register'}
-            </button>
-            {error && <p className="text-red-500 mt-2">{error}</p>}
-          </div>
-        </div>
-      );
+  // Start new audit
+  const startNewAudit = () => {
+    const newAudit = {
+      id: Date.now(),
+      date: new Date().toISOString().split('T')[0],
+      time: new Date().toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' }),
+      auditor: currentUser.name,
+      auditorId: currentUser.id,
+      location: '',
+      area: '',
+      shift: '',
+      status: 'in-progress',
+      responses: {},
+      deficiencies: [],
+      immediateActions: false,
+      immediateActionsDesc: '',
+      positiveObservations: '',
+      generalComments: '',
+      overallCondition: '',
+      overallResult: ''
     };
-
-    // Audit Form Component
-    const AuditForm = ({ user, setAuditId }) => {
-      const [auditData, setAuditData] = useState({
-        vertelizerentrum: '',
-        auditor: user.username,
-        date: new Date().toISOString().split('T')[0],
-        bereich: '',
-        schicht: ''
-      });
-      const [answers, setAnswers] = useState({});
-      const [deficiencies, setDeficiencies] = useState('');
-      const [positiveObservations, setPositiveObservations] = useState('');
-      const [overallAssessment, setOverallAssessment] = useState('Befriedigend');
-
-      const calculateScore = () => {
-        let total = 0;
-        let maxScore = 0;
-        Object.values(answers).forEach(answer => {
-          if (answer === 'Ja') total += 2;
-          else if (answer === 'N/A') total += 1;
-          maxScore += 2;
+    
+    // Initialize all responses
+    auditTemplate.sections.forEach(section => {
+      section.subsections.forEach(subsection => {
+        subsection.items.forEach(item => {
+          newAudit.responses[item.id] = { value: '', notes: '' };
         });
-        return Math.round((total / maxScore) * 100);
-      };
+      });
+    });
+    
+    setCurrentAudit(newAudit);
+    setView('conduct-audit');
+  };
 
-      const handleSubmit = async () => {
-        const audit = {
-          id: Date.now().toString(),
-          ...auditData,
-          answers,
-          deficiencies,
-          positiveObservations,
-          overallAssessment,
-          score: calculateScore(),
-          createdAt: new Date().toISOString(),
-          username: user.username
-        };
-        try {
-          const response = await fetch(`/.netlify/functions/save-audit`, {
-            method: 'POST',
-            body: JSON.stringify(audit),
-            headers: { 'Content-Type': 'application/json' }
-          });
-          const data = await response.json();
-          if (data.error) {
-            alert(data.error);
-          } else {
-            setAuditId(audit.id);
-            alert('Audit submitted successfully!');
+  // Update audit response
+  const updateResponse = (itemId, field, value) => {
+    setCurrentAudit({
+      ...currentAudit,
+      responses: {
+        ...currentAudit.responses,
+        [itemId]: {
+          ...currentAudit.responses[itemId],
+          [field]: value
+        }
+      }
+    });
+  };
+
+  // Update audit info
+  const updateAuditInfo = (field, value) => {
+    setCurrentAudit({
+      ...currentAudit,
+      [field]: value
+    });
+  };
+
+  // Add deficiency
+  const addDeficiency = () => {
+    const newDeficiency = {
+      id: Date.now(),
+      description: '',
+      priority: 'low',
+      responsible: '',
+      dueDate: ''
+    };
+    setCurrentAudit({
+      ...currentAudit,
+      deficiencies: [...currentAudit.deficiencies, newDeficiency]
+    });
+  };
+
+  // Update deficiency
+  const updateDeficiency = (defId, field, value) => {
+    setCurrentAudit({
+      ...currentAudit,
+      deficiencies: currentAudit.deficiencies.map(def =>
+        def.id === defId ? { ...def, [field]: value } : def
+      )
+    });
+  };
+
+  // Remove deficiency
+  const removeDeficiency = (defId) => {
+    setCurrentAudit({
+      ...currentAudit,
+      deficiencies: currentAudit.deficiencies.filter(def => def.id !== defId)
+    });
+  };
+
+  // Calculate audit score
+  const calculateScore = (audit) => {
+    let totalItems = 0;
+    let passedItems = 0;
+    let criticalFails = 0;
+    
+    auditTemplate.sections.forEach(section => {
+      section.subsections.forEach(subsection => {
+        subsection.items.forEach(item => {
+          const response = audit.responses[item.id];
+          if (response && response.value !== '' && response.value !== 'na') {
+            totalItems++;
+            if (response.value === 'yes') {
+              passedItems++;
+            } else if (response.value === 'no' && item.critical) {
+              criticalFails++;
+            }
           }
-        } catch (err) {
-          alert('Failed to save audit');
-        }
-      };
+        });
+      });
+    });
+    
+    const score = totalItems > 0 ? Math.round((passedItems / totalItems) * 100) : 0;
+    return { score, totalItems, passedItems, criticalFails };
+  };
 
-      return (
-        <div className="p-6">
-          <h2 className="text-2xl font-bold mb-4">AMZL Safety Audit</h2>
-          <div className="mb-4">
-            <input
-              type="text"
-              placeholder="Vertelizerentrum"
-              value={auditData.vertelizerentrum}
-              onChange={(e) => setAuditData({ ...auditData, vertelizerentrum: e.target.value })}
-              className="w-full p-2 mb-2 border rounded"
-            />
-            <input
-              type="text"
-              placeholder="Bereich"
-              value={auditData.bereich}
-              onChange={(e) => setAuditData({ ...auditData, bereich: e.target.value })}
-              className="w-full p-2 mb-2 border rounded"
-            />
-            <input
-              type="text"
-              placeholder="Schicht"
-              value={auditData.schicht}
-              onChange={(e) => setAuditData({ ...auditData, schicht: e.target.value })}
-              className="w-full p-2 mb-2 border rounded"
-            />
-          </div>
-          {questionnaire.map((section, index) => (
-            <div key={index} className="mb-6">
-              <h3 className="text-xl font-semibold mb-2">{section.section}</h3>
-              {section.questions.map((question) => (
-                <div key={question.id} className="mb-2">
-                  <p>{question.id} {question.text} {question.basis && <span>({question.basis})</span>}</p>
-                  <div className="flex gap-2">
-                    <label><input type="radio" name={question.id} value="Ja" onChange={() => setAnswers({ ...answers, [question.id]: 'Ja' })} /> Ja</label>
-                    <label><input type="radio" name={question.id} value="Nein" onChange={() => setAnswers({ ...answers, [question.id]: 'Nein' })} /> Nein</label>
-                    <label><input type="radio" name={question.id} value="N/A" onChange={() => setAnswers({ ...answers, [question.id]: 'N/A' })} /> N/A</label>
-                  </div>
-                </div>
-              ))}
+  // Save audit
+  const saveAudit = (status = 'completed') => {
+    const scoreData = calculateScore(currentAudit);
+    const auditToSave = {
+      ...currentAudit,
+      status,
+      score: scoreData.score,
+      totalItems: scoreData.totalItems,
+      passedItems: scoreData.passedItems,
+      criticalFails: scoreData.criticalFails,
+      completedDate: status === 'completed' ? new Date().toISOString() : null
+    };
+    
+    setAudits([...audits, auditToSave]);
+    setCurrentAudit(null);
+    setView('dashboard');
+  };
+
+  // Generate PDF report
+  const generatePDFReport = (audit) => {
+    // In a real app, you'd use a library like jsPDF or react-pdf
+    // For now, we'll create a formatted text report
+    let report = `AMAZON AUSTRIA AMZL - SICHERHEITS-AUDIT BERICHT\n`;
+    report += `===============================================\n\n`;
+    report += `AUDIT INFORMATIONEN\n`;
+    report += `Verteilerzentrum: ${audit.location}\n`;
+    report += `Auditor: ${audit.auditor}\n`;
+    report += `Datum/Uhrzeit: ${audit.date} ${audit.time}\n`;
+    report += `Bereich: ${audit.area}\n`;
+    report += `Schicht: ${audit.shift}\n\n`;
+    
+    report += `GESAMTBEWERTUNG\n`;
+    report += `Score: ${audit.score}%\n`;
+    report += `Bestandene Punkte: ${audit.passedItems}/${audit.totalItems}\n`;
+    report += `Kritische Mängel: ${audit.criticalFails}\n`;
+    report += `Status: ${audit.overallCondition || 'N/A'}\n`;
+    report += `Ergebnis: ${audit.overallResult || 'N/A'}\n\n`;
+    
+    if (audit.deficiencies.length > 0) {
+      report += `MÄNGEL UND MAßNAHMEN\n`;
+      audit.deficiencies.forEach((def, index) => {
+        report += `\nMangel ${index + 1}:\n`;
+        report += `Beschreibung: ${def.description}\n`;
+        report += `Priorität: ${def.priority}\n`;
+        report += `Verantwortlich: ${def.responsible}\n`;
+        report += `Fällig bis: ${def.dueDate}\n`;
+      });
+    }
+    
+    if (audit.positiveObservations) {
+      report += `\nPOSITIVE BEOBACHTUNGEN\n`;
+      report += audit.positiveObservations + '\n';
+    }
+    
+    if (audit.generalComments) {
+      report += `\nALLGEMEINE KOMMENTARE\n`;
+      report += audit.generalComments + '\n';
+    }
+    
+    // Create and download file
+    const blob = new Blob([report], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Audit_Report_${audit.location}_${audit.date}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // View audit details
+  const viewAuditDetails = (audit) => {
+    setCurrentAudit(audit);
+    setView('view-audit');
+  };
+
+  // Get monthly audit statistics
+  const getMonthlyStats = () => {
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    
+    const monthlyAudits = audits.filter(audit => {
+      const auditDate = new Date(audit.date);
+      return auditDate.getMonth() === currentMonth && auditDate.getFullYear() === currentYear;
+    });
+    
+    const avgScore = monthlyAudits.length > 0
+      ? Math.round(monthlyAudits.reduce((sum, audit) => sum + (audit.score || 0), 0) / monthlyAudits.length)
+      : 0;
+    
+    const criticalIssues = monthlyAudits.reduce((sum, audit) => sum + (audit.criticalFails || 0), 0);
+    
+    return {
+      total: monthlyAudits.length,
+      avgScore,
+      criticalIssues
+    };
+  };
+
+  const monthlyStats = getMonthlyStats();
+
+  // Render login page
+  if (view === 'login') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-500 rounded-full mb-4">
+              <Shield className="w-8 h-8 text-white" />
             </div>
-          ))}
-          <div className="mb-4">
-            <textarea
-              placeholder="Gefundene Mängel"
-              value={deficiencies}
-              onChange={(e) => setDeficiencies(e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-            <textarea
-              placeholder="Positive Beobachtungen"
-              value={positiveObservations}
-              onChange={(e) => setPositiveObservations(e.target.value)}
-              className="w-full p-2 mt-2 border rounded"
-            />
-            <select
-              value={overallAssessment}
-              onChange={(e) => setOverallAssessment(e.target.value)}
-              className="w-full p-2 mt-2 border rounded"
-            >
-              <option>Sehr gut</option>
-              <option>Gut</option>
-              <option>Befriedigend</option>
-              <option>Mangelhaft</option>
-            </select>
+            <h1 className="text-3xl font-bold text-gray-800">Safety Audit System</h1>
+            <p className="text-gray-600 mt-2">Amazon Austria AMZL</p>
           </div>
-          <button
-            onClick={handleSubmit}
-            className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Submit Audit
-          </button>
+          
+          {loginError && (
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4">
+              {loginError}
+            </div>
+          )}
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+              <input
+                type="email"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                placeholder="Enter your email"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+              <input
+                type="password"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                placeholder="Enter your password"
+                onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+              />
+            </div>
+            
+            <button
+              onClick={handleLogin}
+              className="w-full bg-orange-500 text-white py-3 rounded-lg font-semibold hover:bg-orange-600 transition-colors"
+            >
+              Sign In
+            </button>
+          </div>
+          
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600">Demo Accounts:</p>
+            <p className="text-xs text-gray-500 mt-1">admin@amazon.at / admin123</p>
+            <p className="text-xs text-gray-500">safety@amazon.at / safety123</p>
+          </div>
         </div>
-      );
-    };
+      </div>
+    );
+  }
 
-    // Audit Report Component
-    const AuditReport = ({ auditId, user }) => {
-      const [audit, setAudit] = useState(null);
-
-      useEffect(() => {
-        if (auditId) {
-          fetch(`/.netlify/functions/get-audit?auditId=${auditId}&username=${user.username}`)
-            .then(response => response.json())
-            .then(data => {
-              if (data.error) {
-                alert(data.error);
-              } else {
-                setAudit(data);
-              }
-            })
-            .catch(() => alert('Failed to load audit'));
-        }
-      }, [auditId, user]);
-
-      if (!audit) return <div>Loading...</div>;
-
-      return (
-        <div className="p-6">
-          <h2 className="text-2xl font-bold mb-4">Audit Report</h2>
-          <p><strong>Vertelizerentrum:</strong> {audit.vertelizerentrum}</p>
-          <p><strong>Auditor:</strong> {audit.auditor}</p>
-          <p><strong>Date:</strong> {audit.date}</p>
-          <p><strong>Bereich:</strong> {audit.bereich}</p>
-          <p><strong>Schicht:</strong> {audit.schicht}</p>
-          <p><strong>Score:</strong> {audit.score}%</p>
-          <p><strong>Overall Assessment:</strong> {audit.overallAssessment}</p>
-          <h3 className="text-xl font-semibold mt-4">Answers</h3>
-          {Object.entries(audit.answers).map(([id, answer]) => (
-            <p key={id}>{id}: {answer}</p>
-          ))}
-          <h3 className="text-xl font-semibold mt-4">Deficiencies</h3>
-          <p>{audit.deficiencies}</p>
-          <h3 className="text-xl font-semibold mt-4">Positive Observations</h3>
-          <p>{audit.positiveObservations}</p>
-        </div>
-      );
-    };
-
-    // Main App Component
-    const App = () => {
-      const [user, setUser] = useState(null);
-      const [auditId, setAuditId] = useState(null);
-
-      return (
-        <div className="min-h-screen bg-gray-100">
-          {user && (
-            <div className="flex justify-between p-4 bg-blue-500 text-white">
-              <h1 className="text-xl font-bold">AMZL Safety Audit</h1>
+  // Main app layout
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center">
               <button
-                onClick={() => setUser(null)}
-                className="p-2 bg-red-500 rounded hover:bg-red-600"
+                onClick={() => setShowMenu(!showMenu)}
+                className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
               >
+                {showMenu ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              </button>
+              <div className="flex items-center ml-4 lg:ml-0">
+                <Shield className="w-8 h-8 text-orange-500 mr-3" />
+                <h1 className="text-xl font-bold text-gray-900">Safety Audit System</h1>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              <div className="hidden sm:flex items-center text-sm text-gray-600">
+                <User className="w-4 h-4 mr-2" />
+                {currentUser?.name} ({currentUser?.role})
+              </div>
+              <button
+                onClick={handleLogout}
+                className="flex items-center text-sm text-gray-600 hover:text-gray-900"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
                 Logout
               </button>
             </div>
-          )}
-          {!user ? (
-            <Auth setUser={setUser} />
-          ) : auditId ? (
-            <AuditReport auditId={auditId} user={user} />
-          ) : (
-            <AuditForm user={user} setAuditId={setAuditId} />
-          )}
+          </div>
         </div>
-      );
-    };
+      </header>
 
-    ReactDOM.render(<App />, document.getElementById('root'));
-  </script>
-</body>
-</html>
+      <div className="flex">
+        {/* Sidebar */}
+        <aside className={`${showMenu ? 'block' : 'hidden'} lg:block w-64 bg-white shadow-sm border-r border-gray-200 min-h-screen`}>
+          <nav className="p-4 space-y-2">
+            <button
+              onClick={() => { setView('dashboard'); setShowMenu(false); }}
+              className={`w-full flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                view === 'dashboard' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <BarChart3 className="w-5 h-5 mr-3" />
+              Dashboard
+            </button>
+            
+            <button
+              onClick={() => { setView('audits'); setShowMenu(false); }}
+              className={`w-full flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                view === 'audits' || view === 'conduct-audit' || view === 'view-audit' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <FileText className="w-5 h-5 mr-3" />
+              Audits
+            </button>
+            
+            {currentUser?.role === 'admin' && (
+              <button
+                onClick={() => { setView('users'); setShowMenu(false); }}
+                className={`w-full flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  view === 'users' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <Users className="w-5 h-5 mr-3" />
+                Users
+              </button>
+            )}
+            
+            <button
+              onClick={() => { setView('reports'); setShowMenu(false); }}
+              className={`w-full flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                view === 'reports' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <Download className="w-5 h-5 mr-3" />
+              Reports
+            </button>
+          </nav>
+        </aside>
+
+        {/* Main Content */}
+        <main className="flex-1 p-4 lg:p-8">
+          {/* Dashboard View */}
+          {view === 'dashboard' && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
+              
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Monthly Audits</p>
+                      <p className="text-3xl font-bold text-gray-900 mt-2">{monthlyStats.total}</p>
+                    </div>
+                    <Calendar className="w-8 h-8 text-orange-500" />
+                  </div>
+                </div>
+                
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Average Score</p>
+                      <p className="text-3xl font-bold text-gray-900 mt-2">{monthlyStats.avgScore}%</p>
+                    </div>
+                    <Award className="w-8 h-8 text-green-500" />
+                  </div>
+                </div>
+                
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Critical Issues</p>
+                      <p className="text-3xl font-bold text-gray-900 mt-2">{monthlyStats.criticalIssues}</p>
+                    </div>
+                    <AlertTriangle className="w-8 h-8 text-red-500" />
+                  </div>
+                </div>
+                
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Compliance Rate</p>
+                      <p className="text-3xl font-bold text-gray-900 mt-2">
+                        {monthlyStats.avgScore >= 90 ? 'Good' : monthlyStats.avgScore >= 70 ? 'Fair' : 'Poor'}
+                      </p>
+                    </div>
+                    <TrendingUp className="w-8 h-8 text-blue-500" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Audits */}
+              <div className="bg-white rounded-lg shadow">
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900">Recent Audits</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Auditor</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {audits.slice(-5).reverse().map(audit => (
+                        <tr key={audit.id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{audit.date}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{audit.location || 'N/A'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{audit.auditor}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              audit.score >= 90 ? 'bg-green-100 text-green-800' :
+                              audit.score >= 70 ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {audit.score}%
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              audit.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {audit.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <button
+                              onClick={() => viewAuditDetails(audit)}
+                              className="text-orange-600 hover:text-orange-900"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {audits.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      No audits found. Start your first audit!
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              {currentUser?.role !== 'viewer' && (
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                  <button
+                    onClick={startNewAudit}
+                    className="inline-flex items-center px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                  >
+                    <Plus className="w-5 h-5 mr-2" />
+                    Start New Audit
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Audits List View */}
+          {view === 'audits' && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-gray-900">Audits</h2>
+                {currentUser?.role !== 'viewer' && (
+                  <button
+                    onClick={startNewAudit}
+                    className="inline-flex items-center px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                  >
+                    <Plus className="w-5 h-5 mr-2" />
+                    New Audit
+                  </button>
+                )}
+              </div>
+
+              <div className="bg-white rounded-lg shadow">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Area</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shift</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Auditor</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Critical</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {audits.map(audit => (
+                        <tr key={audit.id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{audit.date}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{audit.time || 'N/A'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{audit.location || 'N/A'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{audit.area || 'N/A'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{audit.shift || 'N/A'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{audit.auditor}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              audit.score >= 90 ? 'bg-green-100 text-green-800' :
+                              audit.score >= 70 ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {audit.score}%
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {audit.criticalFails > 0 && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                {audit.criticalFails}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              audit.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {audit.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                            <button
+                              onClick={() => viewAuditDetails(audit)}
+                              className="text-orange-600 hover:text-orange-900"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => generatePDFReport(audit)}
+                              className="text-gray-600 hover:text-gray-900"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {audits.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      No audits found. Start your first audit!
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Conduct Audit View */}
+          {view === 'conduct-audit' && currentAudit && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-gray-900">Conduct Safety Audit</h2>
+                <button
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to cancel this audit?')) {
+                      setCurrentAudit(null);
+                      setView('audits');
+                    }
+                  }}
+                  className="text-gray-600 hover:text-gray-900"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Audit Information */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Audit Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Verteilerzentrum</label>
+                    <input
+                      type="text"
+                      value={currentAudit.location}
+                      onChange={(e) => updateAuditInfo('location', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      placeholder="e.g., Wien Hauptlager"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Bereich</label>
+                    <input
+                      type="text"
+                      value={currentAudit.area}
+                      onChange={(e) => updateAuditInfo('area', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      placeholder="e.g., Lagerbereich A"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Schicht</label>
+                    <select
+                      value={currentAudit.shift}
+                      onChange={(e) => updateAuditInfo('shift', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    >
+                      <option value="">Select...</option>
+                      <option value="Frühschicht">Frühschicht</option>
+                      <option value="Spätschicht">Spätschicht</option>
+                      <option value="Nachtschicht">Nachtschicht</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Audit Sections */}
+              {auditTemplate.sections.map((section, sectionIndex) => (
+                <div key={section.id} className="bg-white rounded-lg shadow">
+                  <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <h3 className="text-lg font-semibold text-gray-900">{section.title}</h3>
+                  </div>
+                  <div className="p-6 space-y-6">
+                    {section.subsections.map((subsection, subIndex) => (
+                      <div key={subIndex}>
+                        {subsection.title && (
+                          <h4 className="font-medium text-gray-900 mb-4">{subsection.title}</h4>
+                        )}
+                        <div className="space-y-4">
+                          {subsection.items.map((item) => (
+                            <div key={item.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                              <div className="flex flex-col lg:flex-row lg:items-center justify-between">
+                                <div className="flex-1 mb-4 lg:mb-0">
+                                  <div className="flex items-start">
+                                    <span className="text-sm font-medium text-gray-700 mr-2">{item.id}</span>
+                                    <div className="flex-1">
+                                      <p className="text-sm text-gray-900">{item.text}</p>
+                                      {item.basis && (
+                                        <p className="text-xs text-gray-500 mt-1">Basis: {item.basis}</p>
+                                      )}
+                                      {item.critical && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 mt-1">
+                                          Critical
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                <div className="flex items-center space-x-2">
+                                  <button
+                                    onClick={() => updateResponse(item.id, 'value', 'yes')}
+                                    className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                                      currentAudit.responses[item.id]?.value === 'yes'
+                                        ? 'bg-green-500 text-white'
+                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                    }`}
+                                  >
+                                    Ja
+                                  </button>
+                                  <button
+                                    onClick={() => updateResponse(item.id, 'value', 'no')}
+                                    className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                                      currentAudit.responses[item.id]?.value === 'no'
+                                        ? 'bg-red-500 text-white'
+                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                    }`}
+                                  >
+                                    Nein
+                                  </button>
+                                  <button
+                                    onClick={() => updateResponse(item.id, 'value', 'na')}
+                                    className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                                      currentAudit.responses[item.id]?.value === 'na'
+                                        ? 'bg-gray-500 text-white'
+                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                    }`}
+                                  >
+                                    N/A
+                                  </button>
+                                </div>
+                              </div>
+                              
+                              {currentAudit.responses[item.id]?.value === 'no' && (
+                                <div className="mt-3">
+                                  <input
+                                    type="text"
+                                    value={currentAudit.responses[item.id]?.notes || ''}
+                                    onChange={(e) => updateResponse(item.id, 'notes', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                    placeholder="Add notes..."
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {/* Immediate Actions */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">9. SOFORTMASSNAHMEN</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={currentAudit.immediateActions}
+                        onChange={(e) => updateAuditInfo('immediateActions', e.target.checked)}
+                        className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">
+                        Sind sofortige Sicherheitsmaßnahmen erforderlich?
+                      </span>
+                    </label>
+                  </div>
+                  
+                  {currentAudit.immediateActions && (
+                    <textarea
+                      value={currentAudit.immediateActionsDesc}
+                      onChange={(e) => updateAuditInfo('immediateActionsDesc', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      rows="3"
+                      placeholder="Describe immediate actions required..."
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Deficiencies */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">10. MÄNGEL UND MASSNAHMEN</h3>
+                  <button
+                    onClick={addDeficiency}
+                    className="inline-flex items-center px-3 py-1 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm"
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Add Deficiency
+                  </button>
+                </div>
+                
+                <div className="space-y-4">
+                  {currentAudit.deficiencies.map((def, index) => (
+                    <div key={def.id} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-3">
+                        <h4 className="font-medium text-gray-900">Mangel {index + 1}</h4>
+                        <button
+                          onClick={() => removeDeficiency(def.id)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                          <textarea
+                            value={def.description}
+                            onChange={(e) => updateDeficiency(def.id, 'description', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            rows="2"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Priorität</label>
+                          <select
+                            value={def.priority}
+                            onChange={(e) => updateDeficiency(def.id, 'priority', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                          >
+                            <option value="low">Niedrig</option>
+                            <option value="medium">Mittel</option>
+                            <option value="high">Hoch</option>
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Verantwortlich</label>
+                          <input
+                            type="text"
+                            value={def.responsible}
+                            onChange={(e) => updateDeficiency(def.id, 'responsible', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Termin</label>
+                          <input
+                            type="date"
+                            value={def.dueDate}
+                            onChange={(e) => updateDeficiency(def.id, 'dueDate', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {currentAudit.deficiencies.length === 0 && (
+                    <p className="text-center text-gray-500 py-4">No deficiencies added yet.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Positive Observations */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">11. POSITIVE BEOBACHTUNGEN</h3>
+                <textarea
+                  value={currentAudit.positiveObservations}
+                  onChange={(e) => updateAuditInfo('positiveObservations', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  rows="4"
+                  placeholder="Vorbildliche Arbeitspraktiken..."
+                />
+              </div>
+
+              {/* Overall Assessment */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">12. GESAMTBEWERTUNG</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Zustand des Arbeitsplatzes</label>
+                    <select
+                      value={currentAudit.overallCondition}
+                      onChange={(e) => updateAuditInfo('overallCondition', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    >
+                      <option value="">Select...</option>
+                      <option value="Sehr gut">Sehr gut</option>
+                      <option value="Gut">Gut</option>
+                      <option value="Befriedigend">Befriedigend</option>
+                      <option value="Mangelhaft">Mangelhaft</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Gesamtresultat</label>
+                    <select
+                      value={currentAudit.overallResult}
+                      onChange={(e) => updateAuditInfo('overallResult', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    >
+                      <option value="">Select...</option>
+                      <option value="Keine Beanstandungen">Keine Beanstandungen</option>
+                      <option value="Kleinere Mängel">Kleinere Mängel</option>
+                      <option value="Maßnahmen eingeleitet">Maßnahmen eingeleitet</option>
+                      <option value="Sofortmaßnahmen erforderlich">Sofortmaßnahmen erforderlich</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Allgemeine Kommentare</label>
+                  <textarea
+                    value={currentAudit.generalComments}
+                    onChange={(e) => updateAuditInfo('generalComments', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    rows="4"
+                  />
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end space-x-4">
+                <button
+                  onClick={() => saveAudit('draft')}
+                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Save as Draft
+                </button>
+                <button
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to complete this audit?')) {
+                      saveAudit('completed');
+                    }
+                  }}
+                  className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                >
+                  Complete Audit
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* View Audit Details */}
+          {view === 'view-audit' && currentAudit && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-gray-900">Audit Report</h2>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => generatePDFReport(currentAudit)}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <Download className="w-5 h-5 mr-2" />
+                    Download Report
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCurrentAudit(null);
+                      setView('audits');
+                    }}
+                    className="text-gray-600 hover:text-gray-900"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Audit Summary */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Audit Summary</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div>
+                    <p className="text-sm text-gray-600">Date & Time</p>
+                    <p className="font-medium">{currentAudit.date} {currentAudit.time}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Location</p>
+                    <p className="font-medium">{currentAudit.location || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Area</p>
+                    <p className="font-medium">{currentAudit.area || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Shift</p>
+                    <p className="font-medium">{currentAudit.shift || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Auditor</p>
+                    <p className="font-medium">{currentAudit.auditor}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Status</p>
+                    <p className="font-medium capitalize">{currentAudit.status}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Score Card */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Audit Score</h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <div className={`text-4xl font-bold ${
+                      currentAudit.score >= 90 ? 'text-green-600' :
+                      currentAudit.score >= 70 ? 'text-yellow-600' :
+                      'text-red-600'
+                    }`}>
+                      {currentAudit.score}%
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">Overall Score</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-4xl font-bold text-gray-900">
+                      {currentAudit.passedItems}/{currentAudit.totalItems}
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">Items Passed</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-4xl font-bold text-red-600">
+                      {currentAudit.criticalFails || 0}
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">Critical Failures</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-4xl font-bold text-orange-600">
+                      {currentAudit.deficiencies?.length || 0}
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">Total Deficiencies</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Overall Assessment */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Overall Assessment</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-sm text-gray-600">Workplace Condition</p>
+                    <p className="font-medium">{currentAudit.overallCondition || 'Not specified'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Overall Result</p>
+                    <p className="font-medium">{currentAudit.overallResult || 'Not specified'}</p>
+                  </div>
+                </div>
+                {currentAudit.generalComments && (
+                  <div className="mt-4">
+                    <p className="text-sm text-gray-600 mb-2">General Comments</p>
+                    <p className="text-gray-900">{currentAudit.generalComments}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Immediate Actions */}
+              {currentAudit.immediateActions && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-red-900 mb-2">Immediate Actions Required</h3>
+                  <p className="text-red-700">{currentAudit.immediateActionsDesc || 'No description provided'}</p>
+                </div>
+              )}
+
+              {/* Deficiencies */}
+              {currentAudit.deficiencies?.length > 0 && (
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Deficiencies & Actions</h3>
+                  <div className="space-y-4">
+                    {currentAudit.deficiencies.map((def, index) => (
+                      <div key={def.id} className="border rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <h4 className="font-medium text-gray-900">Deficiency {index + 1}</h4>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            def.priority === 'high' ? 'bg-red-100 text-red-800' :
+                            def.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-green-100 text-green-800'
+                          }`}>
+                            {def.priority} priority
+                          </span>
+                        </div>
+                        <p className="text-gray-700 mb-2">{def.description}</p>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="text-gray-600">Responsible:</span>
+                            <span className="ml-2 font-medium">{def.responsible || 'Not assigned'}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Due Date:</span>
+                            <span className="ml-2 font-medium">{def.dueDate || 'Not set'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Positive Observations */}
+              {currentAudit.positiveObservations && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-green-900 mb-2">Positive Observations</h3>
+                  <p className="text-green-700">{currentAudit.positiveObservations}</p>
+                </div>
+              )}
+
+              {/* Detailed Results */}
+              <div className="bg-white rounded-lg shadow">
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900">Detailed Results</h3>
+                </div>
+                <div className="p-6 space-y-6">
+                  {auditTemplate.sections.map((section) => {
+                    const sectionItems = section.subsections.flatMap(sub => sub.items);
+                    const answeredItems = sectionItems.filter(item => 
+                      currentAudit.responses[item.id]?.value && currentAudit.responses[item.id].value !== ''
+                    );
+                    
+                    if (answeredItems.length === 0) return null;
+                    
+                    return (
+                      <div key={section.id}>
+                        <h4 className="font-medium text-gray-900 mb-3">{section.title}</h4>
+                        <div className="space-y-2">
+                          {answeredItems.map(item => {
+                            const response = currentAudit.responses[item.id];
+                            return (
+                              <div key={item.id} className="flex items-start space-x-3 text-sm">
+                                <span className="font-medium text-gray-700">{item.id}</span>
+                                <div className="flex-1">
+                                  <p className="text-gray-900">{item.text}</p>
+                                  {response.notes && (
+                                    <p className="text-gray-600 mt-1">Note: {response.notes}</p>
+                                  )}
+                                </div>
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                  response.value === 'yes' ? 'bg-green-100 text-green-800' :
+                                  response.value === 'no' ? 'bg-red-100 text-red-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {response.value === 'yes' ? 'Pass' : response.value === 'no' ? 'Fail' : 'N/A'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Users Management View */}
+          {view === 'users' && currentUser?.role === 'admin' && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-gray-900">User Management</h2>
+                <button
+                  onClick={() => setShowUserModal(true)}
+                  className="inline-flex items-center px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                >
+                  <Plus className="w-5 h-5 mr-2" />
+                  Add User
+                </button>
+              </div>
+
+              <div className="bg-white rounded-lg shadow">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {users.map(user => (
+                        <tr key={user.id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.name}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
+                              user.role === 'auditor' ? 'bg-blue-100 text-blue-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {user.role}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            {user.id !== currentUser.id && (
+                              <button
+                                onClick={() => deleteUser(user.id)}
+                                className="text-red-600 hover:text-red-900"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Reports View */}
+          {view === 'reports' && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-gray-900">Reports</h2>
+              
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly Summary</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                    <div className="text-3xl font-bold text-gray-900">{monthlyStats.total}</div>
+                    <p className="text-sm text-gray-600 mt-1">Total Audits</p>
+                  </div>
+                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                    <div className="text-3xl font-bold text-gray-900">{monthlyStats.avgScore}%</div>
+                    <p className="text-sm text-gray-600 mt-1">Average Score</p>
+                  </div>
+                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                    <div className="text-3xl font-bold text-gray-900">{monthlyStats.criticalIssues}</div>
+                    <p className="text-sm text-gray-600 mt-1">Critical Issues</p>
+                  </div>
+                </div>
+                
+                <p className="text-sm text-gray-600">
+                  This month's safety compliance is {monthlyStats.avgScore >= 90 ? 'excellent' : monthlyStats.avgScore >= 70 ? 'satisfactory' : 'needs improvement'}.
+                  {monthlyStats.criticalIssues > 0 && ` There are ${monthlyStats.criticalIssues} critical issues that require immediate attention.`}
+                </p>
+              </div>
+
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Available Reports</h3>
+                <div className="space-y-3">
+                  {audits.map(audit => (
+                    <div key={audit.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                      <div>
+                        <p className="font-medium text-gray-900">
+                          {audit.location || 'Unknown Location'} - {audit.date}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          Auditor: {audit.auditor} | Score: {audit.score}%
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => generatePDFReport(audit)}
+                        className="inline-flex items-center px-3 py-1 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors text-sm"
+                      >
+                        <Download className="w-4 h-4 mr-1" />
+                        Download
+                      </button>
+                    </div>
+                  ))}
+                  
+                  {audits.length === 0 && (
+                    <p className="text-center text-gray-500 py-4">No reports available yet.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* User Modal */}
+      {showUserModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New User</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <input
+                  type="text"
+                  value={newUser.name}
+                  onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input
+                  type="password"
+                  value={newUser.password}
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                <select
+                  value={newUser.role}
+                  onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                >
+                  <option value="viewer">Viewer</option>
+                  <option value="auditor">Auditor</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowUserModal(false);
+                  setNewUser({ name: '', email: '', password: '', role: 'viewer' });
+                }}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={addUser}
+                className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+              >
+                Add User
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
