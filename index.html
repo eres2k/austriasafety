@@ -7,6 +7,7 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/lucide@latest/dist/lucide.css">
     <style>
         [v-cloak] { display: none; }
@@ -30,6 +31,17 @@
             object-fit: cover;
             border-radius: 4px;
             cursor: pointer;
+        }
+        .file-upload-area {
+            border: 2px dashed #d1d5db;
+            transition: border-color 0.3s;
+        }
+        .file-upload-area:hover {
+            border-color: #FF9900;
+        }
+        .file-upload-area.dragover {
+            border-color: #FF9900;
+            background-color: #fef3e2;
         }
     </style>
 </head>
@@ -155,6 +167,17 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                             </svg>
                             Audits
+                        </button>
+                        
+                        <button 
+                            @click="navigateTo('questionnaires')" 
+                            :class="{'bg-orange-50 text-orange-600': currentView === 'questionnaires', 'text-gray-700 hover:bg-gray-50': currentView !== 'questionnaires'}"
+                            class="w-full flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors"
+                        >
+                            <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 011-1.732l4-2 4 2A2 2 0 0118 5v2H6V5z"></path>
+                            </svg>
+                            Questionnaires
                         </button>
                         
                         <button 
@@ -305,6 +328,97 @@
                         </div>
                     </div>
 
+                    <!-- Questionnaires Management View -->
+                    <div v-else-if="currentView === 'questionnaires'" class="space-y-6">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-2xl font-bold text-gray-900">Questionnaire Management</h2>
+                            <button @click="showUploadModal = true" class="inline-flex items-center px-4 py-2 amazon-orange text-white rounded-lg amazon-orange-hover transition-colors">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                </svg>
+                                Upload Excel Questionnaire
+                            </button>
+                        </div>
+
+                        <!-- Current Questionnaire -->
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <div class="flex items-center">
+                                <svg class="w-5 h-5 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <span class="text-sm font-medium text-blue-900">
+                                    Currently Active: {{ getActiveQuestionnaire().name }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Available Questionnaires -->
+                        <div class="bg-white rounded-lg shadow">
+                            <div class="px-6 py-4 border-b border-gray-200">
+                                <h3 class="text-lg font-semibold text-gray-900">Available Questionnaires</h3>
+                            </div>
+                            <div class="p-6">
+                                <div class="space-y-4">
+                                    <div v-for="questionnaire in questionnaires" :key="questionnaire.id" class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+                                        <div class="flex-1">
+                                            <div class="flex items-center">
+                                                <h4 class="font-medium text-gray-900">{{ questionnaire.name }}</h4>
+                                                <span v-if="questionnaire.id === activeQuestionnaireId" class="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                    Active
+                                                </span>
+                                            </div>
+                                            <p class="text-sm text-gray-600 mt-1">{{ questionnaire.description }}</p>
+                                            <p class="text-xs text-gray-500 mt-1">
+                                                {{ questionnaire.sections?.length || 0 }} sections, 
+                                                {{ getTotalQuestions(questionnaire) }} questions
+                                            </p>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            <button 
+                                                v-if="questionnaire.id !== activeQuestionnaireId" 
+                                                @click="setActiveQuestionnaire(questionnaire.id)" 
+                                                class="px-3 py-1 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
+                                            >
+                                                Set Active
+                                            </button>
+                                            <button @click="previewQuestionnaire(questionnaire)" class="px-3 py-1 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm">
+                                                Preview
+                                            </button>
+                                            <button 
+                                                v-if="questionnaire.id !== 'default'" 
+                                                @click="deleteQuestionnaire(questionnaire.id)" 
+                                                class="px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Excel Format Guidelines -->
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Excel Format Guidelines</h3>
+                            <div class="text-sm text-gray-700 space-y-2">
+                                <p class="font-medium">Required columns in your Excel file:</p>
+                                <ul class="list-disc list-inside ml-4 space-y-1">
+                                    <li><strong>Section:</strong> Section title (e.g., "1. ALLGEMEINE SICHERHEIT")</li>
+                                    <li><strong>Subsection:</strong> Subsection title (optional)</li>
+                                    <li><strong>Question_ID:</strong> Unique identifier (e.g., "1.1", "1.2")</li>
+                                    <li><strong>Question_Text:</strong> The actual question</li>
+                                    <li><strong>Legal_Basis:</strong> Legal reference (optional)</li>
+                                    <li><strong>Critical:</strong> "Yes" or "No" to mark critical items</li>
+                                </ul>
+                                <p class="mt-4 text-blue-600">
+                                    <a href="#" @click="downloadSampleExcel" class="hover:underline">
+                                        📥 Download Sample Excel Template
+                                    </a>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Audits List View -->
                     <div v-else-if="currentView === 'audits'" class="space-y-6">
                         <div class="flex justify-between items-center">
@@ -386,6 +500,7 @@
                             <div>
                                 <h2 class="text-2xl font-bold text-gray-900">WHS Safety Audit</h2>
                                 <p class="text-sm text-gray-600">Amazon Austria - Workplace Health & Safety</p>
+                                <p class="text-xs text-gray-500">Questionnaire: {{ getActiveQuestionnaire().name }}</p>
                             </div>
                             <button @click="cancelAudit" class="text-gray-600 hover:text-gray-900">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -400,7 +515,18 @@
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Verteilerzentrum</label>
-                                    <input v-model="currentAudit.location" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent" placeholder="e.g., Wien Hauptlager">
+                                    <select v-model="currentAudit.location" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                                        <option value="">Select Location...</option>
+                                        <option v-for="location in amazonLocations" :key="location" :value="location">{{ location }}</option>
+                                        <option value="custom">Other (specify below)</option>
+                                    </select>
+                                    <input 
+                                        v-if="currentAudit.location === 'custom'" 
+                                        v-model="currentAudit.customLocation" 
+                                        type="text" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent mt-2" 
+                                        placeholder="Enter custom location"
+                                    >
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Bereich</label>
@@ -419,7 +545,7 @@
                         </div>
 
                         <!-- Audit Sections -->
-                        <div v-for="(section, sectionIndex) in auditTemplate.sections" :key="section.id" class="bg-white rounded-lg shadow">
+                        <div v-for="(section, sectionIndex) in getCurrentAuditTemplate().sections" :key="section.id" class="bg-white rounded-lg shadow">
                             <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
                                 <h3 class="text-lg font-semibold text-gray-900">{{ section.title }}</h3>
                             </div>
@@ -664,7 +790,7 @@
                                 </div>
                                 <div>
                                     <p class="text-sm text-gray-600">Location</p>
-                                    <p class="font-medium">{{ viewingAudit.location || 'N/A' }}</p>
+                                    <p class="font-medium">{{ getDisplayLocation(viewingAudit) }}</p>
                                 </div>
                                 <div>
                                     <p class="text-sm text-gray-600">Area</p>
@@ -871,7 +997,7 @@
                                 <div v-for="audit in audits" :key="audit.id" class="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
                                     <div>
                                         <p class="font-medium text-gray-900">
-                                            {{ audit.location || 'Unknown Location' }} - {{ audit.date }}
+                                            {{ getDisplayLocation(audit) }} - {{ audit.date }}
                                         </p>
                                         <p class="text-sm text-gray-600">
                                             Auditor: {{ audit.auditor }} | Score: {{ audit.score }}%
@@ -935,6 +1061,66 @@
             </div>
         </div>
 
+        <!-- Upload Excel Modal -->
+        <div v-if="showUploadModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-lg max-w-2xl w-full p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Upload Excel Questionnaire</h3>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Questionnaire Name</label>
+                        <input v-model="uploadForm.name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent" placeholder="e.g., Safety Audit 2025">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <input v-model="uploadForm.description" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent" placeholder="Brief description of this questionnaire">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Excel File</label>
+                        <div 
+                            class="file-upload-area p-6 rounded-lg text-center cursor-pointer"
+                            @click="triggerFileInput"
+                            @dragover.prevent="handleDragOver"
+                            @dragleave.prevent="handleDragLeave"
+                            @drop.prevent="handleFileDrop"
+                        >
+                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                            </svg>
+                            <p v-if="!selectedFile" class="mt-2 text-sm text-gray-600">
+                                Click to upload or drag and drop your Excel file here
+                            </p>
+                            <p v-else class="mt-2 text-sm text-green-600">
+                                Selected: {{ selectedFile.name }}
+                            </p>
+                        </div>
+                        <input 
+                            ref="fileInput" 
+                            type="file" 
+                            accept=".xlsx,.xls" 
+                            @change="handleFileSelect" 
+                            class="hidden"
+                        >
+                    </div>
+                    
+                    <div v-if="uploadError" class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
+                        {{ uploadError }}
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button @click="closeUploadModal" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                        Cancel
+                    </button>
+                    <button @click="uploadQuestionnaire" :disabled="!selectedFile || !uploadForm.name" class="px-4 py-2 amazon-orange text-white rounded-lg amazon-orange-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        Upload Questionnaire
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Camera Modal -->
         <div v-if="showCameraModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div class="bg-white rounded-lg max-w-md w-full p-6">
@@ -966,6 +1152,40 @@
                 <img :src="fullPhotoUrl" class="max-w-full max-h-full rounded" alt="Full size photo">
             </div>
         </div>
+
+        <!-- Questionnaire Preview Modal -->
+        <div v-if="showPreviewModal && previewingQuestionnaire" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-lg max-w-4xl w-full h-5/6 flex flex-col">
+                <div class="flex justify-between items-center p-6 border-b">
+                    <h3 class="text-lg font-semibold text-gray-900">Preview: {{ previewingQuestionnaire.name }}</h3>
+                    <button @click="closePreviewModal" class="text-gray-600 hover:text-gray-900">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="flex-1 overflow-y-auto p-6">
+                    <div v-for="section in previewingQuestionnaire.sections" :key="section.id" class="mb-6">
+                        <h4 class="font-semibold text-gray-900 mb-3">{{ section.title }}</h4>
+                        <div v-for="subsection in section.subsections" :key="subsection.title" class="ml-4 mb-4">
+                            <h5 v-if="subsection.title" class="font-medium text-gray-800 mb-2">{{ subsection.title }}</h5>
+                            <div class="space-y-2">
+                                <div v-for="item in subsection.items" :key="item.id" class="flex items-start text-sm">
+                                    <span class="font-medium text-gray-600 mr-2 w-12">{{ item.id }}</span>
+                                    <div class="flex-1">
+                                        <span class="text-gray-900">{{ item.text }}</span>
+                                        <span v-if="item.critical" class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                                            Critical
+                                        </span>
+                                        <p v-if="item.basis" class="text-xs text-gray-500 mt-1">Basis: {{ item.basis }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -980,16 +1200,27 @@
                     showUserModal: false,
                     showCameraModal: false,
                     showPhotoModal: false,
+                    showUploadModal: false,
+                    showPreviewModal: false,
                     fullPhotoUrl: '',
                     currentPhotoItemId: null,
                     cameraStream: null,
+                    selectedFile: null,
+                    uploadError: '',
+                    previewingQuestionnaire: null,
                     loginForm: {
                         email: '',
                         password: ''
                     },
+                    uploadForm: {
+                        name: '',
+                        description: ''
+                    },
                     loginError: '',
                     users: [],
                     audits: [],
+                    questionnaires: [],
+                    activeQuestionnaireId: 'default',
                     currentAudit: null,
                     viewingAudit: null,
                     newUser: {
@@ -998,7 +1229,17 @@
                         password: '',
                         role: 'auditor'
                     },
-                    auditTemplate: {
+                    amazonLocations: [
+                        'DVI1 - Verteilerzentrum Wien 1',
+                        'DVI2 - Verteilerzentrum Wien 2', 
+                        'DVI3 - Verteilerzentrum Wien 3',
+                        'DAP5 - Verteilerzentrum Pasching',
+                        'DAP8 - Verteilerzentrum Pasching 8'
+                    ],
+                    defaultQuestionnaire: {
+                        id: 'default',
+                        name: 'Standard WHS Safety Audit',
+                        description: 'Default workplace health and safety audit questionnaire',
                         sections: [
                             {
                                 id: 'general-safety',
@@ -1223,6 +1464,211 @@
                     this.showMobileMenu = false;
                 },
                 
+                // Questionnaire management methods
+                getActiveQuestionnaire() {
+                    return this.questionnaires.find(q => q.id === this.activeQuestionnaireId) || this.defaultQuestionnaire;
+                },
+                getCurrentAuditTemplate() {
+                    return this.getActiveQuestionnaire();
+                },
+                setActiveQuestionnaire(id) {
+                    this.activeQuestionnaireId = id;
+                    this.saveToStorage();
+                },
+                getTotalQuestions(questionnaire) {
+                    let total = 0;
+                    questionnaire.sections?.forEach(section => {
+                        section.subsections?.forEach(subsection => {
+                            total += subsection.items?.length || 0;
+                        });
+                    });
+                    return total;
+                },
+                previewQuestionnaire(questionnaire) {
+                    this.previewingQuestionnaire = questionnaire;
+                    this.showPreviewModal = true;
+                },
+                closePreviewModal() {
+                    this.showPreviewModal = false;
+                    this.previewingQuestionnaire = null;
+                },
+                deleteQuestionnaire(id) {
+                    if (confirm('Are you sure you want to delete this questionnaire?')) {
+                        this.questionnaires = this.questionnaires.filter(q => q.id !== id);
+                        if (this.activeQuestionnaireId === id) {
+                            this.activeQuestionnaireId = 'default';
+                        }
+                        this.saveToStorage();
+                    }
+                },
+
+                // Excel upload methods
+                triggerFileInput() {
+                    this.$refs.fileInput.click();
+                },
+                handleFileSelect(event) {
+                    this.selectedFile = event.target.files[0];
+                },
+                handleDragOver(event) {
+                    event.currentTarget.classList.add('dragover');
+                },
+                handleDragLeave(event) {
+                    event.currentTarget.classList.remove('dragover');
+                },
+                handleFileDrop(event) {
+                    event.currentTarget.classList.remove('dragover');
+                    this.selectedFile = event.dataTransfer.files[0];
+                },
+                closeUploadModal() {
+                    this.showUploadModal = false;
+                    this.selectedFile = null;
+                    this.uploadForm = { name: '', description: '' };
+                    this.uploadError = '';
+                },
+                async uploadQuestionnaire() {
+                    if (!this.selectedFile || !this.uploadForm.name) {
+                        this.uploadError = 'Please provide a name and select an Excel file.';
+                        return;
+                    }
+
+                    try {
+                        const fileData = await this.readExcelFile(this.selectedFile);
+                        const questionnaire = this.parseExcelToQuestionnaire(fileData);
+                        
+                        questionnaire.id = Date.now().toString();
+                        questionnaire.name = this.uploadForm.name;
+                        questionnaire.description = this.uploadForm.description;
+                        
+                        this.questionnaires.push(questionnaire);
+                        this.saveToStorage();
+                        this.closeUploadModal();
+                        
+                        alert('Questionnaire uploaded successfully!');
+                    } catch (error) {
+                        this.uploadError = 'Error processing Excel file: ' + error.message;
+                    }
+                },
+                readExcelFile(file) {
+                    return new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            try {
+                                const data = new Uint8Array(e.target.result);
+                                const workbook = XLSX.read(data, { type: 'array' });
+                                resolve(workbook);
+                            } catch (error) {
+                                reject(error);
+                            }
+                        };
+                        reader.onerror = reject;
+                        reader.readAsArrayBuffer(file);
+                    });
+                },
+                parseExcelToQuestionnaire(workbook) {
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                    
+                    if (jsonData.length === 0) {
+                        throw new Error('Excel file appears to be empty');
+                    }
+                    
+                    // Check required columns
+                    const requiredColumns = ['Section', 'Question_ID', 'Question_Text'];
+                    const firstRow = jsonData[0];
+                    const missingColumns = requiredColumns.filter(col => !(col in firstRow));
+                    
+                    if (missingColumns.length > 0) {
+                        throw new Error(`Missing required columns: ${missingColumns.join(', ')}`);
+                    }
+                    
+                    // Group by section
+                    const sectionsMap = new Map();
+                    
+                    jsonData.forEach((row, index) => {
+                        try {
+                            const sectionTitle = row.Section?.toString().trim();
+                            const subsectionTitle = row.Subsection?.toString().trim() || '';
+                            const questionId = row.Question_ID?.toString().trim();
+                            const questionText = row.Question_Text?.toString().trim();
+                            const legalBasis = row.Legal_Basis?.toString().trim() || '';
+                            const critical = row.Critical?.toString().toLowerCase() === 'yes';
+                            
+                            if (!sectionTitle || !questionId || !questionText) {
+                                throw new Error(`Row ${index + 2}: Missing required data`);
+                            }
+                            
+                            if (!sectionsMap.has(sectionTitle)) {
+                                sectionsMap.set(sectionTitle, {
+                                    id: sectionTitle.toLowerCase().replace(/\s+/g, '-'),
+                                    title: sectionTitle,
+                                    subsections: new Map()
+                                });
+                            }
+                            
+                            const section = sectionsMap.get(sectionTitle);
+                            
+                            if (!section.subsections.has(subsectionTitle)) {
+                                section.subsections.set(subsectionTitle, {
+                                    title: subsectionTitle,
+                                    items: []
+                                });
+                            }
+                            
+                            const subsection = section.subsections.get(subsectionTitle);
+                            subsection.items.push({
+                                id: questionId,
+                                text: questionText,
+                                basis: legalBasis,
+                                critical: critical
+                            });
+                        } catch (error) {
+                            throw new Error(`Row ${index + 2}: ${error.message}`);
+                        }
+                    });
+                    
+                    // Convert maps to arrays
+                    const sections = Array.from(sectionsMap.values()).map(section => ({
+                        ...section,
+                        subsections: Array.from(section.subsections.values())
+                    }));
+                    
+                    return { sections };
+                },
+                downloadSampleExcel() {
+                    const sampleData = [
+                        {
+                            Section: '1. ALLGEMEINE SICHERHEIT',
+                            Subsection: 'Notfallausstattung',
+                            Question_ID: '1.1',
+                            Question_Text: 'Sind Sicherheitshinweise und Fluchtwegpläne deutlich sichtbar?',
+                            Legal_Basis: 'AStV § 19',
+                            Critical: 'Yes'
+                        },
+                        {
+                            Section: '1. ALLGEMEINE SICHERHEIT',
+                            Subsection: 'Notfallausstattung',
+                            Question_ID: '1.2',
+                            Question_Text: 'Sind alle Notausgänge frei und gut gekennzeichnet?',
+                            Legal_Basis: 'AStV § 20',
+                            Critical: 'Yes'
+                        },
+                        {
+                            Section: '1. ALLGEMEINE SICHERHEIT',
+                            Subsection: 'Persönliche Schutzausrüstung',
+                            Question_ID: '1.3',
+                            Question_Text: 'Tragen alle Mitarbeiter die korrekte PSA?',
+                            Legal_Basis: 'ASchG § 71',
+                            Critical: 'No'
+                        }
+                    ];
+                    
+                    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+                    const workbook = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(workbook, worksheet, 'Questions');
+                    XLSX.writeFile(workbook, 'WHS_Questionnaire_Template.xlsx');
+                },
+                
                 // User management
                 addUser() {
                     if (this.newUser.name && this.newUser.email && this.newUser.password) {
@@ -1244,6 +1690,14 @@
                 closeUserModal() {
                     this.showUserModal = false;
                     this.newUser = { name: '', email: '', password: '', role: 'auditor' };
+                },
+                
+                // Location methods
+                getDisplayLocation(audit) {
+                    if (audit.location === 'custom') {
+                        return audit.customLocation || 'Custom Location';
+                    }
+                    return audit.location || 'N/A';
                 },
                 
                 // Photo capture methods
@@ -1325,7 +1779,9 @@
                         time: new Date().toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' }),
                         auditor: this.currentUser.name,
                         auditorId: this.currentUser.id,
+                        questionnaireId: this.activeQuestionnaireId,
                         location: '',
+                        customLocation: '',
                         area: '',
                         shift: '',
                         status: 'in-progress',
@@ -1390,7 +1846,8 @@
                     let passedItems = 0;
                     let criticalFails = 0;
                     
-                    this.auditTemplate.sections.forEach(section => {
+                    const template = this.getActiveQuestionnaire();
+                    template.sections.forEach(section => {
                         section.subsections.forEach(subsection => {
                             subsection.items.forEach(item => {
                                 const response = audit.responses[item.id];
@@ -1450,7 +1907,7 @@
                     doc.setFont('helvetica', 'normal');
                     doc.text(`Date/Time: ${audit.date} ${audit.time || ''}`, 20, yPos);
                     yPos += 7;
-                    doc.text(`Location: ${audit.location || 'N/A'}`, 20, yPos);
+                    doc.text(`Location: ${this.getDisplayLocation(audit)}`, 20, yPos);
                     yPos += 7;
                     doc.text(`Area: ${audit.area || 'N/A'}`, 20, yPos);
                     yPos += 7;
@@ -1459,6 +1916,8 @@
                     doc.text(`Auditor: ${audit.auditor}`, 20, yPos);
                     yPos += 7;
                     doc.text(`Status: ${audit.status}`, 20, yPos);
+                    yPos += 7;
+                    doc.text(`Questionnaire: ${this.getQuestionnaireNameById(audit.questionnaireId) || 'Standard WHS Safety Audit'}`, 20, yPos);
                     yPos += 15;
                     
                     // Score Summary
@@ -1503,7 +1962,8 @@
                     doc.text('DETAILED AUDIT RESULTS', 20, yPos);
                     yPos += 15;
                     
-                    this.auditTemplate.sections.forEach(section => {
+                    const template = this.getQuestionnaireById(audit.questionnaireId) || this.getActiveQuestionnaire();
+                    template.sections.forEach(section => {
                         // Check if we need a new page
                         if (yPos > 270) {
                             doc.addPage();
@@ -1695,8 +2155,19 @@
                     }
                     
                     // Save the PDF
-                    const fileName = `WHS_Audit_Report_${audit.location?.replace(/\s+/g, '_') || 'Unknown'}_${audit.date}.pdf`;
+                    const locationName = this.getDisplayLocation(audit).replace(/\s+/g, '_');
+                    const fileName = `WHS_Audit_Report_${locationName}_${audit.date}.pdf`;
                     doc.save(fileName);
+                },
+
+                // Helper methods for questionnaires
+                getQuestionnaireById(id) {
+                    if (id === 'default') return this.defaultQuestionnaire;
+                    return this.questionnaires.find(q => q.id === id);
+                },
+                getQuestionnaireNameById(id) {
+                    const questionnaire = this.getQuestionnaireById(id);
+                    return questionnaire ? questionnaire.name : 'Unknown Questionnaire';
                 },
                 
                 // Utility methods
@@ -1745,6 +2216,9 @@
                         { id: 2, name: 'Safety Officer', email: 'safety@amazon.at', password: 'safety123', role: 'auditor' },
                         { id: 3, name: 'Area Manager', email: 'manager@amazon.at', password: 'manager123', role: 'viewer' }
                     ];
+                    
+                    // Initialize questionnaires array
+                    this.questionnaires = [];
                 }
             },
             mounted() {
