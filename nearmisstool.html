@@ -58,13 +58,10 @@
         }
         
         .button-group {
-            display: flex;
-            gap: 10px;
             margin-bottom: 15px;
-            flex-wrap: wrap;
         }
         
-        button {
+        button, input[type="file"] {
             background: #FF9900;
             color: white;
             border: none;
@@ -75,7 +72,44 @@
             transition: all 0.3s;
         }
         
-        button:hover {
+        input[type="file"] {
+            background: #232F3E;
+            margin-right: 10px;
+            font-family: inherit;
+        }
+        
+        input[type="file"]::-webkit-file-upload-button {
+            background: #FF9900;
+            color: white;
+            border: none;
+            padding: 5px 15px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-family: inherit;
+        }
+        
+        input[type="file"]::-webkit-file-upload-button:hover {
+            background: #e88600;
+        }
+        
+        /* Firefox */
+        input[type="file"]::file-selector-button {
+            background: #FF9900;
+            color: white;
+            border: none;
+            padding: 5px 15px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-family: inherit;
+        }
+        
+        input[type="file"]::file-selector-button:hover {
+            background: #e88600;
+        }
+        
+        button:hover, input[type="file"]:hover {
             background: #e88600;
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
@@ -83,19 +117,6 @@
         
         button:active {
             transform: translateY(0);
-        }
-        
-        .file-input-wrapper {
-            position: relative;
-            display: inline-block;
-        }
-        
-        input[type="file"] {
-            position: absolute;
-            opacity: 0;
-            width: 100%;
-            height: 100%;
-            cursor: pointer;
         }
         
         .dashboard {
@@ -330,16 +351,31 @@
     <div class="container">
         <div class="control-panel">
             <h2>Data Management</h2>
-            <div class="button-group">
-                <div class="file-input-wrapper">
-                    <button title="Import CSV file with near miss data. Expected columns: region, country, site, severity, risk, status, etc.">📁 Import CSV Data</button>
-                    <input type="file" id="csvInput" accept=".csv">
-                </div>
-                <button onclick="exportToExcel()">📊 Export to Excel</button>
-                <button onclick="generateReport()">📄 Generate Report</button>
-                <button onclick="refreshDashboard()">🔄 Refresh Dashboard</button>
-                <button onclick="testWithSampleData()">🧪 Test with Sample Data</button>
+            <div style="background: #e3f2fd; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
+                <strong>📌 Quick Start:</strong> Click "Choose File" button below to select your CSV file, or try "Test with Sample Data" first.
+                <br><small>If you're having issues, click "Debug Info" to check system status.</small>
             </div>
+            
+            <div class="card">
+                <h3>Investigation Progress</h3>
+                <div class="chart-container">
+                    <canvas id="progressChart"></canvas>
+                </div>
+            </div>
+            <div class="button-group">
+                <div style="display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 10px;">
+                    <label style="font-weight: bold; min-width: 100px;">CSV File:</label>
+                    <input type="file" id="csvInput" accept=".csv" onchange="handleFileUpload(event)" style="flex: 1; padding: 10px; font-size: 16px;">
+                </div>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button onclick="exportToExcel()">📊 Export to Excel</button>
+                    <button onclick="generateReport()">📄 Generate Report</button>
+                    <button onclick="refreshDashboard()">🔄 Refresh Dashboard</button>
+                    <button onclick="testWithSampleData()">🧪 Test with Sample Data</button>
+                    <button onclick="debugInfo()" style="background: #666;">🐛 Debug Info</button>
+                </div>
+            </div>
+            <div id="statusMessage" style="margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 5px; display: none;"></div>
             
             <div class="filter-section">
                 <div class="filter-group">
@@ -365,6 +401,12 @@
                 <div class="filter-group">
                     <label>Date To:</label>
                     <input type="date" id="dateTo">
+                </div>
+                <div class="filter-group">
+                    <label>Near Miss Type:</label>
+                    <select id="typeFilter">
+                        <option value="">All Types</option>
+                    </select>
                 </div>
                 <div class="filter-group">
                     <label>Status:</label>
@@ -404,30 +446,62 @@
             </div>
             
             <div class="card">
-                <h3>Severity Distribution</h3>
+                <h3>Chart 1</h3>
+                <select id="chart1Select" onchange="updateChart(1)" style="width: 100%; margin-bottom: 10px;">
+                    <option value="severity">Severity Distribution</option>
+                    <option value="location">Top Locations</option>
+                    <option value="nearMissType">Near Miss Types</option>
+                    <option value="rootCause">Root Causes</option>
+                    <option value="trend">Monthly Trend</option>
+                    <option value="site">Site Comparison</option>
+                </select>
                 <div class="chart-container">
-                    <canvas id="severityChart"></canvas>
+                    <canvas id="customChart1"></canvas>
                 </div>
             </div>
             
             <div class="card">
-                <h3>Monthly Trend</h3>
+                <h3>Chart 2</h3>
+                <select id="chart2Select" onchange="updateChart(2)" style="width: 100%; margin-bottom: 10px;">
+                    <option value="location">Top Locations</option>
+                    <option value="severity">Severity Distribution</option>
+                    <option value="nearMissType">Near Miss Types</option>
+                    <option value="rootCause">Root Causes</option>
+                    <option value="trend">Monthly Trend</option>
+                    <option value="site">Site Comparison</option>
+                </select>
                 <div class="chart-container">
-                    <canvas id="trendChart"></canvas>
+                    <canvas id="customChart2"></canvas>
                 </div>
             </div>
             
             <div class="card">
-                <h3>Root Cause Categories</h3>
+                <h3>Chart 3</h3>
+                <select id="chart3Select" onchange="updateChart(3)" style="width: 100%; margin-bottom: 10px;">
+                    <option value="nearMissType">Near Miss Types</option>
+                    <option value="severity">Severity Distribution</option>
+                    <option value="location">Top Locations</option>
+                    <option value="rootCause">Root Causes</option>
+                    <option value="trend">Monthly Trend</option>
+                    <option value="site">Site Comparison</option>
+                </select>
                 <div class="chart-container">
-                    <canvas id="rootCauseChart"></canvas>
+                    <canvas id="customChart3"></canvas>
                 </div>
             </div>
             
             <div class="card">
-                <h3>Investigation Progress</h3>
+                <h3>Chart 4</h3>
+                <select id="chart4Select" onchange="updateChart(4)" style="width: 100%; margin-bottom: 10px;">
+                    <option value="rootCause">Root Causes</option>
+                    <option value="severity">Severity Distribution</option>
+                    <option value="location">Top Locations</option>
+                    <option value="nearMissType">Near Miss Types</option>
+                    <option value="trend">Monthly Trend</option>
+                    <option value="site">Site Comparison</option>
+                </select>
                 <div class="chart-container">
-                    <canvas id="progressChart"></canvas>
+                    <canvas id="customChart4"></canvas>
                 </div>
             </div>
         </div>
@@ -442,18 +516,19 @@
         
         <div class="tab-content">
             <div id="overview" class="tab-panel">
-                <h3>Recent Near Miss Incidents</h3>
+                <h3>Recent Near Misses</h3>
                 <div class="data-table">
                     <table id="dataTable">
                         <thead>
                             <tr>
-                                <th>Incident ID</th>
+                                <th>Near Miss ID</th>
                                 <th>Date</th>
                                 <th>Site</th>
+                                <th>Location</th>
+                                <th>Near Miss Type</th>
                                 <th>Severity</th>
                                 <th>Risk Score</th>
                                 <th>Status</th>
-                                <th>Description</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -461,7 +536,7 @@
                             <tr>
                                 <td colspan="8" class="loading">
                                     No data loaded. Please import a CSV file.<br>
-                                    <small>Expected format: CSV with columns including region, country, site, severity, risk, status, etc.</small>
+                                    <small>Expected format: CSV with columns including region, country, site, location, near miss type, severity, risk, status, etc.</small>
                                 </td>
                             </tr>
                         </tbody>
@@ -543,16 +618,38 @@
             initializeCharts();
             createRiskMatrix();
             console.log('Initialization complete. Ready to import data.');
+            
+            // Test that functions are accessible
+            if (typeof handleFileUpload === 'function') {
+                console.log('✓ File upload handler is ready');
+            }
+            if (typeof Papa !== 'undefined') {
+                console.log('✓ Papa Parse library loaded');
+            }
         });
         
         // Setup event listeners
         function setupEventListeners() {
-            document.getElementById('csvInput').addEventListener('change', handleFileUpload);
-            document.getElementById('siteFilter').addEventListener('change', applyFilters);
-            document.getElementById('severityFilter').addEventListener('change', applyFilters);
-            document.getElementById('dateFrom').addEventListener('change', applyFilters);
-            document.getElementById('dateTo').addEventListener('change', applyFilters);
-            document.getElementById('statusFilter').addEventListener('change', applyFilters);
+            // Ensure file input has event listener (fallback for inline onchange)
+            const csvInput = document.getElementById('csvInput');
+            if (csvInput) {
+                // Remove any existing listener to avoid duplicates
+                csvInput.removeEventListener('change', handleFileUpload);
+                // Add the listener
+                csvInput.addEventListener('change', handleFileUpload);
+                console.log('File input listener attached');
+            }
+            
+            // Filter listeners
+            const filters = ['siteFilter', 'severityFilter', 'typeFilter', 'dateFrom', 'dateTo', 'statusFilter'];
+            filters.forEach(filterId => {
+                const element = document.getElementById(filterId);
+                if (element) {
+                    element.addEventListener('change', applyFilters);
+                }
+            });
+            
+            console.log('Event listeners setup complete');
         }
         
         // Handle CSV file upload
@@ -561,8 +658,20 @@
             if (file) {
                 console.log('File selected:', file.name, 'Size:', file.size, 'Type:', file.type);
                 
-                if (!file.name.endsWith('.csv')) {
+                // Show processing message
+                const button = event.target;
+                const originalText = button.value;
+                button.disabled = true;
+                
+                // Create processing message
+                const tableBody = document.getElementById('tableBody');
+                if (tableBody) {
+                    tableBody.innerHTML = '<tr><td colspan="8" class="loading">Processing CSV file...</td></tr>';
+                }
+                
+                if (!file.name.toLowerCase().endsWith('.csv')) {
                     alert('Please select a CSV file');
+                    button.disabled = false;
                     return;
                 }
                 
@@ -570,10 +679,15 @@
                 reader.onload = function(e) {
                     console.log('File loaded, parsing CSV...');
                     parseCSV(e.target.result);
+                    button.disabled = false;
                 };
                 reader.onerror = function(error) {
                     console.error('File reading error:', error);
                     alert('Error reading file: ' + error);
+                    button.disabled = false;
+                    if (tableBody) {
+                        tableBody.innerHTML = '<tr><td colspan="8" class="loading">Error reading file. Please try again.</td></tr>';
+                    }
                 };
                 reader.readAsText(file);
             }
@@ -582,6 +696,8 @@
         // Parse CSV data
         function parseCSV(csvText) {
             try {
+                showStatus('Parsing CSV data...', 'info');
+                
                 // Use Papa Parse for proper CSV parsing
                 Papa.parse(csvText, {
                     header: true,
@@ -590,7 +706,7 @@
                     complete: function(results) {
                         if (results.errors.length > 0) {
                             console.error('CSV parsing errors:', results.errors);
-                            alert('Warning: Some rows had parsing errors. Data may be incomplete.');
+                            showStatus('Warning: Some rows had parsing errors. Data may be incomplete.', 'warning');
                         }
                         
                         rawData = results.data;
@@ -603,16 +719,51 @@
                         populateFilters();
                         applyFilters();
                         
-                        alert(`Successfully loaded ${rawData.length} near miss records!`);
+                        showStatus(`Successfully loaded ${rawData.length} near miss records!`, 'success');
                     },
                     error: function(error) {
                         console.error('CSV parsing failed:', error);
-                        alert('Failed to parse CSV file. Please check the file format.');
+                        showStatus('Failed to parse CSV file. Please check the file format.', 'error');
                     }
                 });
             } catch (error) {
                 console.error('Error in parseCSV:', error);
-                alert('Error processing CSV file: ' + error.message);
+                showStatus('Error processing CSV file: ' + error.message, 'error');
+            }
+        }
+        
+        // Show status messages
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('statusMessage');
+            if (statusDiv) {
+                statusDiv.textContent = message;
+                statusDiv.style.display = 'block';
+                
+                // Set color based on type
+                switch(type) {
+                    case 'success':
+                        statusDiv.style.background = '#d4edda';
+                        statusDiv.style.color = '#155724';
+                        break;
+                    case 'error':
+                        statusDiv.style.background = '#f8d7da';
+                        statusDiv.style.color = '#721c24';
+                        break;
+                    case 'warning':
+                        statusDiv.style.background = '#fff3cd';
+                        statusDiv.style.color = '#856404';
+                        break;
+                    default:
+                        statusDiv.style.background = '#d1ecf1';
+                        statusDiv.style.color = '#0c5460';
+                }
+                
+                // Hide after 5 seconds for non-error messages
+                if (type !== 'error') {
+                    setTimeout(() => {
+                        statusDiv.style.display = 'none';
+                    }, 5000);
+                }
             }
         }
         
@@ -688,7 +839,7 @@
             return 'Unknown';
         }
         
-        // Generate incident ID
+        // Generate near miss ID
         function generateIncidentId(row) {
             const date = row.parsedDate || new Date();
             const site = (row.site || 'XX').substring(0, 3).toUpperCase();
@@ -698,11 +849,22 @@
         
         // Populate filter dropdowns
         function populateFilters() {
+            // Sites
             const sites = [...new Set(rawData.map(row => row.site).filter(Boolean))];
             const siteFilter = document.getElementById('siteFilter');
             siteFilter.innerHTML = '<option value="">All Sites</option>';
             sites.forEach(site => {
                 siteFilter.innerHTML += `<option value="${site}">${site}</option>`;
+            });
+            
+            // Near Miss Types
+            const types = [...new Set(rawData.map(row => 
+                row.initial_info_nearmiss_type || row.type
+            ).filter(Boolean))];
+            const typeFilter = document.getElementById('typeFilter');
+            typeFilter.innerHTML = '<option value="">All Types</option>';
+            types.forEach(type => {
+                typeFilter.innerHTML += `<option value="${type}">${type}</option>`;
             });
         }
         
@@ -715,6 +877,7 @@
             
             const siteFilter = document.getElementById('siteFilter').value;
             const severityFilter = document.getElementById('severityFilter').value;
+            const typeFilter = document.getElementById('typeFilter').value;
             const dateFrom = document.getElementById('dateFrom').value;
             const dateTo = document.getElementById('dateTo').value;
             const statusFilter = document.getElementById('statusFilter').value;
@@ -722,6 +885,7 @@
             filteredData = rawData.filter(row => {
                 if (siteFilter && row.site !== siteFilter) return false;
                 if (severityFilter && row.severity !== severityFilter) return false;
+                if (typeFilter && row.initial_info_nearmiss_type !== typeFilter && row.type !== typeFilter) return false;
                 if (statusFilter && row.status !== statusFilter) return false;
                 
                 if (dateFrom || dateTo) {
@@ -778,31 +942,32 @@
             const tbody = document.getElementById('tableBody');
             
             if (filteredData.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="loading">No data matches the current filters.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="loading">No data matches the current filters.</td></tr>';
                 return;
             }
             
             tbody.innerHTML = filteredData.slice(0, 10).map(row => {
-                const incidentId = row.incident_id || 'N/A';
+                const nearMissId = row.incident_id || 'N/A';
                 const date = row.nearmiss_date || 'N/A';
                 const site = row.site || 'N/A';
+                const location = (row.initial_info_location_event || row.location || 'N/A').substring(0, 30);
+                const nearMissType = (row.initial_info_nearmiss_type || row.type || 'N/A').substring(0, 30);
                 const severity = row.severity || 'Unknown';
                 const risk = row.risk || 'N/A';
                 const status = row.status || 'Open';
-                const description = (row.initial_info_incident_description || 'No description').substring(0, 50);
                 
                 return `
                     <tr>
-                        <td>${incidentId}</td>
+                        <td>${nearMissId}</td>
                         <td>${date}</td>
                         <td>${site}</td>
+                        <td>${location}${location.length >= 30 ? '...' : ''}</td>
+                        <td>${nearMissType}${nearMissType.length >= 30 ? '...' : ''}</td>
                         <td><span class="severity-badge severity-${severity.toLowerCase()}">${severity}</span></td>
                         <td>${risk}</td>
                         <td>${status}</td>
-                        <td>${description}...</td>
                         <td>
-                            <button onclick="viewDetails('${incidentId.replace(/'/g, "\\'")}')">View</button>
-                            <button onclick="editIncident('${incidentId.replace(/'/g, "\\'")}')">Edit</button>
+                            <button onclick="viewDetails('${nearMissId.replace(/'/g, "\\'")}')">View</button>
                         </td>
                     </tr>
                 `;
@@ -811,175 +976,249 @@
         
         // Initialize charts
         function initializeCharts() {
-            // Severity distribution chart
-            const severityCtx = document.getElementById('severityChart').getContext('2d');
-            charts.severity = new Chart(severityCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        data: [],
-                        backgroundColor: []
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom'
-                        }
-                    }
-                }
-            });
-            
-            // Monthly trend chart
-            const trendCtx = document.getElementById('trendChart').getContext('2d');
-            charts.trend = new Chart(trendCtx, {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Near Misses',
-                        data: [],
-                        borderColor: '#FF9900',
-                        backgroundColor: 'rgba(255, 153, 0, 0.1)',
-                        tension: 0.3
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    }
-                }
-            });
-            
-            // Root cause chart
-            const rootCauseCtx = document.getElementById('rootCauseChart').getContext('2d');
-            charts.rootCause = new Chart(rootCauseCtx, {
-                type: 'bar',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        data: [],
-                        backgroundColor: '#232F3E'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
+            // Initialize 4 customizable charts
+            for (let i = 1; i <= 4; i++) {
+                const ctx = document.getElementById(`customChart${i}`).getContext('2d');
+                charts[`custom${i}`] = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            data: [],
+                            backgroundColor: '#FF9900'
+                        }]
                     },
-                    scales: {
-                        y: {
-                            beginAtZero: true
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
                         }
                     }
-                }
-            });
-            
-            // Progress chart
-            const progressCtx = document.getElementById('progressChart').getContext('2d');
-            charts.progress = new Chart(progressCtx, {
-                type: 'radar',
-                data: {
-                    labels: ['Initial Info', 'Investigation', 'RCA', 'Actions', 'Closed'],
-                    datasets: [{
-                        label: 'Completion %',
-                        data: [0, 0, 0, 0, 0],
-                        borderColor: '#FF9900',
-                        backgroundColor: 'rgba(255, 153, 0, 0.2)'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        r: {
-                            beginAtZero: true,
-                            max: 100
-                        }
-                    }
-                }
-            });
-        }
-        
-        // Update charts with data
-        function updateCharts() {
-            if (!charts.severity || filteredData.length === 0) {
-                console.log('No data to update charts');
-                return;
+                });
             }
             
-            // Update severity distribution
+            // Keep progress chart separate
+            const progressCtx = document.getElementById('progressChart');
+            if (progressCtx) {
+                charts.progress = new Chart(progressCtx.getContext('2d'), {
+                    type: 'radar',
+                    data: {
+                        labels: ['Initial Info', 'Investigation', 'RCA', 'Actions', 'Closed'],
+                        datasets: [{
+                            label: 'Completion %',
+                            data: [0, 0, 0, 0, 0],
+                            borderColor: '#FF9900',
+                            backgroundColor: 'rgba(255, 153, 0, 0.2)'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            r: {
+                                beginAtZero: true,
+                                max: 100
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        
+        // Update specific chart based on selection
+        function updateChart(chartNumber) {
+            const selectElement = document.getElementById(`chart${chartNumber}Select`);
+            const chartType = selectElement.value;
+            const chart = charts[`custom${chartNumber}`];
+            
+            if (!chart || filteredData.length === 0) return;
+            
+            switch(chartType) {
+                case 'severity':
+                    updateSeverityChart(chart);
+                    break;
+                case 'location':
+                    updateLocationChart(chart);
+                    break;
+                case 'nearMissType':
+                    updateNearMissTypeChart(chart);
+                    break;
+                case 'rootCause':
+                    updateRootCauseChart(chart);
+                    break;
+                case 'trend':
+                    updateTrendChart(chart);
+                    break;
+                case 'site':
+                    updateSiteChart(chart);
+                    break;
+            }
+        }
+        
+        // Update severity distribution chart
+        function updateSeverityChart(chart) {
             const severityCounts = {
                 'Low': filteredData.filter(r => r.severity === 'Low').length,
                 'Medium': filteredData.filter(r => r.severity === 'Medium').length,
                 'High': filteredData.filter(r => r.severity === 'High').length,
-                'Critical': filteredData.filter(r => r.severity === 'Critical').length,
-                'Unknown': filteredData.filter(r => r.severity === 'Unknown').length
+                'Critical': filteredData.filter(r => r.severity === 'Critical').length
             };
             
-            // Only show non-zero severities
-            const nonZeroSeverities = Object.entries(severityCounts)
-                .filter(([severity, count]) => count > 0);
+            const nonZero = Object.entries(severityCounts).filter(([_, count]) => count > 0);
             
-            if (nonZeroSeverities.length > 0) {
-                charts.severity.data.labels = nonZeroSeverities.map(([severity]) => severity);
-                charts.severity.data.datasets[0].data = nonZeroSeverities.map(([, count]) => count);
-                charts.severity.data.datasets[0].backgroundColor = nonZeroSeverities.map(([severity]) => {
-                    const colorMap = {
-                        'Low': '#4CAF50',
-                        'Medium': '#FFC107',
-                        'High': '#FF5722',
-                        'Critical': '#B71C1C',
-                        'Unknown': '#9E9E9E'
-                    };
-                    return colorMap[severity] || '#9E9E9E';
-                });
-                charts.severity.update();
-            }
+            chart.config.type = 'doughnut';
+            chart.data.labels = nonZero.map(([severity]) => severity);
+            chart.data.datasets[0].data = nonZero.map(([, count]) => count);
+            chart.data.datasets[0].backgroundColor = nonZero.map(([severity]) => {
+                const colorMap = {
+                    'Low': '#4CAF50',
+                    'Medium': '#FFC107',
+                    'High': '#FF5722',
+                    'Critical': '#B71C1C'
+                };
+                return colorMap[severity];
+            });
+            chart.options.plugins.legend.display = true;
+            chart.update();
+        }
+        
+        // Update location chart
+        function updateLocationChart(chart) {
+            const locationCounts = {};
+            filteredData.forEach(row => {
+                const location = row.initial_info_location_event || row.location || 'Unknown';
+                locationCounts[location] = (locationCounts[location] || 0) + 1;
+            });
             
-            // Update monthly trend
+            const topLocations = Object.entries(locationCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+            
+            chart.config.type = 'bar';
+            chart.data.labels = topLocations.map(([location]) => 
+                location.length > 30 ? location.substring(0, 30) + '...' : location
+            );
+            chart.data.datasets[0].data = topLocations.map(([, count]) => count);
+            chart.data.datasets[0].backgroundColor = '#232F3E';
+            chart.options.plugins.legend.display = false;
+            chart.options.indexAxis = 'y';
+            chart.update();
+        }
+        
+        // Update near miss type chart
+        function updateNearMissTypeChart(chart) {
+            const typeCounts = {};
+            filteredData.forEach(row => {
+                const type = row.initial_info_nearmiss_type || row.type || 'Unknown';
+                typeCounts[type] = (typeCounts[type] || 0) + 1;
+            });
+            
+            const topTypes = Object.entries(typeCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 8);
+            
+            chart.config.type = 'bar';
+            chart.data.labels = topTypes.map(([type]) => type);
+            chart.data.datasets[0].data = topTypes.map(([, count]) => count);
+            chart.data.datasets[0].backgroundColor = '#37475A';
+            chart.options.plugins.legend.display = false;
+            chart.options.indexAxis = undefined;
+            chart.update();
+        }
+        
+        // Update root cause chart
+        function updateRootCauseChart(chart) {
+            const rootCauses = {};
+            filteredData.forEach(row => {
+                const cause = row.rca_primary_cause || 'Under Investigation';
+                rootCauses[cause] = (rootCauses[cause] || 0) + 1;
+            });
+            
+            const topCauses = Object.entries(rootCauses)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 6);
+            
+            chart.config.type = 'pie';
+            chart.data.labels = topCauses.map(([cause]) => cause);
+            chart.data.datasets[0].data = topCauses.map(([, count]) => count);
+            chart.data.datasets[0].backgroundColor = [
+                '#FF9900', '#232F3E', '#37475A', '#FF5722', '#4CAF50', '#2196F3'
+            ];
+            chart.options.plugins.legend.display = true;
+            chart.options.plugins.legend.position = 'right';
+            chart.update();
+        }
+        
+        // Update trend chart
+        function updateTrendChart(chart) {
             const monthlyData = {};
             filteredData.forEach(row => {
-                if (row.parsedDate) {
+                if (row.parsedDate && !isNaN(row.parsedDate)) {
                     const monthKey = `${row.parsedDate.getFullYear()}-${String(row.parsedDate.getMonth() + 1).padStart(2, '0')}`;
                     monthlyData[monthKey] = (monthlyData[monthKey] || 0) + 1;
                 }
             });
+            
             const sortedMonths = Object.keys(monthlyData).sort();
-            charts.trend.data.labels = sortedMonths.map(m => {
+            const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            
+            chart.config.type = 'line';
+            chart.data.labels = sortedMonths.map(m => {
                 const [year, month] = m.split('-');
-                return `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(month)-1]} ${year}`;
+                return `${monthNames[parseInt(month)-1]} ${year}`;
             });
-            charts.trend.data.datasets[0].data = sortedMonths.map(m => monthlyData[m]);
-            charts.trend.update();
-            
-            // Update root cause analysis
-            const rootCauses = {};
+            chart.data.datasets[0].data = sortedMonths.map(m => monthlyData[m]);
+            chart.data.datasets[0].borderColor = '#FF9900';
+            chart.data.datasets[0].backgroundColor = 'rgba(255, 153, 0, 0.1)';
+            chart.data.datasets[0].tension = 0.3;
+            chart.options.plugins.legend.display = false;
+            chart.options.indexAxis = undefined;
+            chart.update();
+        }
+        
+        // Update site comparison chart
+        function updateSiteChart(chart) {
+            const siteCounts = {};
             filteredData.forEach(row => {
-                const cause = row.rca_primary_cause || 'Unknown';
-                rootCauses[cause] = (rootCauses[cause] || 0) + 1;
+                const site = row.site || 'Unknown';
+                siteCounts[site] = (siteCounts[site] || 0) + 1;
             });
-            const topCauses = Object.entries(rootCauses)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 5);
-            charts.rootCause.data.labels = topCauses.map(c => c[0]);
-            charts.rootCause.data.datasets[0].data = topCauses.map(c => c[1]);
-            charts.rootCause.update();
             
-            // Update progress chart
-            const progressData = calculateInvestigationProgress();
-            charts.progress.data.datasets[0].data = progressData;
-            charts.progress.update();
+            const sites = Object.entries(siteCounts)
+                .sort((a, b) => b[1] - a[1]);
+            
+            chart.config.type = 'bar';
+            chart.data.labels = sites.map(([site]) => site);
+            chart.data.datasets[0].data = sites.map(([, count]) => count);
+            chart.data.datasets[0].backgroundColor = sites.map((_, i) => 
+                i % 2 === 0 ? '#FF9900' : '#232F3E'
+            );
+            chart.options.plugins.legend.display = false;
+            chart.options.indexAxis = undefined;
+            chart.update();
+        }
+        
+        // Update charts with data
+        function updateCharts() {
+            if (filteredData.length === 0) {
+                console.log('No data to update charts');
+                return;
+            }
+            
+            // Update each customizable chart based on its current selection
+            for (let i = 1; i <= 4; i++) {
+                updateChart(i);
+            }
+            
+            // Update progress chart if it exists
+            if (charts.progress) {
+                const progressData = calculateInvestigationProgress();
+                charts.progress.data.datasets[0].data = progressData;
+                charts.progress.update();
+            }
         }
         
         // Calculate investigation progress
@@ -1047,14 +1286,14 @@
             return 'critical';
         }
         
-        // Show incidents for matrix cell
+        // Show near misses for matrix cell
         function showMatrixIncidents(severity, likelihood) {
-            const incidents = filteredData.filter(row => 
+            const nearMisses = filteredData.filter(row => 
                 row.severity === severity && 
                 row.initial_risk_assessment_likeliness === likelihood
             );
             
-            alert(`Found ${incidents.length} incidents with ${severity} severity and ${likelihood} likelihood`);
+            alert(`Found ${nearMisses.length} near misses with ${severity} severity and ${likelihood} likelihood`);
         }
         
         // Switch tabs
@@ -1084,17 +1323,19 @@
         // Load timeline view
         function loadTimeline() {
             const timelineContent = document.getElementById('timelineContent');
-            const recentIncidents = filteredData
+            const recentNearMisses = filteredData
                 .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
                 .slice(0, 10);
             
-            timelineContent.innerHTML = recentIncidents.map(incident => `
+            timelineContent.innerHTML = recentNearMisses.map(nearMiss => `
                 <div class="timeline-item">
-                    <h4>${incident.incident_id}</h4>
-                    <p><strong>Date:</strong> ${incident.nearmiss_date || 'N/A'}</p>
-                    <p><strong>Site:</strong> ${incident.site || 'N/A'}</p>
-                    <p><strong>Status:</strong> ${incident.status || 'Open'}</p>
-                    <p><strong>Description:</strong> ${incident.initial_info_incident_description || 'No description'}</p>
+                    <h4>${nearMiss.incident_id}</h4>
+                    <p><strong>Date:</strong> ${nearMiss.nearmiss_date || 'N/A'}</p>
+                    <p><strong>Site:</strong> ${nearMiss.site || 'N/A'}</p>
+                    <p><strong>Location:</strong> ${nearMiss.initial_info_location_event || 'N/A'}</p>
+                    <p><strong>Type:</strong> ${nearMiss.initial_info_nearmiss_type || 'N/A'}</p>
+                    <p><strong>Status:</strong> ${nearMiss.status || 'Open'}</p>
+                    <p><strong>Description:</strong> ${nearMiss.initial_info_incident_description || 'No description'}</p>
                 </div>
             `).join('');
         }
@@ -1120,7 +1361,7 @@
                             x: {
                                 title: {
                                     display: true,
-                                    text: 'Days Since Last Incident'
+                                    text: 'Days Since Last Near Miss'
                                 }
                             },
                             y: {
@@ -1170,9 +1411,9 @@
             const sites = [...new Set(filteredData.map(r => r.site).filter(Boolean))];
             
             sites.forEach(site => {
-                const siteIncidents = filteredData.filter(r => r.site === site);
-                const daysSinceLast = calculateDaysSinceLastIncident(siteIncidents);
-                const predictedRisk = calculatePredictedRisk(daysSinceLast, siteIncidents);
+                const siteNearMisses = filteredData.filter(r => r.site === site);
+                const daysSinceLast = calculateDaysSinceLastIncident(siteNearMisses);
+                const predictedRisk = calculatePredictedRisk(daysSinceLast, siteNearMisses);
                 
                 predictiveData.push({
                     x: daysSinceLast,
@@ -1208,11 +1449,11 @@
             charts.factors.update();
         }
         
-        // Calculate days since last incident
-        function calculateDaysSinceLastIncident(incidents) {
-            if (incidents.length === 0) return 365;
+        // Calculate days since last near miss
+        function calculateDaysSinceLastIncident(nearMisses) {
+            if (nearMisses.length === 0) return 365;
             
-            const dates = incidents
+            const dates = nearMisses
                 .map(i => new Date(i.nearmiss_date))
                 .filter(d => !isNaN(d))
                 .sort((a, b) => b - a);
@@ -1224,11 +1465,11 @@
         }
         
         // Calculate predicted risk
-        function calculatePredictedRisk(daysSince, incidents) {
-            // Simple model: risk increases with time since last incident
+        function calculatePredictedRisk(daysSince, nearMisses) {
+            // Simple model: risk increases with time since last near miss
             const baseRisk = 2;
             const riskIncrease = daysSince * 0.02;
-            const historicalFactor = incidents.length * 0.1;
+            const historicalFactor = nearMisses.length * 0.1;
             
             return Math.min(10, baseRisk + riskIncrease + historicalFactor);
         }
@@ -1236,11 +1477,11 @@
         // Load action items
         function loadActionItems() {
             const actionContent = document.getElementById('actionItems');
-            const highRiskIncidents = filteredData.filter(r => 
+            const highRiskNearMisses = filteredData.filter(r => 
                 r.severity === 'High' || r.severity === 'Critical' || parseFloat(r.risk) > 7
             );
             
-            const actions = generateActionItems(highRiskIncidents);
+            const actions = generateActionItems(highRiskNearMisses);
             
             actionContent.innerHTML = `
                 <h4>Immediate Actions Required (${actions.immediate.length})</h4>
@@ -1261,7 +1502,7 @@
         }
         
         // Generate action items based on data
-        function generateActionItems(highRiskIncidents) {
+        function generateActionItems(highRiskNearMisses) {
             const actions = {
                 immediate: [],
                 shortTerm: [],
@@ -1269,8 +1510,8 @@
             };
             
             // Analyze patterns and generate actions
-            if (highRiskIncidents.length > 5) {
-                actions.immediate.push(`Review and address ${highRiskIncidents.length} high-risk incidents immediately`);
+            if (highRiskNearMisses.length > 5) {
+                actions.immediate.push(`Review and address ${highRiskNearMisses.length} high-risk near misses immediately`);
             }
             
             const openInvestigations = filteredData.filter(r => 
@@ -1290,7 +1531,7 @@
             
             Object.entries(siteCounts).forEach(([site, count]) => {
                 if (count > 5) {
-                    actions.shortTerm.push(`Conduct safety review at ${site} (${count} incidents)`);
+                    actions.shortTerm.push(`Conduct safety review at ${site} (${count} near misses)`);
                 }
             });
             
@@ -1408,10 +1649,29 @@
             document.body.removeChild(a);
         }
         
-        function viewDetails(incidentId) {
-            const incident = filteredData.find(r => r.incident_id === incidentId);
-            if (incident) {
-                alert(`Incident Details:\n\nID: ${incidentId}\nSite: ${incident.site}\nSeverity: ${incident.severity}\nDescription: ${incident.initial_info_incident_description || 'N/A'}`);
+        function viewDetails(nearMissId) {
+            const nearMiss = filteredData.find(r => r.incident_id === nearMissId);
+            if (nearMiss) {
+                const details = `Near Miss Details:
+                
+ID: ${nearMissId}
+Date: ${nearMiss.nearmiss_date || 'N/A'}
+Site: ${nearMiss.site || 'N/A'}
+Location: ${nearMiss.initial_info_location_event || nearMiss.location || 'N/A'}
+Near Miss Type: ${nearMiss.initial_info_nearmiss_type || nearMiss.type || 'N/A'}
+Severity: ${nearMiss.severity || 'N/A'}
+Risk Score: ${nearMiss.risk || 'N/A'}
+Status: ${nearMiss.status || 'N/A'}
+
+Description: ${nearMiss.initial_info_incident_description || 'No description available'}
+
+Root Cause: ${nearMiss.rca_primary_cause || 'Under investigation'}
+Contributing Factors:
+- Human: ${nearMiss.rca_contributing_factor_human_behaviour || 'N/A'}
+- Process: ${nearMiss.rca_contributing_factor_org_process || 'N/A'}
+- Equipment: ${nearMiss.rca_contributing_factor_tech_equipment || 'N/A'}`;
+                
+                alert(details);
             }
         }
         
@@ -1421,11 +1681,15 @@
         
         // Test with sample data
         function testWithSampleData() {
+            showStatus('Loading sample data...', 'info');
+            
             rawData = [
                 {
                     incident_id: 'NM-VIE-202401-001',
                     nearmiss_date: '2024-01-15',
                     site: 'Vienna DC1',
+                    initial_info_location_event: 'Warehouse Aisle 3',
+                    initial_info_nearmiss_type: 'Vehicle/Pedestrian',
                     severity: 'High',
                     risk: 7.5,
                     status: 'Open',
@@ -1445,6 +1709,8 @@
                     incident_id: 'NM-VIE-202401-002',
                     nearmiss_date: '2024-01-20',
                     site: 'Vienna DC1',
+                    initial_info_location_event: 'Storage Rack B4',
+                    initial_info_nearmiss_type: 'Falling Object',
                     severity: 'Medium',
                     risk: 4.2,
                     status: 'In Progress',
@@ -1463,6 +1729,8 @@
                     incident_id: 'NM-GRZ-202401-003',
                     nearmiss_date: '2024-02-01',
                     site: 'Graz FC',
+                    initial_info_location_event: 'Main Entrance',
+                    initial_info_nearmiss_type: 'Slip/Trip/Fall',
                     severity: 'Low',
                     risk: 2.1,
                     status: 'Closed',
@@ -1481,6 +1749,8 @@
                     incident_id: 'NM-VIE-202402-004',
                     nearmiss_date: '2024-02-15',
                     site: 'Vienna DC2',
+                    initial_info_location_event: 'Emergency Exit West',
+                    initial_info_nearmiss_type: 'Blocked Exit/Egress',
                     severity: 'Critical',
                     risk: 9.0,
                     status: 'Open',
@@ -1493,6 +1763,22 @@
                     investigation_phase_status: 'Not Started',
                     rca_phase_status: 'Not Started',
                     created_at: '2024-02-15'
+                },
+                {
+                    incident_id: 'NM-VIE-202402-005',
+                    nearmiss_date: '2024-02-20',
+                    site: 'Vienna DC1',
+                    initial_info_location_event: 'Loading Dock 2',
+                    initial_info_nearmiss_type: 'Vehicle/Pedestrian',
+                    severity: 'Medium',
+                    risk: 5.0,
+                    status: 'Open',
+                    initial_info_incident_description: 'Truck reversing without spotter',
+                    country: 'Austria',
+                    region: 'EU',
+                    rca_primary_cause: 'Process Gap',
+                    initial_risk_assessment_likeliness: 'Likely',
+                    created_at: '2024-02-20'
                 }
             ];
             
@@ -1500,7 +1786,24 @@
             processData();
             populateFilters();
             applyFilters();
-            alert('Sample data loaded successfully! You can now explore the dashboard.');
+            showStatus('Sample data loaded successfully! You can now explore the dashboard.', 'success');
+        }
+        
+        // Debug information
+        function debugInfo() {
+            const info = {
+                'Browser': navigator.userAgent,
+                'Papa Parse loaded': typeof Papa !== 'undefined',
+                'XLSX loaded': typeof XLSX !== 'undefined',
+                'Chart.js loaded': typeof Chart !== 'undefined',
+                'File input exists': document.getElementById('csvInput') !== null,
+                'Raw data count': rawData.length,
+                'Filtered data count': filteredData.length
+            };
+            
+            console.log('Debug Information:', info);
+            alert('Debug Info (check console for details):\n\n' + 
+                  Object.entries(info).map(([key, value]) => `${key}: ${value}`).join('\n'));
         }
     </script>
 </body>
