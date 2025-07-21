@@ -1,0 +1,12 @@
+{
+  "name": "whs-safety-audit",
+  "version": "1.0.0",
+  "description": "Amazon WHS Safety Audit System",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "echo 'No build needed'"
+  },
+  "dependencies": {
+    "@netlify/functions": "^2.0.0"
+  }
+}

@@ -1,36 +1,8 @@
 {
-  "name": "whs-safety-audit-system-netlify",
+  "name": "whs-safety-audit",
   "version": "1.0.0",
-  "description": "WHS Safety Audit System for Amazon Austria - Netlify-Only Edition",
-  "main": "index.html",
-  "scripts": {
-    "build": "echo 'Static site - no build needed'",
-    "dev": "netlify dev",
-    "deploy": "netlify deploy",
-    "deploy:prod": "netlify deploy --prod",
-    "test": "echo 'No tests - simple deployment' && exit 0"
-  },
-  "dependencies": {},
-  "devDependencies": {
-    "netlify-cli": "^16.0.0"
-  },
-  "keywords": [
-    "safety",
-    "audit",
-    "amazon",
-    "whs",
-    "netlify",
-    "serverless",
-    "workplace-health-safety",
-    "small-scale"
-  ],
-  "author": "Erwin Esener - WHS Austria",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/your-username/whs-audit-system-netlify.git"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+  "description": "WHS Safety Audit System for Amazon Austria",
+  "dependencies": {
+    "jszip": "^3.10.1"
   }
 }
