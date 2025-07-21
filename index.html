@@ -3,253 +3,1224 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Amazon WHS Austria - SIFA Begehungen Audit Tool</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .hidden { display: none; }
-        section { margin-bottom: 20px; }
-        .question { margin-bottom: 10px; }
-        .critical { color: red; font-weight: bold; }
-        button { margin-right: 10px; }
-        #audit-form { max-width: 800px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-    </style>
-    <!-- jsPDF for PDF export -->
+    <title>Amazon WHS Austria - Safety Audit System</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <!-- JSZip for ZIP export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <!-- Netlify Identity for User Management -->
-    <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f5f5f5;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background-color: #232f3e;
+            color: white;
+            padding: 20px 0;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            text-align: center;
+            font-size: 24px;
+        }
+
+        .nav {
+            background-color: #37475a;
+            padding: 10px 0;
+            margin-bottom: 20px;
+        }
+
+        .nav ul {
+            list-style: none;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .nav li {
+            margin: 0 15px;
+        }
+
+        .nav a {
+            color: white;
+            text-decoration: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+
+        .nav a:hover {
+            background-color: #485769;
+        }
+
+        .page {
+            display: none;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        button {
+            background-color: #ff9900;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #e88b00;
+        }
+
+        button.secondary {
+            background-color: #6c757d;
+        }
+
+        button.secondary:hover {
+            background-color: #5a6268;
+        }
+
+        .audit-question {
+            background-color: #f8f9fa;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #ff9900;
+        }
+
+        .audit-question.critical {
+            border-left-color: #dc3545;
+        }
+
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .question-number {
+            font-weight: bold;
+            color: #232f3e;
+        }
+
+        .critical-badge {
+            background-color: #dc3545;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .question-text {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .basis-text {
+            font-size: 14px;
+            color: #666;
+            font-style: italic;
+        }
+
+        .answer-options {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .answer-options button {
+            flex: 1;
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+
+        .answer-options button.selected {
+            background-color: #28a745;
+        }
+
+        .answer-options button.selected.no {
+            background-color: #dc3545;
+        }
+
+        .answer-options button.selected.na {
+            background-color: #6c757d;
+        }
+
+        .audit-list {
+            margin-top: 20px;
+        }
+
+        .audit-item {
+            background-color: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .audit-info {
+            flex: 1;
+        }
+
+        .audit-score {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ff9900;
+        }
+
+        .user-info {
+            text-align: right;
+            margin-bottom: 20px;
+            color: #666;
+        }
+
+        .import-export {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .file-input {
+            margin-top: 10px;
+        }
+
+        .error {
+            color: #dc3545;
+            margin-top: 10px;
+        }
+
+        .success {
+            color: #28a745;
+            margin-top: 10px;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .summary-card {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .summary-card h3 {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .summary-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #232f3e;
+        }
+    </style>
 </head>
 <body>
-    <h1>Amazon WHS Austria - SIFA Begehungen auf dem Shopfloor</h1>
-    <p>Willkommen zum Safety Audit Tool, inspiriert von SafetyCulture. Loggen Sie sich ein, um Audits durchzuführen.</p>
+    <div class="header">
+        <div class="container">
+            <h1>Amazon WHS Austria - Safety Audit System</h1>
+            <div class="user-info" id="userInfo"></div>
+        </div>
+    </div>
 
-    <!-- Login Section -->
-    <section id="login-section">
-        <button onclick="netlifyIdentity.open('login')">Login</button>
-        <button onclick="netlifyIdentity.open('signup')">Registrieren</button>
-    </section>
+    <div class="nav" id="nav" style="display: none;">
+        <div class="container">
+            <ul>
+                <li><a href="#" onclick="showPage('dashboard')">Dashboard</a></li>
+                <li><a href="#" onclick="showPage('newAudit')">Neues Audit</a></li>
+                <li><a href="#" onclick="showPage('auditList')">Audit Liste</a></li>
+                <li><a href="#" onclick="showPage('questions')">Fragen verwalten</a></li>
+                <li id="adminMenu" style="display: none;"><a href="#" onclick="showPage('userManagement')">Benutzer</a></li>
+                <li><a href="#" onclick="logout()">Logout</a></li>
+            </ul>
+        </div>
+    </div>
 
-    <!-- Audit Form Section -->
-    <section id="audit-section" class="hidden">
-        <h2>Audit Durchführen</h2>
-        <form id="audit-form">
-            <!-- Audit Info -->
-            <label for="audit-date">Datum/Zeit:</label>
-            <input type="datetime-local" id="audit-date" required><br><br>
-            <label for="audit-location">Location:</label>
-            <input type="text" id="audit-location" value="DVI1" required><br><br>
-            <label for="audit-area">Area:</label>
-            <input type="text" id="audit-area" value="N/A"><br><br>
-            <label for="audit-shift">Shift:</label>
-            <input type="text" id="audit-shift" value="Spätschicht"><br><br>
+    <div class="container">
+        <!-- Login Page -->
+        <div id="loginPage" class="page active">
+            <h2>Login</h2>
+            <form onsubmit="login(event)">
+                <div class="form-group">
+                    <label for="username">Benutzername</label>
+                    <input type="text" id="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Passwort</label>
+                    <input type="password" id="password" required>
+                </div>
+                <button type="submit">Login</button>
+                <div id="loginError" class="error"></div>
+            </form>
+        </div>
 
-            <!-- Questions will be dynamically added here -->
-            <div id="questions-container"></div>
+        <!-- Dashboard -->
+        <div id="dashboard" class="page">
+            <h2>Dashboard</h2>
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <h3>Audits Heute</h3>
+                    <div class="value" id="auditsToday">0</div>
+                </div>
+                <div class="summary-card">
+                    <h3>Durchschnittliche Punktzahl</h3>
+                    <div class="value" id="avgScore">0%</div>
+                </div>
+                <div class="summary-card">
+                    <h3>Kritische Fehler</h3>
+                    <div class="value" id="criticalFailures">0</div>
+                </div>
+                <div class="summary-card">
+                    <h3>Gesamt Audits</h3>
+                    <div class="value" id="totalAudits">0</div>
+                </div>
+            </div>
+            <button onclick="showPage('newAudit')">Neues Audit starten</button>
+        </div>
 
-            <button type="button" onclick="submitAudit()">Audit Abschicken</button>
-            <button type="button" onclick="exportPDF()">Als PDF Exportieren</button>
-        </form>
-    </section>
+        <!-- New Audit Page -->
+        <div id="newAudit" class="page">
+            <h2>Neues Audit</h2>
+            <form id="auditForm">
+                <div class="form-group">
+                    <label for="location">Location</label>
+                    <input type="text" id="location" value="DVI1" required>
+                </div>
+                <div class="form-group">
+                    <label for="area">Bereich</label>
+                    <input type="text" id="area" placeholder="z.B. Versand">
+                </div>
+                <div class="form-group">
+                    <label for="shift">Schicht</label>
+                    <select id="shift" required>
+                        <option value="Frühschicht">Frühschicht</option>
+                        <option value="Spätschicht">Spätschicht</option>
+                        <option value="Nachtschicht">Nachtschicht</option>
+                    </select>
+                </div>
+                <button type="button" onclick="startAudit()">Audit starten</button>
+            </form>
+        </div>
 
-    <!-- Admin Section -->
-    <section id="admin-section" class="hidden">
-        <h2>Admin Panel</h2>
-        <button onclick="viewArchives()">Archiv Anzeigen</button>
-        <button onclick="exportZIP()">Archiv als ZIP Exportieren</button>
-        <div id="archive-table"></div>
-    </section>
+        <!-- Audit Questions -->
+        <div id="auditQuestions" class="page">
+            <h2>Audit durchführen</h2>
+            <div id="questionContainer"></div>
+            <button onclick="completeAudit()">Audit abschließen</button>
+            <button class="secondary" onclick="showPage('newAudit')">Abbrechen</button>
+        </div>
+
+        <!-- Audit List -->
+        <div id="auditList" class="page">
+            <h2>Audit Liste</h2>
+            <div class="audit-list" id="auditListContainer"></div>
+            <button onclick="exportAllAudits()">Alle als ZIP exportieren</button>
+        </div>
+
+        <!-- Questions Management -->
+        <div id="questions" class="page">
+            <h2>Fragen verwalten</h2>
+            <div class="import-export">
+                <h3>Fragen importieren/exportieren</h3>
+                <button onclick="exportQuestions()">Fragen als JSON exportieren</button>
+                <div class="file-input">
+                    <input type="file" id="importFile" accept=".json" onchange="importQuestions(event)">
+                    <label for="importFile">JSON-Datei auswählen zum Importieren</label>
+                </div>
+                <div id="importMessage"></div>
+            </div>
+        </div>
+
+        <!-- User Management (Admin only) -->
+        <div id="userManagement" class="page">
+            <h2>Benutzerverwaltung</h2>
+            <form onsubmit="addUser(event)">
+                <div class="form-group">
+                    <label for="newUsername">Benutzername</label>
+                    <input type="text" id="newUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="newPassword">Passwort</label>
+                    <input type="password" id="newPassword" required>
+                </div>
+                <div class="form-group">
+                    <label for="userRole">Rolle</label>
+                    <select id="userRole" required>
+                        <option value="user">Benutzer</option>
+                        <option value="admin">Administrator</option>
+                    </select>
+                </div>
+                <button type="submit">Benutzer hinzufügen</button>
+            </form>
+            <div id="userList"></div>
+        </div>
+    </div>
 
     <script>
-        // Netlify Identity Setup
-        netlifyIdentity.on('init', user => {
-            if (user) {
-                currentUser = user;
-                currentRole = user.app_metadata.roles ? user.app_metadata.roles[0] : 'User'; // Assume roles set in Identity
-                showAuditSection();
-                if (currentRole === 'Admin') {
-                    document.getElementById('admin-section').classList.remove('hidden');
+        // Audit Questions Data
+        const auditQuestions = {
+            "1": {
+                "title": "ALLGEMEINE SICHERHEIT",
+                "subsections": {
+                    "Notfallausstattung": [
+                        {
+                            "id": "1.1",
+                            "question": "Sind Sicherheitshinweise und Fluchtwegpläne deutlich sichtbar?",
+                            "critical": true,
+                            "basis": "AStV § 19"
+                        },
+                        {
+                            "id": "1.2",
+                            "question": "Sind alle Notausgänge frei und gut gekennzeichnet?",
+                            "critical": true,
+                            "basis": "AStV § 20"
+                        },
+                        {
+                            "id": "1.3",
+                            "question": "Ist die Erste-Hilfe-Ausstattung vollständig und erreichbar?",
+                            "critical": true,
+                            "basis": "ASchG § 26"
+                        },
+                        {
+                            "id": "1.4",
+                            "question": "Ist die Notfallausrüstung (Augenspülung, Feuerlöscher) zugänglich?",
+                            "critical": true,
+                            "basis": null
+                        }
+                    ],
+                    "Persönliche Schutzausrüstung": [
+                        {
+                            "id": "1.5",
+                            "question": "Tragen alle Mitarbeiter die korrekte PSA?",
+                            "critical": false,
+                            "basis": "ASchG § 71"
+                        },
+                        {
+                            "id": "1.6",
+                            "question": "Sind alle Mitarbeiter-Badges sichtbar?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "1.7",
+                            "question": "Entsprechen Frisur/Kleidung den Sicherheitsvorschriften? (max. Schulterhöhe)",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "1.8",
+                            "question": "Sind aktuelle Arbeitsanweisungen verfügbar?",
+                            "critical": false,
+                            "basis": "ASchG § 12"
+                        }
+                    ]
                 }
-            } else {
-                document.getElementById('login-section').classList.remove('hidden');
+            },
+            "2": {
+                "title": "ARBEITSPLATZ UND UMGEBUNG",
+                "subsections": {
+                    "Ordnung und Sauberkeit": [
+                        {
+                            "id": "2.1",
+                            "question": "Ist die Lagerhalle sauber und aufgeräumt?",
+                            "critical": false,
+                            "basis": "AStV § 4"
+                        },
+                        {
+                            "id": "2.2",
+                            "question": "Sind die Böden rutschfest und eben?",
+                            "critical": true,
+                            "basis": "AStV § 5"
+                        },
+                        {
+                            "id": "2.3",
+                            "question": "Ist ausreichend Bewegungsfreiheit vorhanden? (min. 1,5 m² pro Person)",
+                            "critical": false,
+                            "basis": null
+                        }
+                    ],
+                    "Arbeitsumgebung": [
+                        {
+                            "id": "2.4",
+                            "question": "Entspricht die Beleuchtung den Anforderungen? (min. 200 Lux)",
+                            "critical": false,
+                            "basis": "AStV § 22"
+                        },
+                        {
+                            "id": "2.5",
+                            "question": "Ist die Raumtemperatur angemessen? (18-25°C)",
+                            "critical": false,
+                            "basis": "AStV § 23"
+                        },
+                        {
+                            "id": "2.6",
+                            "question": "Ist die Lüftung ausreichend?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "2.7",
+                            "question": "Liegt der Lärmpegel im zulässigen Bereich? (≤ 85 dB(A))",
+                            "critical": false,
+                            "basis": null
+                        }
+                    ],
+                    "Ergonomie": [
+                        {
+                            "id": "2.8",
+                            "question": "Sind die Arbeitsplätze ergonomisch gestaltet?",
+                            "critical": false,
+                            "basis": "AStV § 21"
+                        }
+                    ]
+                }
+            },
+            "3": {
+                "title": "LAGERUNG UND TRANSPORT",
+                "subsections": {
+                    "Lagerbereiche": [
+                        {
+                            "id": "3.1",
+                            "question": "Werden die 5S-Markierungen respektiert?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "3.2",
+                            "question": "Sind die Lagerbereiche sicher organisiert?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "3.3",
+                            "question": "Werden Lagerungen über Kopf vermieden?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "3.4",
+                            "question": "Sind Regale ordnungsgemäß befestigt?",
+                            "critical": true,
+                            "basis": null
+                        },
+                        {
+                            "id": "3.5",
+                            "question": "Sind die maximalen Stapelhöhen eingehalten?",
+                            "critical": false,
+                            "basis": null
+                        }
+                    ],
+                    "Transportwege": [
+                        {
+                            "id": "3.6",
+                            "question": "Sind Fußgängerwege klar gekennzeichnet? (min. 1,2 m breit)",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "3.7",
+                            "question": "Sind alle Transportwege frei von Hindernissen?",
+                            "critical": true,
+                            "basis": null
+                        },
+                        {
+                            "id": "3.8",
+                            "question": "Sind Gefahrenbereiche deutlich markiert?",
+                            "critical": false,
+                            "basis": null
+                        }
+                    ],
+                    "Flurförderzeuge": [
+                        {
+                            "id": "3.9",
+                            "question": "Sind alle Flurförderzeuge in gutem Zustand?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "3.10",
+                            "question": "Sind die Wartungsprotokolle aktuell? (jährliche Prüfung)",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "3.11",
+                            "question": "Sind Ladehilfsmittel unbeschädigt?",
+                            "critical": false,
+                            "basis": null
+                        }
+                    ]
+                }
+            },
+            "4": {
+                "title": "GEFAHRSTOFFE",
+                "subsections": {
+                    "": [
+                        {
+                            "id": "4.1",
+                            "question": "Sind Gefahrstoffe korrekt gelagert?",
+                            "critical": true,
+                            "basis": "ChemG"
+                        },
+                        {
+                            "id": "4.2",
+                            "question": "Sind alle Gefahrstoffe ordnungsgemäß gekennzeichnet?",
+                            "critical": true,
+                            "basis": null
+                        },
+                        {
+                            "id": "4.3",
+                            "question": "Sind Sicherheitsdatenblätter verfügbar?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "4.4",
+                            "question": "Sind Gefahrstoffbereiche abgesperrt?",
+                            "critical": true,
+                            "basis": null
+                        }
+                    ]
+                }
+            },
+            "5": {
+                "title": "ERGONOMIE UND ARBEITSVERHALTEN",
+                "subsections": {
+                    "": [
+                        {
+                            "id": "5.1",
+                            "question": "Vermeiden Mitarbeiter ungünstige Körperhaltungen?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "5.2",
+                            "question": "Werden Transportwagen kontrolliert bewegt?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "5.3",
+                            "question": "Werden Handläufe verwendet (wo vorhanden)?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "5.4",
+                            "question": "Werden Hebehilfen bei schweren Lasten eingesetzt? (ab 25 kg Männer, 15 kg Frauen)",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "5.5",
+                            "question": "Werden Pausenzeiten eingehalten?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "5.6",
+                            "question": "Ist der Arbeitsrhythmus angemessen?",
+                            "critical": false,
+                            "basis": null
+                        }
+                    ]
+                }
+            },
+            "6": {
+                "title": "NOTFALLVORSORGE",
+                "subsections": {
+                    "Personal": [
+                        {
+                            "id": "6.1",
+                            "question": "Sind genügend Ersthelfer verfügbar? (1 pro 19 Mitarbeiter)",
+                            "critical": true,
+                            "basis": null
+                        },
+                        {
+                            "id": "6.2",
+                            "question": "Sind Brandschutzwarte ernannt und geschult?",
+                            "critical": true,
+                            "basis": null
+                        },
+                        {
+                            "id": "6.3",
+                            "question": "Sind die Notfallpläne aktuell und bekannt?",
+                            "critical": false,
+                            "basis": null
+                        }
+                    ],
+                    "Übungen": [
+                        {
+                            "id": "6.4",
+                            "question": "Werden regelmäßig Notfallübungen durchgeführt?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "6.5",
+                            "question": "Sind Sammelplätze bekannt und gekennzeichnet?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "6.6",
+                            "question": "Funktioniert das Alarmsystem ordnungsgemäß?",
+                            "critical": true,
+                            "basis": null
+                        }
+                    ]
+                }
+            },
+            "7": {
+                "title": "WARTUNG UND INSTANDHALTUNG",
+                "subsections": {
+                    "": [
+                        {
+                            "id": "7.1",
+                            "question": "Werden Wartungsintervalle bei Toren eingehalten?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "7.2",
+                            "question": "Sind Feuerlöscher-Prüffristen aktuell? (alle 2 Jahre)",
+                            "critical": true,
+                            "basis": null
+                        },
+                        {
+                            "id": "7.3",
+                            "question": "Sind elektrische Anlagen ordnungsgemäß geprüft?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "7.4",
+                            "question": "Erfolgt regelmäßige Wartung der Lüftungsanlagen?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "7.5",
+                            "question": "Sind alle Wartungsprotokolle verfügbar?",
+                            "critical": false,
+                            "basis": null
+                        }
+                    ]
+                }
+            },
+            "8": {
+                "title": "HÖHENARBEITEN (falls zutreffend)",
+                "subsections": {
+                    "": [
+                        {
+                            "id": "8.1",
+                            "question": "Sind Absturzsicherungen vorhanden?",
+                            "critical": true,
+                            "basis": null
+                        },
+                        {
+                            "id": "8.2",
+                            "question": "Ist spezielle Schutzausrüstung verfügbar?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "8.3",
+                            "question": "Sind Arbeiten in der Höhe genehmigt?",
+                            "critical": false,
+                            "basis": null
+                        }
+                    ]
+                }
             }
-        });
-        netlifyIdentity.on('login', user => {
-            currentUser = user;
-            currentRole = user.app_metadata.roles ? user.app_metadata.roles[0] : 'User';
-            showAuditSection();
-            if (currentRole === 'Admin') {
-                document.getElementById('admin-section').classList.remove('hidden');
-            }
-        });
-        netlifyIdentity.on('logout', () => {
-            currentUser = null;
-            currentRole = null;
-            location.reload();
-        });
+        };
+
+        // Initialize default users if not exists
+        if (!localStorage.getItem('users')) {
+            const defaultUsers = [
+                { username: 'admin', password: 'admin123', role: 'admin' },
+                { username: 'user', password: 'user123', role: 'user' }
+            ];
+            localStorage.setItem('users', JSON.stringify(defaultUsers));
+        }
+
+        // Initialize audit questions if not exists
+        if (!localStorage.getItem('auditQuestions')) {
+            localStorage.setItem('auditQuestions', JSON.stringify(auditQuestions));
+        }
 
         let currentUser = null;
-        let currentRole = null;
+        let currentAudit = null;
 
-        function showAuditSection() {
-            document.getElementById('login-section').classList.add('hidden');
-            document.getElementById('audit-section').classList.remove('hidden');
-            loadQuestions();
+        // Check if user is already logged in
+        const savedUser = localStorage.getItem('currentUser');
+        if (savedUser) {
+            currentUser = JSON.parse(savedUser);
+            showDashboard();
         }
 
-        // Questions from PDF (reconstructed with OCR fixes)
-        const sections = [
-            {
-                title: '1. ALLGEMEINE SICHERHEIT',
-                questions: [
-                    { id: '1.1', text: 'Sind Sicherheitshinweise und Fluchtwegpläne deutlich sichtbar?', critical: true },
-                    { id: '1.2', text: 'Sind alle Notausgänge frei und gut gekennzeichnet?', critical: true },
-                    { id: '1.3', text: 'Ist die Erste Hilfe Ausstattung vollständig und erreichbar?', critical: true },
-                    { id: '1.4', text: 'Ist die Notfallausrüstung (Augenspülung, Feuerlöscher) zugänglich?', critical: false },
-                    { id: '1.5', text: 'Tragen alle Mitarbeiter die korrekte PSA?', critical: false },
-                    { id: '1.6', text: 'Tragen die Mitarbeiter Badges sichtbar?', critical: false },
-                    { id: '1.7', text: 'Entsprechen Freizeitkleidung den Sicherheitsvorschriften?', critical: false },
-                    { id: '1.8', text: 'Sind aktuelle Arbeitsanweisungen verfügbar?', critical: false }
-                ]
-            },
-            // ... (rest of sections as before, omitted for brevity)
-        ];
-
-        function loadQuestions() {
-            const container = document.getElementById('questions-container');
-            sections.forEach(section => {
-                const sectionElem = document.createElement('h3');
-                sectionElem.textContent = section.title;
-                container.appendChild(sectionElem);
-                section.questions.forEach(q => {
-                    const div = document.createElement('div');
-                    div.classList.add('question');
-                    if (q.critical) div.classList.add('critical');
-                    div.innerHTML = `
-                        <label>${q.id}: ${q.text} ${q.critical ? '(CRITICAL)' : ''}</label><br>
-                        <input type="radio" name="${q.id}" value="YES"> Ja
-                        <input type="radio" name="${q.id}" value="NO"> Nein
-                        <input type="radio" name="${q.id}" value="NO RESPONSE"> Keine Antwort<br>
-                    `;
-                    container.appendChild(div);
-                });
-            });
-        }
-
-        async function submitAudit() {
-            const form = document.getElementById('audit-form');
-            const data = {
-                date: document.getElementById('audit-date').value,
-                location: document.getElementById('audit-location').value,
-                area: document.getElementById('audit-area').value,
-                shift: document.getElementById('audit-shift').value,
-                answers: {},
-                user: currentUser.email
-            };
-
-            // Collect answers
-            sections.flatMap(s => s.questions).forEach(q => {
-                const selected = form.querySelector(`input[name="${q.id}"]:checked`);
-                data.answers[q.id] = selected ? selected.value : 'NO RESPONSE';
-            });
-
-            // Calculate score
-            const totalItems = Object.keys(data.answers).length;
-            const passed = Object.values(data.answers).filter(a => a === 'YES').length;
-            const criticalFails = sections.flatMap(s => s.questions).filter(q => q.critical && data.answers[q.id] === 'NO').length;
-            data.score = {
-                overall: Math.round((passed / totalItems) * 100),
-                passed: passed,
-                total: totalItems,
-                criticalFails: criticalFails
-            };
-
-            // Save to Netlify Blobs via Function
-            const response = await fetch('/.netlify/functions/save-audit', {
-                method: 'POST',
-                body: JSON.stringify(data),
-                headers: { 'Authorization': `Bearer ${currentUser.token.access_token}` }
-            });
-            if (response.ok) {
-                alert('Audit gespeichert! Score: ' + data.score.overall + '%');
+        function login(event) {
+            event.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const users = JSON.parse(localStorage.getItem('users'));
+            
+            const user = users.find(u => u.username === username && u.password === password);
+            
+            if (user) {
+                currentUser = user;
+                localStorage.setItem('currentUser', JSON.stringify(user));
+                showDashboard();
             } else {
-                alert('Fehler beim Speichern.');
+                document.getElementById('loginError').textContent = 'Ungültiger Benutzername oder Passwort';
             }
         }
 
-        function exportPDF() {
+        function logout() {
+            currentUser = null;
+            localStorage.removeItem('currentUser');
+            showPage('loginPage');
+            document.getElementById('nav').style.display = 'none';
+        }
+
+        function showDashboard() {
+            document.getElementById('nav').style.display = 'block';
+            document.getElementById('userInfo').textContent = `Angemeldet als: ${currentUser.username} (${currentUser.role})`;
+            
+            if (currentUser.role === 'admin') {
+                document.getElementById('adminMenu').style.display = 'block';
+            }
+            
+            updateDashboard();
+            showPage('dashboard');
+        }
+
+        function showPage(pageId) {
+            if (!currentUser && pageId !== 'loginPage') {
+                return;
+            }
+            
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+            
+            document.getElementById(pageId).classList.add('active');
+            
+            if (pageId === 'auditList') {
+                loadAuditList();
+            } else if (pageId === 'userManagement') {
+                loadUserList();
+            }
+        }
+
+        function updateDashboard() {
+            const audits = JSON.parse(localStorage.getItem('audits') || '[]');
+            const today = new Date().toDateString();
+            const todayAudits = audits.filter(a => new Date(a.date).toDateString() === today);
+            
+            document.getElementById('auditsToday').textContent = todayAudits.length;
+            document.getElementById('totalAudits').textContent = audits.length;
+            
+            if (audits.length > 0) {
+                const totalScore = audits.reduce((sum, audit) => sum + audit.score, 0);
+                const avgScore = Math.round(totalScore / audits.length);
+                document.getElementById('avgScore').textContent = avgScore + '%';
+                
+                const totalCritical = audits.reduce((sum, audit) => sum + audit.criticalFailures, 0);
+                document.getElementById('criticalFailures').textContent = totalCritical;
+            }
+        }
+
+        function startAudit() {
+            const location = document.getElementById('location').value;
+            const area = document.getElementById('area').value;
+            const shift = document.getElementById('shift').value;
+            
+            currentAudit = {
+                id: Date.now(),
+                date: new Date().toISOString(),
+                location: location,
+                area: area || 'N/A',
+                shift: shift,
+                auditor: currentUser.username,
+                answers: {},
+                status: 'in_progress'
+            };
+            
+            displayQuestions();
+            showPage('auditQuestions');
+        }
+
+        function displayQuestions() {
+            const container = document.getElementById('questionContainer');
+            container.innerHTML = '';
+            const questions = JSON.parse(localStorage.getItem('auditQuestions'));
+            
+            Object.keys(questions).forEach(sectionKey => {
+                const section = questions[sectionKey];
+                const sectionDiv = document.createElement('div');
+                sectionDiv.innerHTML = `<h3>${sectionKey}. ${section.title}</h3>`;
+                
+                Object.keys(section.subsections).forEach(subsectionKey => {
+                    if (subsectionKey) {
+                        sectionDiv.innerHTML += `<h4>${subsectionKey}</h4>`;
+                    }
+                    
+                    section.subsections[subsectionKey].forEach(question => {
+                        const questionDiv = document.createElement('div');
+                        questionDiv.className = `audit-question ${question.critical ? 'critical' : ''}`;
+                        
+                        questionDiv.innerHTML = `
+                            <div class="question-header">
+                                <span class="question-number">${question.id}</span>
+                                ${question.critical ? '<span class="critical-badge">KRITISCH</span>' : ''}
+                            </div>
+                            <div class="question-text">${question.question}</div>
+                            ${question.basis ? `<div class="basis-text">Basis: ${question.basis}</div>` : ''}
+                            <div class="answer-options">
+                                <button onclick="selectAnswer('${question.id}', 'YES', this)">JA</button>
+                                <button onclick="selectAnswer('${question.id}', 'NO', this)" class="no">NEIN</button>
+                                <button onclick="selectAnswer('${question.id}', 'NA', this)" class="na">N/A</button>
+                            </div>
+                        `;
+                        
+                        sectionDiv.appendChild(questionDiv);
+                    });
+                });
+                
+                container.appendChild(sectionDiv);
+            });
+        }
+
+        function selectAnswer(questionId, answer, button) {
+            currentAudit.answers[questionId] = answer;
+            
+            // Update button styling
+            const buttons = button.parentElement.querySelectorAll('button');
+            buttons.forEach(btn => btn.classList.remove('selected'));
+            button.classList.add('selected');
+        }
+
+        function completeAudit() {
+            const questions = JSON.parse(localStorage.getItem('auditQuestions'));
+            let totalQuestions = 0;
+            let answeredQuestions = 0;
+            let passedQuestions = 0;
+            let criticalFailures = 0;
+            
+            // Count questions and calculate score
+            Object.values(questions).forEach(section => {
+                Object.values(section.subsections).forEach(subsection => {
+                    subsection.forEach(question => {
+                        totalQuestions++;
+                        if (currentAudit.answers[question.id]) {
+                            answeredQuestions++;
+                            if (currentAudit.answers[question.id] === 'YES') {
+                                passedQuestions++;
+                            } else if (currentAudit.answers[question.id] === 'NO' && question.critical) {
+                                criticalFailures++;
+                            }
+                        }
+                    });
+                });
+            });
+            
+            currentAudit.score = Math.round((passedQuestions / answeredQuestions) * 100);
+            currentAudit.itemsPassed = passedQuestions;
+            currentAudit.totalItems = answeredQuestions;
+            currentAudit.criticalFailures = criticalFailures;
+            currentAudit.status = 'completed';
+            currentAudit.overallCondition = currentAudit.score >= 80 ? 'Gut' : 'Verbesserungsbedürftig';
+            currentAudit.overallResult = criticalFailures === 0 ? 'Keine Beanstandungen' : 'Kritische Mängel festgestellt';
+            
+            // Save audit
+            const audits = JSON.parse(localStorage.getItem('audits') || '[]');
+            audits.push(currentAudit);
+            localStorage.setItem('audits', JSON.stringify(audits));
+            
+            // Generate PDF
+            generatePDF(currentAudit);
+            
+            currentAudit = null;
+            updateDashboard();
+            showPage('dashboard');
+        }
+
+        function loadAuditList() {
+            const container = document.getElementById('auditListContainer');
+            const audits = JSON.parse(localStorage.getItem('audits') || '[]');
+            
+            container.innerHTML = '';
+            
+            audits.reverse().forEach(audit => {
+                const auditDiv = document.createElement('div');
+                auditDiv.className = 'audit-item';
+                
+                auditDiv.innerHTML = `
+                    <div class="audit-info">
+                        <strong>${new Date(audit.date).toLocaleDateString('de-AT')} ${new Date(audit.date).toLocaleTimeString('de-AT')}</strong><br>
+                        Location: ${audit.location} | Bereich: ${audit.area} | Schicht: ${audit.shift}<br>
+                        Auditor: ${audit.auditor} | Status: ${audit.status}
+                    </div>
+                    <div class="audit-score">${audit.score}%</div>
+                    <button onclick="viewAudit(${audit.id})">PDF anzeigen</button>
+                `;
+                
+                container.appendChild(auditDiv);
+            });
+        }
+
+        function viewAudit(auditId) {
+            const audits = JSON.parse(localStorage.getItem('audits') || '[]');
+            const audit = audits.find(a => a.id === auditId);
+            if (audit) {
+                generatePDF(audit);
+            }
+        }
+
+        function generatePDF(audit) {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            doc.text('Amazon WHS Austria Audit Report', 10, 10);
-            // Add content (simplified)
-            doc.save('audit-report.pdf');
+            
+            // Header
+            doc.setFontSize(20);
+            doc.text('AMAZON AUSTRIA', 20, 20);
+            doc.setFontSize(16);
+            doc.text('Workplace Health & Safety', 20, 30);
+            doc.setFontSize(18);
+            doc.text('SAFETY AUDIT REPORT', 20, 40);
+            
+            // Audit Information
+            doc.setFontSize(12);
+            doc.text('AUDIT INFORMATION', 20, 60);
+            doc.setFontSize(10);
+            doc.text(`Date/Time: ${new Date(audit.date).toLocaleDateString('de-AT')} ${new Date(audit.date).toLocaleTimeString('de-AT')}`, 20, 70);
+            doc.text(`Location: ${audit.location}`, 20, 75);
+            doc.text(`Area: ${audit.area}`, 20, 80);
+            doc.text(`Shift: ${audit.shift}`, 20, 85);
+            doc.text(`Auditor: ${audit.auditor}`, 20, 90);
+            doc.text(`Status: ${audit.status}`, 20, 95);
+            
+            // Score Summary
+            doc.setFontSize(12);
+            doc.text('AUDIT SCORE SUMMARY', 20, 110);
+            doc.setFontSize(10);
+            doc.text(`Overall Score: ${audit.score}%`, 20, 120);
+            doc.text(`Items Passed: ${audit.itemsPassed}/${audit.totalItems}`, 20, 125);
+            doc.text(`Critical Failures: ${audit.criticalFailures}`, 20, 130);
+            
+            // Overall Assessment
+            doc.text('OVERALL ASSESSMENT', 20, 145);
+            doc.text(`Workplace Condition: ${audit.overallCondition}`, 20, 155);
+            doc.text(`Overall Result: ${audit.overallResult}`, 20, 160);
+            
+            // Add new page for detailed results
+            doc.addPage();
+            doc.setFontSize(14);
+            doc.text('DETAILED AUDIT RESULTS', 20, 20);
+            
+            let yPos = 40;
+            const questions = JSON.parse(localStorage.getItem('auditQuestions'));
+            
+            Object.keys(questions).forEach(sectionKey => {
+                if (yPos > 250) {
+                    doc.addPage();
+                    yPos = 20;
+                }
+                
+                const section = questions[sectionKey];
+                doc.setFontSize(12);
+                doc.text(`${sectionKey}. ${section.title}`, 20, yPos);
+                yPos += 10;
+                
+                Object.values(section.subsections).forEach(subsection => {
+                    subsection.forEach(question => {
+                        if (yPos > 270) {
+                            doc.addPage();
+                            yPos = 20;
+                        }
+                        
+                        const answer = audit.answers[question.id] || 'NO RESPONSE';
+                        doc.setFontSize(10);
+                        doc.text(`${question.id}: ${answer} ${question.critical ? '[CRITICAL]' : ''}`, 20, yPos);
+                        
+                        // Wrap long questions
+                        const lines = doc.splitTextToSize(question.question, 160);
+                        lines.forEach(line => {
+                            yPos += 5;
+                            doc.text(line, 25, yPos);
+                        });
+                        
+                        if (question.basis) {
+                            yPos += 5;
+                            doc.setFontSize(8);
+                            doc.text(`Basis: ${question.basis}`, 25, yPos);
+                        }
+                        
+                        yPos += 10;
+                    });
+                });
+            });
+            
+            // Footer
+            doc.setFontSize(8);
+            doc.text('Generated by WHS Safety Audit System - Amazon Austria', 20, 285);
+            doc.text(`by ${currentUser.username} - WHS Austria`, 20, 290);
+            
+            // Save PDF
+            doc.save(`audit_${audit.location}_${new Date(audit.date).toISOString().split('T')[0]}.pdf`);
         }
 
-        async function viewArchives() {
-            if (currentRole !== 'Admin') return alert('Nur für Admin');
-            const response = await fetch('/.netlify/functions/get-audits', {
-                headers: { 'Authorization': `Bearer ${currentUser.token.access_token}` }
-            });
-            const audits = await response.json();
-            const table = document.getElementById('archive-table');
-            table.innerHTML = '<table><tr><th>Date</th><th>Score</th><th>User</th></tr>' + 
-                audits.map(a => `<tr><td>${a.date}</td><td>${a.score.overall}%</td><td>${a.user}</td></tr>`).join('') + 
-                '</table>';
-        }
-
-        async function exportZIP() {
-            if (currentRole !== 'Admin') return alert('Nur für Admin');
-            const response = await fetch('/.netlify/functions/get-audits', {
-                headers: { 'Authorization': `Bearer ${currentUser.token.access_token}` }
-            });
-            const audits = await response.json();
-            const zip = new JSZip();
-            audits.forEach((audit, index) => {
-                zip.file(`audit_${index}.json`, JSON.stringify(audit));
-            });
-            const content = await zip.generateAsync({type: 'blob'});
+        function exportQuestions() {
+            const questions = localStorage.getItem('auditQuestions');
+            const blob = new Blob([questions], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = URL.createObjectURL(content);
-            a.download = 'audits_archive.zip';
+            a.href = url;
+            a.download = 'audit_questions.json';
             a.click();
+            URL.revokeObjectURL(url);
         }
 
-        // Deployment Instructions:
-        // 1. Erstelle ein Netlify-Projekt und aktiviere Netlify Identity für User Management (füge Rollen wie 'User', 'Admin' hinzu).
-        // 2. Installiere @netlify/blobs via npm (package.json hinzufügen).
-        // 3. Erstelle Netlify Functions in /netlify/functions/:
+        function importQuestions(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const questions = JSON.parse(e.target.result);
+                    localStorage.setItem('auditQuestions', JSON.stringify(questions));
+                    document.getElementById('importMessage').innerHTML = '<div class="success">Fragen erfolgreich importiert!</div>';
+                } catch (error) {
+                    document.getElementById('importMessage').innerHTML = '<div class="error">Fehler beim Importieren der Datei!</div>';
+                }
+            };
+            reader.readAsText(file);
+        }
 
-        // save-audit.js
-        /*
-        import { getStore } from "@netlify/blobs";
-        import { v4 as uuid } from "uuid"; // npm install uuid
+        function exportAllAudits() {
+            const audits = JSON.parse(localStorage.getItem('audits') || '[]');
+            const zip = new JSZip();
+            
+            // Add JSON data
+            zip.file('audits_data.json', JSON.stringify(audits, null, 2));
+            
+            // Generate ZIP
+            zip.generateAsync({ type: 'blob' }).then(function(content) {
+                const url = URL.createObjectURL(content);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `audits_export_${new Date().toISOString().split('T')[0]}.zip`;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+        }
 
-        export default async (req) => {
-          const body = await req.json();
-          const auditsStore = getStore("audits");
-          const key = `audit-${uuid()}`;
-          await auditsStore.setJSON(key, body);
-          return new Response(JSON.stringify({ key }), { status: 200 });
-        };
-        */
+        function addUser(event) {
+            event.preventDefault();
+            if (currentUser.role !== 'admin') return;
+            
+            const username = document.getElementById('newUsername').value;
+            const password = document.getElementById('newPassword').value;
+            const role = document.getElementById('userRole').value;
+            
+            const users = JSON.parse(localStorage.getItem('users'));
+            
+            if (users.find(u => u.username === username)) {
+                alert('Benutzername existiert bereits!');
+                return;
+            }
+            
+            users.push({ username, password, role });
+            localStorage.setItem('users', JSON.stringify(users));
+            
+            document.getElementById('newUsername').value = '';
+            document.getElementById('newPassword').value = '';
+            
+            loadUserList();
+        }
 
-        // get-audits.js
-        /*
-        import { getStore } from "@netlify/blobs";
+        function loadUserList() {
+            if (currentUser.role !== 'admin') return;
+            
+            const container = document.getElementById('userList');
+            const users = JSON.parse(localStorage.getItem('users'));
+            
+            container.innerHTML = '<h3>Benutzer Liste</h3>';
+            
+            users.forEach(user => {
+                const userDiv = document.createElement('div');
+                userDiv.className = 'audit-item';
+                userDiv.innerHTML = `
+                    <div class="audit-info">
+                        <strong>${user.username}</strong> - ${user.role}
+                    </div>
+                    ${user.username !== 'admin' ? `<button onclick="deleteUser('${user.username}')">Löschen</button>` : ''}
+                `;
+                container.appendChild(userDiv);
+            });
+        }
 
-        export default async () => {
-          const auditsStore = getStore("audits");
-          const { keys } = await auditsStore.list();
-          const audits = await Promise.all(keys.map(async (key) => await auditsStore.get(key, { type: "json" })));
-          return new Response(JSON.stringify(audits), { status: 200 });
-        };
-        */
-
-        // Für Auth in Functions: Verwende context.identity für Überprüfung.
-        // Deploye auf Netlify; Functions werden automatisch erkannt.
+        function deleteUser(username) {
+            if (currentUser.role !== 'admin' || username === 'admin') return;
+            
+            const users = JSON.parse(localStorage.getItem('users'));
+            const filteredUsers = users.filter(u => u.username !== username);
+            localStorage.setItem('users', JSON.stringify(filteredUsers));
+            
+            loadUserList();
+        }
     </script>
 </body>
 </html>
