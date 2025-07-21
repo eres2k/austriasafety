@@ -4,879 +4,1310 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WHS Safety Audit System - Amazon Austria</title>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        [v-cloak] { display: none; }
-        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
-        .fade-enter-from, .fade-leave-to { opacity: 0; }
-        .amazon-orange { background-color: #FF9900; }
-        .amazon-orange-hover:hover { background-color: #E6870B; }
-        .amazon-blue { background-color: #232F3E; }
-        .camera-preview { max-width: 300px; max-height: 200px; border-radius: 8px; }
-        .photo-thumbnail { width: 80px; height: 60px; object-fit: cover; border-radius: 4px; cursor: pointer; }
-        .file-upload-area { border: 2px dashed #d1d5db; transition: border-color 0.3s; }
-        .file-upload-area:hover { border-color: #FF9900; }
-        .file-upload-area.dragover { border-color: #FF9900; background-color: #fef3e2; }
-        .loading-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: rgba(0, 0, 0, 0.7); display: flex; align-items: center;
-            justify-content: center; z-index: 9999;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        .loading-spinner {
-            border: 4px solid #f3f3f3; border-top: 4px solid #FF9900; border-radius: 50%;
-            width: 50px; height: 50px; animation: spin 1s linear infinite;
+
+        :root {
+            --amazon-orange: #FF9900;
+            --amazon-dark: #232F3E;
+            --amazon-blue: #146EB4;
+            --success: #4CAF50;
+            --warning: #FFC107;
+            --danger: #F44336;
+            --light-gray: #F5F5F5;
+            --border-gray: #DDD;
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .connection-status {
-            position: fixed; top: 10px; right: 10px; padding: 8px 12px; border-radius: 6px;
-            font-size: 12px; font-weight: bold; z-index: 1000;
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background-color: var(--light-gray);
+            color: #333;
+            line-height: 1.6;
         }
-        .connection-online { background-color: #10b981; color: white; }
-        .connection-offline { background-color: #ef4444; color: white; }
-        .connection-syncing { background-color: #f59e0b; color: white; }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header Styles */
+        header {
+            background-color: var(--amazon-dark);
+            color: white;
+            padding: 1rem 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--amazon-orange);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        /* Login Form */
+        .login-container {
+            max-width: 400px;
+            margin: 100px auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        input[type="datetime-local"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid var(--border-gray);
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        button {
+            background-color: var(--amazon-orange);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #E88600;
+        }
+
+        button.secondary {
+            background-color: #6c757d;
+        }
+
+        button.danger {
+            background-color: var(--danger);
+        }
+
+        /* Dashboard */
+        .dashboard {
+            display: none;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .stat-card h3 {
+            color: var(--amazon-dark);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--amazon-orange);
+        }
+
+        /* Audit Form */
+        .audit-form {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+
+        .audit-section {
+            margin-bottom: 2rem;
+            padding: 1rem;
+            border: 1px solid var(--border-gray);
+            border-radius: 4px;
+        }
+
+        .audit-section h3 {
+            color: var(--amazon-dark);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--amazon-orange);
+        }
+
+        .audit-question {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background-color: var(--light-gray);
+            border-radius: 4px;
+        }
+
+        .audit-question.critical {
+            border-left: 4px solid var(--danger);
+        }
+
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 0.5rem;
+        }
+
+        .question-number {
+            font-weight: bold;
+            color: var(--amazon-blue);
+        }
+
+        .critical-badge {
+            background-color: var(--danger);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+
+        .response-options {
+            display: flex;
+            gap: 1rem;
+            margin-top: 0.5rem;
+        }
+
+        .response-options label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .response-options input[type="radio"] {
+            margin-right: 0.5rem;
+        }
+
+        /* Audit List */
+        .audit-list {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .audit-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .audit-table th,
+        .audit-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-gray);
+        }
+
+        .audit-table th {
+            background-color: var(--light-gray);
+            font-weight: 600;
+        }
+
+        .score-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-weight: bold;
+            display: inline-block;
+        }
+
+        .score-good { background-color: #C8E6C9; color: #2E7D32; }
+        .score-medium { background-color: #FFE0B2; color: #E65100; }
+        .score-poor { background-color: #FFCDD2; color: #C62828; }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid var(--border-gray);
+        }
+
+        .tab {
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab:hover {
+            background-color: var(--light-gray);
+        }
+
+        .tab.active {
+            border-bottom-color: var(--amazon-orange);
+            color: var(--amazon-orange);
+            font-weight: 600;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            margin: 5% auto;
+            padding: 2rem;
+            border-radius: 8px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .close {
+            font-size: 2rem;
+            cursor: pointer;
+            color: #999;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .response-options {
+                flex-direction: column;
+            }
+
+            .audit-table {
+                font-size: 0.875rem;
+            }
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 4px solid rgba(0,0,0,0.1);
+            border-left-color: var(--amazon-orange);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Print Styles */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            
+            body {
+                background: white;
+            }
+            
+            .audit-section {
+                page-break-inside: avoid;
+            }
+        }
     </style>
 </head>
 <body>
-    <div id="app" v-cloak>
-        <!-- Connection Status -->
-        <div :class="['connection-status', connectionStatusClass]">
-            {{ connectionStatusText }}
-        </div>
-
-        <!-- Loading Overlay -->
-        <div v-if="isLoading" class="loading-overlay">
-            <div class="bg-white rounded-lg p-6 text-center">
-                <div class="loading-spinner mx-auto mb-4"></div>
-                <p class="text-gray-700">{{ loadingMessage }}</p>
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">WHS Safety Audit System</div>
+                <div class="user-info" id="userInfo" style="display: none;">
+                    <span id="currentUser"></span>
+                    <button onclick="logout()" class="secondary">Abmelden</button>
+                </div>
             </div>
         </div>
+    </header>
 
-        <!-- Login Page -->
-        <div v-if="currentView === 'login'" class="min-h-screen bg-gradient-to-br from-gray-900 via-amazon-blue to-gray-800 flex items-center justify-center p-4">
-            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
-                <div class="text-center mb-8">
-                    <div class="inline-flex items-center justify-center w-16 h-16 amazon-orange rounded-full mb-4">
-                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.618 5.984A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-                        </svg>
-                    </div>
-                    <h1 class="text-3xl font-bold text-gray-800">WHS Safety Audit System</h1>
-                    <p class="text-gray-600 mt-2">Amazon Austria</p>
-                    <p class="text-xs text-gray-500 mt-1">by Erwin Esener - WHS Austria</p>
-                    <p class="text-xs text-blue-600 mt-1">🚀 Netlify-Powered</p>
+    <!-- Login Form -->
+    <div class="login-container" id="loginForm">
+        <h2>Anmeldung</h2>
+        <form onsubmit="login(event)">
+            <div class="form-group">
+                <label for="username">Benutzername</label>
+                <input type="text" id="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Passwort</label>
+                <input type="password" id="password" required>
+            </div>
+            <button type="submit">Anmelden</button>
+        </form>
+        <p style="margin-top: 1rem; font-size: 0.875rem; color: #666;">
+            Demo-Zugänge: admin/admin123 oder user/user123
+        </p>
+    </div>
+
+    <!-- Dashboard -->
+    <div class="container dashboard" id="dashboard">
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('overview')">Übersicht</div>
+            <div class="tab" onclick="showTab('newAudit')">Neue Begehung</div>
+            <div class="tab" onclick="showTab('audits')">Begehungen</div>
+            <div class="tab" onclick="showTab('settings')" id="settingsTab" style="display: none;">Einstellungen</div>
+        </div>
+
+        <!-- Overview Tab -->
+        <div id="overviewTab" class="tab-content">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Gesamt Begehungen</h3>
+                    <div class="stat-value" id="totalAudits">0</div>
                 </div>
-                
-                <div v-if="loginError" class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4">
-                    {{ loginError }}
+                <div class="stat-card">
+                    <h3>Durchschnittliche Bewertung</h3>
+                    <div class="stat-value" id="avgScore">0%</div>
                 </div>
-                
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                        <input 
-                            v-model="loginForm.email" 
-                            type="email" 
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                            placeholder="Enter your email"
-                            @keyup.enter="handleLogin"
-                        >
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
-                        <input 
-                            v-model="loginForm.password" 
-                            type="password" 
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                            placeholder="Enter your password"
-                            @keyup.enter="handleLogin"
-                        >
-                    </div>
-                    
-                    <button @click="handleLogin" class="w-full amazon-orange text-white py-3 rounded-lg font-semibold amazon-orange-hover transition-colors">
-                        Sign In
-                    </button>
+                <div class="stat-card">
+                    <h3>Kritische Mängel</h3>
+                    <div class="stat-value" id="criticalIssues">0</div>
                 </div>
-                
-                <div class="mt-6 text-center">
-                    <p class="text-sm text-gray-600">Demo Accounts:</p>
-                    <p class="text-xs text-gray-500 mt-1">admin@amazon.at / admin123</p>
-                    <p class="text-xs text-gray-500">safety@amazon.at / safety123</p>
+                <div class="stat-card">
+                    <h3>Letzte Begehung</h3>
+                    <div class="stat-value" id="lastAudit">-</div>
                 </div>
             </div>
         </div>
 
-        <!-- Main App -->
-        <div v-else class="min-h-screen bg-gray-50">
-            <!-- Header -->
-            <header class="bg-white shadow-sm border-b border-gray-200">
-                <div class="px-4 sm:px-6 lg:px-8">
-                    <div class="flex justify-between items-center h-16">
-                        <div class="flex items-center">
-                            <button @click="showMobileMenu = !showMobileMenu" class="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path v-if="!showMobileMenu" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                                    <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                </svg>
-                            </button>
-                            <div class="flex items-center ml-4 lg:ml-0">
-                                <svg class="w-8 h-8 text-orange-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.618 5.984A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-                                </svg>
-                                <div>
-                                    <h1 class="text-xl font-bold text-gray-900">WHS Safety Audit System</h1>
-                                    <p class="text-xs text-gray-600">Amazon Austria - Netlify Edition</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="flex items-center space-x-4">
-                            <div class="hidden sm:flex items-center text-sm text-gray-600">
-                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                                </svg>
-                                {{ currentUser.name }} ({{ currentUser.role }})
-                            </div>
-                            <button @click="syncToNetlify" class="text-sm text-blue-600 hover:text-blue-800 flex items-center" :disabled="isLoading">
-                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                                </svg>
-                                Sync
-                            </button>
-                            <button @click="handleLogout" class="flex items-center text-sm text-gray-600 hover:text-gray-900">
-                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                                </svg>
-                                Logout
-                            </button>
-                        </div>
+        <!-- New Audit Tab -->
+        <div id="newAuditTab" class="tab-content" style="display: none;">
+            <div class="audit-form">
+                <h2>Neue Sicherheitsbegehung</h2>
+                <form id="auditForm" onsubmit="saveAudit(event)">
+                    <div class="form-group">
+                        <label for="auditDate">Datum/Zeit</label>
+                        <input type="datetime-local" id="auditDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="location">Standort</label>
+                        <select id="location" required>
+                            <option value="">Bitte wählen...</option>
+                            <option value="DVI1">DVI1</option>
+                            <option value="DVI2">DVI2</option>
+                            <option value="DVI3">DVI3</option>
+                            <option value="DVI4">DVI4</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="area">Bereich</label>
+                        <input type="text" id="area" placeholder="z.B. Wareneingang, Pick Tower">
+                    </div>
+                    <div class="form-group">
+                        <label for="shift">Schicht</label>
+                        <select id="shift" required>
+                            <option value="">Bitte wählen...</option>
+                            <option value="Frühschicht">Frühschicht</option>
+                            <option value="Spätschicht">Spätschicht</option>
+                            <option value="Nachtschicht">Nachtschicht</option>
+                        </select>
+                    </div>
+
+                    <div id="auditQuestions"></div>
+
+                    <div class="form-group">
+                        <label for="overallCondition">Gesamtzustand Arbeitsplatz</label>
+                        <select id="overallCondition" required>
+                            <option value="">Bitte wählen...</option>
+                            <option value="Sehr gut">Sehr gut</option>
+                            <option value="Gut">Gut</option>
+                            <option value="Befriedigend">Befriedigend</option>
+                            <option value="Mangelhaft">Mangelhaft</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="notes">Anmerkungen</label>
+                        <textarea id="notes" rows="4" placeholder="Zusätzliche Beobachtungen oder Maßnahmen..."></textarea>
+                    </div>
+
+                    <button type="submit">Begehung speichern</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Audits List Tab -->
+        <div id="auditsTab" class="tab-content" style="display: none;">
+            <div class="audit-list">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h2>Begehungsübersicht</h2>
+                    <div>
+                        <button onclick="exportArchive()" class="secondary">ZIP-Archiv</button>
                     </div>
                 </div>
-            </header>
+                <table class="audit-table">
+                    <thead>
+                        <tr>
+                            <th>Datum</th>
+                            <th>Standort</th>
+                            <th>Bereich</th>
+                            <th>Schicht</th>
+                            <th>Bewertung</th>
+                            <th>Prüfer</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody id="auditsList">
+                        <tr>
+                            <td colspan="7" style="text-align: center;">Keine Begehungen vorhanden</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-            <div class="flex">
-                <!-- Sidebar -->
-                <aside :class="{'block': showMobileMenu, 'hidden': !showMobileMenu}" class="lg:block w-64 bg-white shadow-sm border-r border-gray-200 min-h-screen">
-                    <nav class="p-4 space-y-2">
-                        <button 
-                            @click="navigateTo('dashboard')" 
-                            :class="{'bg-orange-50 text-orange-600': currentView === 'dashboard', 'text-gray-700 hover:bg-gray-50': currentView !== 'dashboard'}"
-                            class="w-full flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors"
-                        >
-                            <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                            </svg>
-                            Dashboard
-                        </button>
-                        
-                        <button 
-                            @click="navigateTo('audits')" 
-                            :class="{'bg-orange-50 text-orange-600': currentView === 'audits' || currentView === 'conduct-audit' || currentView === 'view-audit', 'text-gray-700 hover:bg-gray-50': currentView !== 'audits'}"
-                            class="w-full flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors"
-                        >
-                            <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                            </svg>
-                            Audits
-                        </button>
-                        
-                        <button 
-                            @click="navigateTo('questionnaires')" 
-                            :class="{'bg-orange-50 text-orange-600': currentView === 'questionnaires', 'text-gray-700 hover:bg-gray-50': currentView !== 'questionnaires'}"
-                            class="w-full flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors"
-                        >
-                            <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 011-1.732l4-2 4 2A2 2 0 0118 5v2H6V5z"></path>
-                            </svg>
-                            Questionnaires
-                        </button>
-                        
-                        <button 
-                            v-if="currentUser.role === 'admin'"
-                            @click="navigateTo('users')" 
-                            :class="{'bg-orange-50 text-orange-600': currentView === 'users', 'text-gray-700 hover:bg-gray-50': currentView !== 'users'}"
-                            class="w-full flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors"
-                        >
-                            <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                            </svg>
-                            Users
-                        </button>
-                        
-                        <button 
-                            @click="navigateTo('reports')" 
-                            :class="{'bg-orange-50 text-orange-600': currentView === 'reports', 'text-gray-700 hover:bg-gray-50': currentView !== 'reports'}"
-                            class="w-full flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors"
-                        >
-                            <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                            </svg>
-                            Reports
-                        </button>
-                    </nav>
-                </aside>
-
-                <!-- Main Content -->
-                <main class="flex-1 p-4 lg:p-8">
-                    <!-- Dashboard View -->
-                    <div v-if="currentView === 'dashboard'" class="space-y-6">
-                        <div class="flex justify-between items-center">
-                            <h2 class="text-2xl font-bold text-gray-900">WHS Dashboard</h2>
-                            <div class="text-sm text-gray-600">
-                                Amazon Austria - Workplace Health & Safety
-                                <br><span class="text-xs text-blue-600">Storage: {{ storageStatus }}</span>
-                            </div>
-                        </div>
-                        
-                        <!-- Stats Cards -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div class="bg-white rounded-lg shadow p-6">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <p class="text-sm font-medium text-gray-600">Total Audits</p>
-                                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ audits.length }}</p>
-                                    </div>
-                                    <svg class="w-8 h-8 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                    </svg>
-                                </div>
-                            </div>
-                            
-                            <div class="bg-white rounded-lg shadow p-6">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <p class="text-sm font-medium text-gray-600">Average Score</p>
-                                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ averageScore }}%</p>
-                                    </div>
-                                    <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
-                                    </svg>
-                                </div>
-                            </div>
-                            
-                            <div class="bg-white rounded-lg shadow p-6">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <p class="text-sm font-medium text-gray-600">Critical Issues</p>
-                                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ totalCriticalIssues }}</p>
-                                    </div>
-                                    <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                                    </svg>
-                                </div>
-                            </div>
-                            
-                            <div class="bg-white rounded-lg shadow p-6">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <p class="text-sm font-medium text-gray-600">This Month</p>
-                                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ monthlyAudits }}</p>
-                                    </div>
-                                    <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Recent Audits -->
-                        <div class="bg-white rounded-lg shadow">
-                            <div class="px-6 py-4 border-b border-gray-200">
-                                <h3 class="text-lg font-semibold text-gray-900">Recent Audits</h3>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="w-full">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Auditor</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        <tr v-for="audit in recentAudits" :key="audit.id">
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ audit.date }}</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ getDisplayLocation(audit) }}</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ audit.auditor }}</td>
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <span :class="getScoreClass(audit.score)" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium">
-                                                    {{ audit.score }}%
-                                                </span>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <span :class="audit.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium">
-                                                    {{ audit.status }}
-                                                </span>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                                <button @click="viewAuditDetails(audit)" class="text-orange-600 hover:text-orange-900">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                                                    </svg>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                                <div v-if="audits.length === 0" class="text-center py-8 text-gray-500">
-                                    No audits found. Start your first audit!
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Quick Actions -->
-                        <div v-if="currentUser.role !== 'viewer'" class="bg-white rounded-lg shadow p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-                            <div class="flex space-x-4">
-                                <button @click="startNewAudit" class="inline-flex items-center px-4 py-2 amazon-orange text-white rounded-lg amazon-orange-hover transition-colors">
-                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                                    </svg>
-                                    Start New Audit
-                                </button>
-                                <button @click="exportAllData" class="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                    </svg>
-                                    Export All Data
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Audits View -->
-                    <div v-else-if="currentView === 'audits'" class="space-y-6">
-                        <div class="flex justify-between items-center">
-                            <h2 class="text-2xl font-bold text-gray-900">Safety Audits</h2>
-                            <div class="flex space-x-3">
-                                <button v-if="audits.length > 0" @click="exportAllData" class="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M7 13l3 3 7-7"></path>
-                                    </svg>
-                                    Export All
-                                </button>
-                                <button v-if="currentUser.role !== 'viewer'" @click="startNewAudit" class="inline-flex items-center px-4 py-2 amazon-orange text-white rounded-lg amazon-orange-hover transition-colors">
-                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                                    </svg>
-                                    New Audit
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="bg-white rounded-lg shadow">
-                            <div class="overflow-x-auto">
-                                <table class="w-full">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Area</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Auditor</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Critical</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        <tr v-for="audit in audits" :key="audit.id">
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ audit.date }}</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ getDisplayLocation(audit) }}</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ audit.area || 'N/A' }}</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ audit.auditor }}</td>
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <span :class="getScoreClass(audit.score)" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium">
-                                                    {{ audit.score }}%
-                                                </span>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <span v-if="audit.criticalFails > 0" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                                    {{ audit.criticalFails }}
-                                                </span>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <span :class="audit.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium">
-                                                    {{ audit.status }}
-                                                </span>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                                                <button @click="viewAuditDetails(audit)" class="text-orange-600 hover:text-orange-900">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                                                    </svg>
-                                                </button>
-                                                <button @click="downloadPDFReport(audit)" class="text-blue-600 hover:text-blue-900">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                                    </svg>
-                                                </button>
-                                                <button v-if="currentUser.role === 'admin'" @click="deleteAudit(audit.id)" class="text-red-600 hover:text-red-900">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                                    </svg>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                                <div v-if="audits.length === 0" class="text-center py-8 text-gray-500">
-                                    No audits found. Start your first audit!
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Simple Conduct Audit View -->
-                    <div v-else-if="currentView === 'conduct-audit' && currentAudit" class="space-y-6">
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <h2 class="text-2xl font-bold text-gray-900">WHS Safety Audit</h2>
-                                <p class="text-sm text-gray-600">Amazon Austria - Workplace Health & Safety</p>
-                            </div>
-                            <button @click="cancelAudit" class="text-gray-600 hover:text-gray-900">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                </svg>
-                            </button>
-                        </div>
-
-                        <!-- Basic Information -->
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Audit Information</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                                    <select v-model="currentAudit.location" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                                        <option value="">Select Location...</option>
-                                        <option v-for="location in amazonLocations" :key="location" :value="location">{{ location }}</option>
-                                        <option value="custom">Other</option>
-                                    </select>
-                                    <input v-if="currentAudit.location === 'custom'" v-model="currentAudit.customLocation" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg mt-2" placeholder="Enter location">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Area</label>
-                                    <input v-model="currentAudit.area" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Shift</label>
-                                    <select v-model="currentAudit.shift" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                                        <option value="">Select...</option>
-                                        <option value="Early">Early Shift</option>
-                                        <option value="Late">Late Shift</option>
-                                        <option value="Night">Night Shift</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Quick Questions -->
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Safety Checklist</h3>
-                            <div class="space-y-4">
-                                <div v-for="question in quickQuestions" :key="question.id" class="border rounded-lg p-4">
-                                    <div class="flex justify-between items-center">
-                                        <div class="flex-1">
-                                            <p class="text-sm text-gray-900">{{ question.text }}</p>
-                                            <span v-if="question.critical" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 mt-1">Critical</span>
-                                        </div>
-                                        <div class="flex space-x-2 ml-4">
-                                            <button @click="updateResponse(question.id, 'yes')" :class="currentAudit.responses[question.id] === 'yes' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700'" class="px-3 py-1 rounded text-sm">Yes</button>
-                                            <button @click="updateResponse(question.id, 'no')" :class="currentAudit.responses[question.id] === 'no' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-700'" class="px-3 py-1 rounded text-sm">No</button>
-                                            <button @click="updateResponse(question.id, 'na')" :class="currentAudit.responses[question.id] === 'na' ? 'bg-gray-500 text-white' : 'bg-gray-200 text-gray-700'" class="px-3 py-1 rounded text-sm">N/A</button>
-                                        </div>
-                                    </div>
-                                    <div v-if="currentAudit.responses[question.id] === 'no'" class="mt-3">
-                                        <input v-model="currentAudit.notes[question.id]" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Add notes...">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Comments -->
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Additional Comments</h3>
-                            <textarea v-model="currentAudit.generalComments" class="w-full px-3 py-2 border border-gray-300 rounded-lg" rows="4" placeholder="Any additional observations or comments..."></textarea>
-                        </div>
-
-                        <!-- Actions -->
-                        <div class="flex justify-end space-x-4">
-                            <button @click="saveAudit('draft')" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Save as Draft</button>
-                            <button @click="completeAudit" class="px-6 py-2 amazon-orange text-white rounded-lg amazon-orange-hover">Complete Audit</button>
-                        </div>
-                    </div>
-
-                    <!-- Other views would continue here... -->
-                    
-                </main>
+        <!-- Settings Tab (Admin only) -->
+        <div id="settingsTab" class="tab-content" style="display: none;">
+            <div class="audit-form">
+                <h2>Einstellungen</h2>
+                <h3>Benutzer verwalten</h3>
+                <div id="usersList"></div>
+                <button onclick="showAddUserModal()">Neuer Benutzer</button>
+                
+                <h3 style="margin-top: 2rem;">Fragen verwalten</h3>
+                <button onclick="showQuestionsModal()">Fragen bearbeiten</button>
             </div>
         </div>
     </div>
 
+    <!-- Modal -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Modal</h2>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
     <script>
-        const { createApp } = Vue;
-
-        createApp({
-            data() {
-                return {
-                    currentView: 'login',
-                    currentUser: null,
-                    showMobileMenu: false,
-                    isLoading: false,
-                    loadingMessage: '',
-                    isOnline: navigator.onLine,
-                    storageStatus: 'Local Storage',
-                    lastSyncTime: null,
-                    loginForm: { email: '', password: '' },
-                    loginError: '',
-                    users: [],
-                    audits: [],
-                    currentAudit: null,
-                    viewingAudit: null,
-                    amazonLocations: [
-                        'DVI1 - Verteilerzentrum Wien 1',
-                        'DVI2 - Verteilerzentrum Wien 2', 
-                        'DVI3 - Verteilerzentrum Wien 3',
-                        'DAP5 - Verteilerzentrum Graz',
-                        'DAP8 - Verteilerzentrum Klagenfurt'
-                    ],
-                    quickQuestions: [
-                        { id: '1.1', text: 'Are safety signs and escape route plans clearly visible?', critical: true },
-                        { id: '1.2', text: 'Are all emergency exits free and well marked?', critical: true },
-                        { id: '1.3', text: 'Is first aid equipment complete and accessible?', critical: true },
-                        { id: '2.1', text: 'Is the warehouse clean and tidy?', critical: false },
-                        { id: '2.2', text: 'Are floors non-slip and level?', critical: true },
-                        { id: '3.1', text: 'Are 5S markings respected?', critical: false },
-                        { id: '3.2', text: 'Are storage areas safely organized?', critical: false },
-                        { id: '4.1', text: 'Are hazardous materials stored correctly?', critical: true },
-                        { id: '5.1', text: 'Do employees avoid unfavorable body postures?', critical: false },
-                        { id: '6.1', text: 'Are enough first aiders available?', critical: true }
-                    ]
-                };
+        // Audit Questions Template
+        const auditSections = [
+            {
+                title: "1. ALLGEMEINE SICHERHEIT",
+                subsections: [
+                    {
+                        title: "Notfallausstattung",
+                        questions: [
+                            { id: "1.1", text: "Sind Sicherheitshinweise und Fluchtwegpläne deutlich sichtbar?", critical: true, basis: "AStV § 19" },
+                            { id: "1.2", text: "Sind alle Notausgänge frei und gut gekennzeichnet?", critical: true, basis: "AStV § 20" },
+                            { id: "1.3", text: "Ist die Erste-Hilfe-Ausstattung vollständig und erreichbar?", critical: true, basis: "ASchG § 26" },
+                            { id: "1.4", text: "Ist die Notfallausrüstung (Augenspülung, Feuerlöscher) zugänglich?", critical: true }
+                        ]
+                    },
+                    {
+                        title: "Persönliche Schutzausrüstung",
+                        questions: [
+                            { id: "1.5", text: "Tragen alle Mitarbeiter die korrekte PSA?", critical: false, basis: "ASchG § 71" },
+                            { id: "1.6", text: "Sind alle Mitarbeiter-Badges sichtbar?", critical: false },
+                            { id: "1.7", text: "Entsprechen Frisur/Kleidung den Sicherheitsvorschriften? (max. Schulterhöhe)", critical: false },
+                            { id: "1.8", text: "Sind aktuelle Arbeitsanweisungen verfügbar?", critical: false, basis: "ASchG § 12" }
+                        ]
+                    }
+                ]
             },
-            computed: {
-                connectionStatusClass() {
-                    if (!this.isOnline) return 'connection-offline';
-                    if (this.isLoading) return 'connection-syncing';
-                    return 'connection-online';
-                },
-                connectionStatusText() {
-                    if (!this.isOnline) return '🔴 Offline';
-                    if (this.isLoading) return '🟡 Syncing...';
-                    return '🟢 Online';
-                },
-                recentAudits() {
-                    return [...this.audits].reverse().slice(0, 5);
-                },
-                averageScore() {
-                    if (this.audits.length === 0) return 0;
-                    const total = this.audits.reduce((sum, audit) => sum + (audit.score || 0), 0);
-                    return Math.round(total / this.audits.length);
-                },
-                totalCriticalIssues() {
-                    return this.audits.reduce((sum, audit) => sum + (audit.criticalFails || 0), 0);
-                },
-                monthlyAudits() {
-                    const currentMonth = new Date().getMonth();
-                    const currentYear = new Date().getFullYear();
-                    return this.audits.filter(audit => {
-                        const auditDate = new Date(audit.date);
-                        return auditDate.getMonth() === currentMonth && auditDate.getFullYear() === currentYear;
-                    }).length;
+            {
+                title: "2. ARBEITSPLATZ UND UMGEBUNG",
+                subsections: [
+                    {
+                        title: "Ordnung und Sauberkeit",
+                        questions: [
+                            { id: "2.1", text: "Ist die Lagerhalle sauber und aufgeräumt?", critical: false, basis: "AStV § 4" },
+                            { id: "2.2", text: "Sind die Böden rutschfest und eben?", critical: true, basis: "AStV § 5" },
+                            { id: "2.3", text: "Ist ausreichend Bewegungsfreiheit vorhanden? (min. 1,5 m² pro Person)", critical: false }
+                        ]
+                    },
+                    {
+                        title: "Arbeitsumgebung",
+                        questions: [
+                            { id: "2.4", text: "Entspricht die Beleuchtung den Anforderungen? (min. 200 Lux)", critical: false, basis: "AStV § 22" },
+                            { id: "2.5", text: "Ist die Raumtemperatur angemessen? (18-25°C)", critical: false, basis: "AStV § 23" },
+                            { id: "2.6", text: "Ist die Lüftung ausreichend?", critical: false },
+                            { id: "2.7", text: "Liegt der Lärmpegel im zulässigen Bereich? (≤ 85 dB(A))", critical: false }
+                        ]
+                    },
+                    {
+                        title: "Ergonomie",
+                        questions: [
+                            { id: "2.8", text: "Sind die Arbeitsplätze ergonomisch gestaltet?", critical: false, basis: "AStV § 21" }
+                        ]
+                    }
+                ]
+            },
+            {
+                title: "3. LAGERUNG UND TRANSPORT",
+                subsections: [
+                    {
+                        title: "Lagerbereiche",
+                        questions: [
+                            { id: "3.1", text: "Werden die 5S-Markierungen respektiert?", critical: false },
+                            { id: "3.2", text: "Sind die Lagerbereiche sicher organisiert?", critical: false },
+                            { id: "3.3", text: "Werden Lagerungen über Kopf vermieden?", critical: false },
+                            { id: "3.4", text: "Sind Regale ordnungsgemäß befestigt?", critical: true },
+                            { id: "3.5", text: "Sind die maximalen Stapelhöhen eingehalten?", critical: false }
+                        ]
+                    },
+                    {
+                        title: "Transportwege",
+                        questions: [
+                            { id: "3.6", text: "Sind Fußgängerwege klar gekennzeichnet? (min. 1,2 m breit)", critical: false },
+                            { id: "3.7", text: "Sind alle Transportwege frei von Hindernissen?", critical: true },
+                            { id: "3.8", text: "Sind Gefahrenbereiche deutlich markiert?", critical: false }
+                        ]
+                    },
+                    {
+                        title: "Flurförderzeuge",
+                        questions: [
+                            { id: "3.9", text: "Sind alle Flurförderzeuge in gutem Zustand?", critical: false },
+                            { id: "3.10", text: "Sind die Wartungsprotokolle aktuell? (jährliche Prüfung)", critical: false },
+                            { id: "3.11", text: "Sind Ladehilfsmittel unbeschädigt?", critical: false }
+                        ]
+                    }
+                ]
+            },
+            {
+                title: "4. GEFAHRSTOFFE",
+                questions: [
+                    { id: "4.1", text: "Sind Gefahrstoffe korrekt gelagert?", critical: true, basis: "ChemG" },
+                    { id: "4.2", text: "Sind alle Gefahrstoffe ordnungsgemäß gekennzeichnet?", critical: true },
+                    { id: "4.3", text: "Sind Sicherheitsdatenblätter verfügbar?", critical: false },
+                    { id: "4.4", text: "Sind Gefahrstoffbereiche abgesperrt?", critical: true }
+                ]
+            },
+            {
+                title: "5. ERGONOMIE UND ARBEITSVERHALTEN",
+                questions: [
+                    { id: "5.1", text: "Vermeiden Mitarbeiter ungünstige Körperhaltungen?", critical: false },
+                    { id: "5.2", text: "Werden Transportwagen kontrolliert bewegt?", critical: false },
+                    { id: "5.3", text: "Werden Handläufe verwendet (wo vorhanden)?", critical: false },
+                    { id: "5.4", text: "Werden Hebehilfen bei schweren Lasten eingesetzt? (ab 25 kg Männer, 15 kg Frauen)", critical: false },
+                    { id: "5.5", text: "Werden Pausenzeiten eingehalten?", critical: false },
+                    { id: "5.6", text: "Ist der Arbeitsrhythmus angemessen?", critical: false }
+                ]
+            },
+            {
+                title: "6. NOTFALLVORSORGE",
+                subsections: [
+                    {
+                        title: "Personal",
+                        questions: [
+                            { id: "6.1", text: "Sind genügend Ersthelfer verfügbar? (1 pro 19 Mitarbeiter)", critical: true },
+                            { id: "6.2", text: "Sind Brandschutzwarte ernannt und geschult?", critical: true },
+                            { id: "6.3", text: "Sind die Notfallpläne aktuell und bekannt?", critical: false }
+                        ]
+                    },
+                    {
+                        title: "Übungen",
+                        questions: [
+                            { id: "6.4", text: "Werden regelmäßig Notfallübungen durchgeführt?", critical: false },
+                            { id: "6.5", text: "Sind Sammelplätze bekannt und gekennzeichnet?", critical: false },
+                            { id: "6.6", text: "Funktioniert das Alarmsystem ordnungsgemäß?", critical: true }
+                        ]
+                    }
+                ]
+            },
+            {
+                title: "7. WARTUNG UND INSTANDHALTUNG",
+                questions: [
+                    { id: "7.1", text: "Werden Wartungsintervalle bei Toren eingehalten?", critical: false },
+                    { id: "7.2", text: "Sind Feuerlöscher-Prüffristen aktuell? (alle 2 Jahre)", critical: true },
+                    { id: "7.3", text: "Sind elektrische Anlagen ordnungsgemäß geprüft?", critical: false },
+                    { id: "7.4", text: "Erfolgt regelmäßige Wartung der Lüftungsanlagen?", critical: false },
+                    { id: "7.5", text: "Sind alle Wartungsprotokolle verfügbar?", critical: false }
+                ]
+            },
+            {
+                title: "8. HÖHENARBEITEN (falls zutreffend)",
+                questions: [
+                    { id: "8.1", text: "Sind Absturzsicherungen vorhanden?", critical: true },
+                    { id: "8.2", text: "Ist spezielle Schutzausrüstung verfügbar?", critical: false },
+                    { id: "8.3", text: "Sind Arbeiten in der Höhe genehmigt?", critical: false }
+                ]
+            }
+        ];
+
+        // State Management
+        let currentUser = null;
+        let audits = [];
+
+        // API Configuration
+        const API_BASE = '/.netlify/functions';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set current date/time
+            const now = new Date();
+            const dateTimeLocal = now.toISOString().slice(0, 16);
+            document.getElementById('auditDate').value = dateTimeLocal;
+
+            // Check if user is logged in
+            const savedUser = localStorage.getItem('currentUser');
+            if (savedUser) {
+                currentUser = JSON.parse(savedUser);
+                showDashboard();
+            }
+
+            // Load audit questions
+            renderAuditQuestions();
+        });
+
+        // Authentication
+        async function login(event) {
+            event.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/auth`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'login', username, password })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentUser = data.user;
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    showDashboard();
+                } else {
+                    alert('Ungültige Anmeldedaten');
                 }
-            },
-            methods: {
-                // Authentication
-                handleLogin() {
-                    const demoUsers = [
-                        { id: 1, name: 'Admin User', email: 'admin@amazon.at', password: 'admin123', role: 'admin' },
-                        { id: 2, name: 'Safety Officer', email: 'safety@amazon.at', password: 'safety123', role: 'auditor' },
-                        { id: 3, name: 'Area Manager', email: 'manager@amazon.at', password: 'manager123', role: 'viewer' }
-                    ];
-
-                    const user = demoUsers.find(u => u.email === this.loginForm.email && u.password === this.loginForm.password);
-                    
-                    if (user) {
-                        this.currentUser = user;
-                        this.currentView = 'dashboard';
-                        this.loginError = '';
-                        this.loginForm = { email: '', password: '' };
-                        this.loadFromStorage();
-                    } else {
-                        this.loginError = 'Invalid email or password';
-                    }
-                },
-
-                handleLogout() {
-                    this.currentUser = null;
-                    this.currentView = 'login';
-                },
-
-                // Navigation
-                navigateTo(view) {
-                    this.currentView = view;
-                    this.showMobileMenu = false;
-                },
-
-                // Audit Management
-                startNewAudit() {
-                    this.currentAudit = {
-                        id: Date.now(),
-                        date: new Date().toISOString().split('T')[0],
-                        time: new Date().toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' }),
-                        auditor: this.currentUser.name,
-                        location: '',
-                        customLocation: '',
-                        area: '',
-                        shift: '',
-                        status: 'in-progress',
-                        responses: {},
-                        notes: {},
-                        generalComments: ''
+            } catch (error) {
+                // Fallback for demo
+                if ((username === 'admin' && password === 'admin123') || 
+                    (username === 'user' && password === 'user123')) {
+                    currentUser = { 
+                        username, 
+                        role: username === 'admin' ? 'admin' : 'user',
+                        name: username === 'admin' ? 'Admin User' : 'Standard User'
                     };
-                    this.currentView = 'conduct-audit';
-                },
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    showDashboard();
+                } else {
+                    alert('Ungültige Anmeldedaten');
+                }
+            }
+        }
 
-                updateResponse(questionId, value) {
-                    this.currentAudit.responses[questionId] = value;
-                },
+        function logout() {
+            currentUser = null;
+            localStorage.removeItem('currentUser');
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('dashboard').style.display = 'none';
+            document.getElementById('userInfo').style.display = 'none';
+        }
 
-                calculateScore(audit) {
-                    let totalItems = 0;
-                    let passedItems = 0;
-                    let criticalFails = 0;
-                    
-                    this.quickQuestions.forEach(question => {
-                        const response = audit.responses[question.id];
-                        if (response && response !== '') {
-                            totalItems++;
-                            if (response === 'yes') {
-                                passedItems++;
-                            } else if (response === 'no' && question.critical) {
-                                criticalFails++;
-                            }
-                        }
-                    });
-                    
-                    const score = totalItems > 0 ? Math.round((passedItems / totalItems) * 100) : 0;
-                    return { score, totalItems, passedItems, criticalFails };
-                },
+        function showDashboard() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+            document.getElementById('userInfo').style.display = 'flex';
+            document.getElementById('currentUser').textContent = currentUser.name || currentUser.username;
+            
+            // Show/hide admin features
+            if (currentUser.role === 'admin') {
+                document.getElementById('settingsTab').style.display = 'block';
+            }
+            
+            loadAudits();
+            updateStatistics();
+        }
 
-                saveAudit(status) {
-                    const scoreData = this.calculateScore(this.currentAudit);
-                    const auditToSave = {
-                        ...this.currentAudit,
-                        status,
-                        score: scoreData.score,
-                        totalItems: scoreData.totalItems,
-                        passedItems: scoreData.passedItems,
-                        criticalFails: scoreData.criticalFails,
-                        completedDate: status === 'completed' ? new Date().toISOString() : null
-                    };
-                    
-                    this.audits.push(auditToSave);
-                    this.saveToStorage();
-                    
-                    // Try to sync to Netlify
-                    this.syncToNetlify();
-                    
-                    this.currentAudit = null;
-                    this.currentView = 'audits';
-                },
+        // Tab Navigation
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.style.display = 'none';
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + 'Tab').style.display = 'block';
+            
+            // Set active class on clicked tab
+            event.target.classList.add('active');
+        }
 
-                completeAudit() {
-                    if (confirm('Are you sure you want to complete this audit?')) {
-                        this.saveAudit('completed');
-                    }
-                },
-
-                cancelAudit() {
-                    if (confirm('Are you sure you want to cancel this audit? All progress will be lost.')) {
-                        this.currentAudit = null;
-                        this.currentView = 'audits';
-                    }
-                },
-
-                viewAuditDetails(audit) {
-                    this.viewingAudit = audit;
-                    this.currentView = 'view-audit';
-                },
-
-                deleteAudit(auditId) {
-                    if (confirm('Are you sure you want to delete this audit?')) {
-                        this.audits = this.audits.filter(a => a.id !== auditId);
-                        this.saveToStorage();
-                        this.syncToNetlify();
-                    }
-                },
-
-                // Storage Management
-                saveToStorage() {
-                    try {
-                        localStorage.setItem('whs_audits', JSON.stringify(this.audits));
-                        localStorage.setItem('whs_users', JSON.stringify(this.users));
-                        localStorage.setItem('whs_last_save', new Date().toISOString());
-                        this.storageStatus = 'Saved Locally';
-                    } catch (error) {
-                        console.error('Error saving to localStorage:', error);
-                        alert('Error saving data locally. Storage may be full.');
-                    }
-                },
-
-                loadFromStorage() {
-                    try {
-                        const savedAudits = localStorage.getItem('whs_audits');
-                        const savedUsers = localStorage.getItem('whs_users');
+        // Render Audit Questions
+        function renderAuditQuestions() {
+            const container = document.getElementById('auditQuestions');
+            container.innerHTML = '';
+            
+            auditSections.forEach(section => {
+                const sectionDiv = document.createElement('div');
+                sectionDiv.className = 'audit-section';
+                
+                const sectionTitle = document.createElement('h3');
+                sectionTitle.textContent = section.title;
+                sectionDiv.appendChild(sectionTitle);
+                
+                if (section.subsections) {
+                    section.subsections.forEach(subsection => {
+                        const subsectionTitle = document.createElement('h4');
+                        subsectionTitle.textContent = subsection.title;
+                        subsectionTitle.style.marginTop = '1rem';
+                        subsectionTitle.style.marginBottom = '0.5rem';
+                        sectionDiv.appendChild(subsectionTitle);
                         
-                        if (savedAudits) {
-                            this.audits = JSON.parse(savedAudits);
-                        }
-                        
-                        if (savedUsers) {
-                            this.users = JSON.parse(savedUsers);
-                        }
-                        
-                        const lastSave = localStorage.getItem('whs_last_save');
-                        if (lastSave) {
-                            this.lastSyncTime = new Date(lastSave);
-                        }
-                    } catch (error) {
-                        console.error('Error loading from localStorage:', error);
-                        this.audits = [];
-                        this.users = [];
-                    }
-                },
-
-                // Netlify Integration (Simplified)
-                async syncToNetlify() {
-                    if (!this.isOnline) return;
-                    
-                    try {
-                        this.isLoading = true;
-                        this.loadingMessage = 'Syncing to Netlify...';
-                        
-                        // Send data to Netlify function
-                        const response = await fetch('/.netlify/functions/store-data', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                audits: this.audits,
-                                users: this.users,
-                                timestamp: new Date().toISOString()
-                            })
+                        subsection.questions.forEach(question => {
+                            sectionDiv.appendChild(createQuestionElement(question));
                         });
+                    });
+                } else if (section.questions) {
+                    section.questions.forEach(question => {
+                        sectionDiv.appendChild(createQuestionElement(question));
+                    });
+                }
+                
+                container.appendChild(sectionDiv);
+            });
+        }
 
-                        if (response.ok) {
-                            this.storageStatus = 'Synced to Netlify';
-                            this.lastSyncTime = new Date();
-                        } else {
-                            throw new Error('Sync failed');
-                        }
-                    } catch (error) {
-                        console.error('Sync error:', error);
-                        this.storageStatus = 'Local Storage (Sync Failed)';
-                    } finally {
-                        this.isLoading = false;
-                        this.loadingMessage = '';
+        function createQuestionElement(question) {
+            const questionDiv = document.createElement('div');
+            questionDiv.className = 'audit-question' + (question.critical ? ' critical' : '');
+            
+            const headerDiv = document.createElement('div');
+            headerDiv.className = 'question-header';
+            
+            const questionLabel = document.createElement('div');
+            questionLabel.innerHTML = `
+                <span class="question-number">${question.id}</span>
+                ${question.text}
+                ${question.basis ? `<small style="color: #666;"> (${question.basis})</small>` : ''}
+            `;
+            
+            headerDiv.appendChild(questionLabel);
+            
+            if (question.critical) {
+                const badge = document.createElement('span');
+                badge.className = 'critical-badge';
+                badge.textContent = 'KRITISCH';
+                headerDiv.appendChild(badge);
+            }
+            
+            questionDiv.appendChild(headerDiv);
+            
+            const responseDiv = document.createElement('div');
+            responseDiv.className = 'response-options';
+            responseDiv.innerHTML = `
+                <label>
+                    <input type="radio" name="q_${question.id}" value="YES" required>
+                    Ja
+                </label>
+                <label>
+                    <input type="radio" name="q_${question.id}" value="NO" required>
+                    Nein
+                </label>
+                <label>
+                    <input type="radio" name="q_${question.id}" value="NA" required>
+                    N/A
+                </label>
+            `;
+            
+            questionDiv.appendChild(responseDiv);
+            
+            return questionDiv;
+        }
+
+        // Save Audit
+        async function saveAudit(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(event.target);
+            const responses = {};
+            let passedCount = 0;
+            let totalCount = 0;
+            let criticalFailures = 0;
+            
+            // Collect all responses
+            const allQuestions = getAllQuestions();
+            allQuestions.forEach(question => {
+                const response = formData.get(`q_${question.id}`);
+                if (response) {
+                    responses[question.id] = response;
+                    totalCount++;
+                    if (response === 'YES') passedCount++;
+                    if (response === 'NO' && question.critical) criticalFailures++;
+                }
+            });
+            
+            const audit = {
+                id: Date.now().toString(),
+                date: document.getElementById('auditDate').value,
+                location: document.getElementById('location').value,
+                area: document.getElementById('area').value || 'N/A',
+                shift: document.getElementById('shift').value,
+                auditor: currentUser.name || currentUser.username,
+                responses: responses,
+                score: Math.round((passedCount / totalCount) * 100),
+                itemsPassed: passedCount,
+                totalItems: totalCount,
+                criticalFailures: criticalFailures,
+                overallCondition: document.getElementById('overallCondition').value,
+                notes: document.getElementById('notes').value,
+                status: 'completed'
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/audits`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(audit)
+                });
+                
+                if (response.ok) {
+                    alert('Begehung erfolgreich gespeichert!');
+                    document.getElementById('auditForm').reset();
+                    // Reset date to current
+                    const now = new Date();
+                    document.getElementById('auditDate').value = now.toISOString().slice(0, 16);
+                    showTab('audits');
+                    loadAudits();
+                }
+            } catch (error) {
+                // Fallback - save to localStorage
+                const savedAudits = JSON.parse(localStorage.getItem('audits') || '[]');
+                savedAudits.push(audit);
+                localStorage.setItem('audits', JSON.stringify(savedAudits));
+                
+                alert('Begehung erfolgreich gespeichert!');
+                document.getElementById('auditForm').reset();
+                const now = new Date();
+                document.getElementById('auditDate').value = now.toISOString().slice(0, 16);
+                showTab('audits');
+                loadAudits();
+            }
+        }
+
+        function getAllQuestions() {
+            const questions = [];
+            auditSections.forEach(section => {
+                if (section.subsections) {
+                    section.subsections.forEach(subsection => {
+                        questions.push(...subsection.questions);
+                    });
+                } else if (section.questions) {
+                    questions.push(...section.questions);
+                }
+            });
+            return questions;
+        }
+
+        // Load Audits
+        async function loadAudits() {
+            try {
+                const response = await fetch(`${API_BASE}/audits`);
+                if (response.ok) {
+                    audits = await response.json();
+                } else {
+                    throw new Error('Failed to load audits');
+                }
+            } catch (error) {
+                // Fallback - load from localStorage
+                audits = JSON.parse(localStorage.getItem('audits') || '[]');
+            }
+            
+            displayAudits();
+            updateStatistics();
+        }
+
+        function displayAudits() {
+            const tbody = document.getElementById('auditsList');
+            
+            if (audits.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Keine Begehungen vorhanden</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = audits.map(audit => {
+                const scoreClass = audit.score >= 80 ? 'score-good' : audit.score >= 60 ? 'score-medium' : 'score-poor';
+                const date = new Date(audit.date);
+                const formattedDate = date.toLocaleString('de-DE', { 
+                    day: '2-digit', 
+                    month: '2-digit', 
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                return `
+                    <tr>
+                        <td>${formattedDate}</td>
+                        <td>${audit.location}</td>
+                        <td>${audit.area}</td>
+                        <td>${audit.shift}</td>
+                        <td><span class="score-badge ${scoreClass}">${audit.score}%</span></td>
+                        <td>${audit.auditor}</td>
+                        <td>
+                            <button onclick="viewAudit('${audit.id}')" class="secondary" style="padding: 0.5rem;">Anzeigen</button>
+                            <button onclick="exportPDF('${audit.id}')" class="secondary" style="padding: 0.5rem;">PDF</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Update Statistics
+        function updateStatistics() {
+            document.getElementById('totalAudits').textContent = audits.length;
+            
+            if (audits.length > 0) {
+                const avgScore = audits.reduce((sum, audit) => sum + audit.score, 0) / audits.length;
+                document.getElementById('avgScore').textContent = Math.round(avgScore) + '%';
+                
+                const totalCritical = audits.reduce((sum, audit) => sum + (audit.criticalFailures || 0), 0);
+                document.getElementById('criticalIssues').textContent = totalCritical;
+                
+                const lastAudit = audits[audits.length - 1];
+                const lastDate = new Date(lastAudit.date);
+                document.getElementById('lastAudit').textContent = lastDate.toLocaleDateString('de-DE');
+            } else {
+                document.getElementById('avgScore').textContent = '0%';
+                document.getElementById('criticalIssues').textContent = '0';
+                document.getElementById('lastAudit').textContent = '-';
+            }
+        }
+
+        // View Audit Details
+        function viewAudit(auditId) {
+            const audit = audits.find(a => a.id === auditId);
+            if (!audit) return;
+            
+            const modalTitle = document.getElementById('modalTitle');
+            const modalBody = document.getElementById('modalBody');
+            
+            modalTitle.textContent = 'Begehungsdetails';
+            
+            const date = new Date(audit.date);
+            const formattedDate = date.toLocaleString('de-DE');
+            
+            modalBody.innerHTML = `
+                <div style="margin-bottom: 1rem;">
+                    <p><strong>Datum:</strong> ${formattedDate}</p>
+                    <p><strong>Standort:</strong> ${audit.location}</p>
+                    <p><strong>Bereich:</strong> ${audit.area}</p>
+                    <p><strong>Schicht:</strong> ${audit.shift}</p>
+                    <p><strong>Prüfer:</strong> ${audit.auditor}</p>
+                    <p><strong>Bewertung:</strong> ${audit.score}% (${audit.itemsPassed}/${audit.totalItems})</p>
+                    <p><strong>Kritische Mängel:</strong> ${audit.criticalFailures}</p>
+                    <p><strong>Gesamtzustand:</strong> ${audit.overallCondition}</p>
+                </div>
+                
+                <h3>Detaillierte Ergebnisse</h3>
+                <div id="auditDetailsResults"></div>
+                
+                ${audit.notes ? `<h3>Anmerkungen</h3><p>${audit.notes}</p>` : ''}
+            `;
+            
+            // Display detailed results
+            const resultsDiv = document.getElementById('auditDetailsResults');
+            const allQuestions = getAllQuestions();
+            
+            auditSections.forEach(section => {
+                const sectionDiv = document.createElement('div');
+                sectionDiv.style.marginBottom = '1rem';
+                
+                const sectionTitle = document.createElement('h4');
+                sectionTitle.textContent = section.title;
+                sectionDiv.appendChild(sectionTitle);
+                
+                const renderQuestion = (question) => {
+                    const response = audit.responses[question.id];
+                    if (response) {
+                        const color = response === 'YES' ? 'green' : response === 'NO' ? 'red' : 'gray';
+                        const icon = response === 'YES' ? '✓' : response === 'NO' ? '✗' : '-';
+                        
+                        const questionDiv = document.createElement('div');
+                        questionDiv.style.marginLeft = '1rem';
+                        questionDiv.style.marginBottom = '0.5rem';
+                        questionDiv.innerHTML = `
+                            <span style="color: ${color}; font-weight: bold;">${icon}</span>
+                            ${question.id}: ${question.text}
+                            ${question.critical ? '<span style="color: red; font-size: 0.8rem;"> (KRITISCH)</span>' : ''}
+                        `;
+                        sectionDiv.appendChild(questionDiv);
                     }
-                },
+                };
+                
+                if (section.subsections) {
+                    section.subsections.forEach(subsection => {
+                        subsection.questions.forEach(renderQuestion);
+                    });
+                } else if (section.questions) {
+                    section.questions.forEach(renderQuestion);
+                }
+                
+                resultsDiv.appendChild(sectionDiv);
+            });
+            
+            document.getElementById('modal').style.display = 'block';
+        }
 
-                // Utility Methods
-                getDisplayLocation(audit) {
-                    if (audit.location === 'custom') {
-                        return audit.customLocation || 'Custom Location';
+        // Export Functions
+        function exportPDF(auditId) {
+            const audit = audits.find(a => a.id === auditId);
+            if (!audit) return;
+            
+            // Create PDF content
+            const date = new Date(audit.date);
+            const formattedDate = date.toLocaleString('de-DE');
+            
+            let content = `
+                <h1>WHS Safety Audit Report</h1>
+                <h2>Amazon Austria - ${audit.location}</h2>
+                
+                <h3>Audit Information</h3>
+                <p><strong>Date/Time:</strong> ${formattedDate}</p>
+                <p><strong>Location:</strong> ${audit.location}</p>
+                <p><strong>Area:</strong> ${audit.area}</p>
+                <p><strong>Shift:</strong> ${audit.shift}</p>
+                <p><strong>Auditor:</strong> ${audit.auditor}</p>
+                <p><strong>Status:</strong> ${audit.status}</p>
+                
+                <h3>Audit Score Summary</h3>
+                <p><strong>Overall Score:</strong> ${audit.score}%</p>
+                <p><strong>Items Passed:</strong> ${audit.itemsPassed}/${audit.totalItems}</p>
+                <p><strong>Critical Failures:</strong> ${audit.criticalFailures}</p>
+                
+                <h3>Overall Assessment</h3>
+                <p><strong>Workplace Condition:</strong> ${audit.overallCondition}</p>
+                
+                <h3>Detailed Audit Results</h3>
+            `;
+            
+            // Add detailed results
+            const allQuestions = getAllQuestions();
+            auditSections.forEach(section => {
+                content += `<h4>${section.title}</h4>`;
+                
+                const addQuestion = (question) => {
+                    const response = audit.responses[question.id];
+                    if (response) {
+                        const status = response === 'YES' ? 'PASSED' : response === 'NO' ? 'FAILED' : 'N/A';
+                        content += `<p>${question.id}: ${status} ${question.critical ? '[CRITICAL]' : ''}<br/>`;
+                        content += `${question.text}`;
+                        if (question.basis) content += ` <small>(${question.basis})</small>`;
+                        content += `</p>`;
                     }
-                    return audit.location || 'N/A';
-                },
+                };
+                
+                if (section.subsections) {
+                    section.subsections.forEach(subsection => {
+                        content += `<h5>${subsection.title}</h5>`;
+                        subsection.questions.forEach(addQuestion);
+                    });
+                } else if (section.questions) {
+                    section.questions.forEach(addQuestion);
+                }
+            });
+            
+            if (audit.notes) {
+                content += `<h3>Notes</h3><p>${audit.notes}</p>`;
+            }
+            
+            // Create and download PDF
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>WHS Safety Audit Report - ${audit.location}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 40px; }
+                        h1 { color: #232F3E; }
+                        h2, h3 { color: #FF9900; }
+                        h4, h5 { color: #146EB4; }
+                        p { margin: 0.5rem 0; }
+                        small { color: #666; }
+                    </style>
+                </head>
+                <body>
+                    ${content}
+                    <p style="margin-top: 2rem; font-size: 0.8rem; color: #666;">
+                        Generated by WHS Safety Audit System - Amazon Austria<br>
+                        Generated: ${new Date().toLocaleString('de-DE')}
+                    </p>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.print();
+        }
 
-                getScoreClass(score) {
-                    if (score >= 90) return 'bg-green-100 text-green-800';
-                    if (score >= 70) return 'bg-yellow-100 text-yellow-800';
-                    return 'bg-red-100 text-red-800';
-                },
-
-                // Export functionality
-                exportAllData() {
-                    const exportData = {
-                        audits: this.audits,
-                        users: this.users,
-                        exportDate: new Date().toISOString(),
-                        totalAudits: this.audits.length
-                    };
-                    
-                    const dataStr = JSON.stringify(exportData, null, 2);
-                    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-                    const url = URL.createObjectURL(dataBlob);
-                    
+        async function exportArchive() {
+            if (audits.length === 0) {
+                alert('Keine Begehungen zum Exportieren vorhanden.');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/export-archive`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ audits })
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `WHS_Audit_Export_${new Date().toISOString().split('T')[0]}.json`;
-                    document.body.appendChild(a);
+                    a.download = `whs-audits-archive-${new Date().toISOString().split('T')[0]}.zip`;
                     a.click();
-                    document.body.removeChild(a);
                     URL.revokeObjectURL(url);
-                },
-
-                downloadPDFReport(audit) {
-                    const { jsPDF } = window.jspdf;
-                    const doc = new jsPDF();
-                    
-                    // Simple PDF generation
-                    doc.setFontSize(20);
-                    doc.text('WHS Safety Audit Report', 20, 30);
-                    doc.setFontSize(12);
-                    doc.text(`Date: ${audit.date}`, 20, 50);
-                    doc.text(`Location: ${this.getDisplayLocation(audit)}`, 20, 60);
-                    doc.text(`Auditor: ${audit.auditor}`, 20, 70);
-                    doc.text(`Score: ${audit.score}%`, 20, 80);
-                    doc.text(`Status: ${audit.status}`, 20, 90);
-                    
-                    if (audit.generalComments) {
-                        doc.text('Comments:', 20, 110);
-                        const splitText = doc.splitTextToSize(audit.generalComments, 170);
-                        doc.text(splitText, 20, 120);
-                    }
-                    
-                    doc.save(`WHS_Audit_${audit.id}_${audit.date}.pdf`);
-                },
-
-                // Initialize app
-                initializeApp() {
-                    this.loadFromStorage();
-                    
-                    // Set up online/offline listeners
-                    window.addEventListener('online', () => {
-                        this.isOnline = true;
-                        this.syncToNetlify();
-                    });
-                    
-                    window.addEventListener('offline', () => {
-                        this.isOnline = false;
-                        this.storageStatus = 'Offline Mode';
-                    });
-                    
-                    // Auto-sync every 5 minutes if online
-                    setInterval(() => {
-                        if (this.isOnline && this.currentUser) {
-                            this.syncToNetlify();
-                        }
-                    }, 5 * 60 * 1000);
                 }
-            },
-
-            mounted() {
-                this.initializeApp();
+            } catch (error) {
+                // Fallback - export as JSON
+                const dataStr = JSON.stringify(audits, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `whs-audits-${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
             }
-        }).mount('#app');
+        }
+
+        // Modal Functions
+        function closeModal() {
+            document.getElementById('modal').style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('modal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+
+        // Admin Functions
+        function showAddUserModal() {
+            const modalTitle = document.getElementById('modalTitle');
+            const modalBody = document.getElementById('modalBody');
+            
+            modalTitle.textContent = 'Neuer Benutzer';
+            modalBody.innerHTML = `
+                <form onsubmit="addUser(event)">
+                    <div class="form-group">
+                        <label for="newUsername">Benutzername</label>
+                        <input type="text" id="newUsername" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="newPassword">Passwort</label>
+                        <input type="password" id="newPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="newName">Name</label>
+                        <input type="text" id="newName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="newRole">Rolle</label>
+                        <select id="newRole" required>
+                            <option value="user">Benutzer</option>
+                            <option value="admin">Administrator</option>
+                        </select>
+                    </div>
+                    <button type="submit">Benutzer anlegen</button>
+                </form>
+            `;
+            
+            document.getElementById('modal').style.display = 'block';
+        }
+
+        async function addUser(event) {
+            event.preventDefault();
+            
+            const userData = {
+                username: document.getElementById('newUsername').value,
+                password: document.getElementById('newPassword').value,
+                name: document.getElementById('newName').value,
+                role: document.getElementById('newRole').value
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+                
+                if (response.ok) {
+                    alert('Benutzer erfolgreich angelegt!');
+                    closeModal();
+                }
+            } catch (error) {
+                alert('Fehler beim Anlegen des Benutzers');
+            }
+        }
+
+        function showQuestionsModal() {
+            alert('Fragenverwaltung - Diese Funktion wird in der nächsten Version verfügbar sein.');
+        }
     </script>
 </body>
 </html>
