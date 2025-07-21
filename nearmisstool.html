@@ -341,6 +341,10 @@
         .severity-medium { background: #FFC107; color: #333; }
         .severity-high { background: #FF5722; color: white; }
         .severity-critical { background: #B71C1C; color: white; }
+        .severity-a { background: #B71C1C; color: white; }
+        .severity-b { background: #FF5722; color: white; }
+        .severity-c { background: #FFC107; color: #333; }
+        .severity-d { background: #4CAF50; color: white; }
         .severity-unknown { background: #9E9E9E; color: white; }
         
         #pdfPreview {
@@ -405,10 +409,10 @@
                     <label>Potential Severity:</label>
                     <select id="potentialSeverityFilter">
                         <option value="">All Severities</option>
-                        <option value="Low">Low</option>
-                        <option value="Medium">Medium</option>
-                        <option value="High">High</option>
-                        <option value="Critical">Critical</option>
+                        <option value="A">A - Critical</option>
+                        <option value="B">B - High</option>
+                        <option value="C">C - Medium</option>
+                        <option value="D">D - Low</option>
                     </select>
                 </div>
                 <div class="filter-group">
@@ -454,7 +458,7 @@
             </div>
             
             <div class="card">
-                <h3>High Severity Cases</h3>
+                <h3>High Severity Cases (A & B)</h3>
                 <div class="metric" id="highSeverityCount">0</div>
                 <div class="sub-metric">Requires immediate action</div>
             </div>
@@ -746,13 +750,13 @@
                         row.parsedDate = new Date(row.nearmiss_date);
                     }
                     
+                    // Use potential_severity for severity
+                    row.severity = standardizeSeverity(row.potential_severity || row.severity);
+                    
                     // Calculate risk score if not present
                     if (!row.risk || row.risk === '' || row.risk === 0) {
                         row.risk = calculateRiskScore(row);
                     }
-                    
-                    // Use potential_severity for severity
-                    row.severity = standardizeSeverity(row.potential_severity || row.severity);
                     
                     // Generate incident ID if not present
                     if (!row.incident_id) {
@@ -766,10 +770,10 @@
         
         // Calculate risk score
         function calculateRiskScore(row) {
-            const severityMap = { 'Low': 1, 'Medium': 3, 'High': 5, 'Critical': 8, 'Unknown': 2 };
+            const severityMap = { 'A': 8, 'B': 5, 'C': 3, 'D': 1, 'Unknown': 2 };
             const likelihoodMap = { 'Rare': 1, 'Unlikely': 2, 'Possible': 3, 'Likely': 4, 'Almost Certain': 5 };
             
-            const severity = severityMap[row.potential_severity] || severityMap[row.severity] || 2;
+            const severity = severityMap[row.severity] || 2;
             const likelihood = likelihoodMap[row.initial_risk_assessment_likeliness] || 3;
             
             return ((severity * likelihood) / 5).toFixed(1);
@@ -778,11 +782,21 @@
         // Standardize severity levels
         function standardizeSeverity(severity) {
             if (!severity) return 'Unknown';
-            const lower = String(severity).toLowerCase();
-            if (lower.includes('low') || lower.includes('minor')) return 'Low';
-            if (lower.includes('high') || lower.includes('major')) return 'High';
-            if (lower.includes('critical') || lower.includes('severe')) return 'Critical';
-            if (lower.includes('medium') || lower.includes('moderate')) return 'Medium';
+            const severityStr = String(severity).toUpperCase().trim();
+            
+            // Handle A-D severity scale
+            if (severityStr === 'A') return 'A';
+            if (severityStr === 'B') return 'B';
+            if (severityStr === 'C') return 'C';
+            if (severityStr === 'D') return 'D';
+            
+            // Fallback for other formats
+            const lower = severityStr.toLowerCase();
+            if (lower.includes('critical') || lower.includes('severe')) return 'A';
+            if (lower.includes('high') || lower.includes('major')) return 'B';
+            if (lower.includes('medium') || lower.includes('moderate')) return 'C';
+            if (lower.includes('low') || lower.includes('minor')) return 'D';
+            
             return 'Unknown';
         }
         
@@ -848,6 +862,8 @@
                 return true;
             });
             
+            console.log(`Filtered data: ${filteredData.length} of ${rawData.length} records`);
+            
             updateDashboard();
             updateTable();
             updateCharts();
@@ -865,8 +881,9 @@
                 : '0.0';
             document.getElementById('avgRisk').textContent = avgRisk;
             
+            // High severity cases (A and B)
             const highSeverityCount = filteredData.filter(row => 
-                row.severity === 'High' || row.severity === 'Critical'
+                row.severity === 'A' || row.severity === 'B'
             ).length;
             document.getElementById('highSeverityCount').textContent = highSeverityCount;
         }
@@ -941,32 +958,55 @@
                     type: 'bar',
                     data: {
                         labels: [],
-                        datasets: [{
-                            data: [],
-                            backgroundColor: '#FF9900'
-                        }]
+                        datasets: []
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
-                        }
+                        maintainAspectRatio: false
                     }
                 });
             }
+            
+            console.log('Charts initialized');
         }
         
         // Update specific chart based on selection
         function updateChart(chartNumber) {
             const selectElement = document.getElementById(`chart${chartNumber}Select`);
             const chartType = selectElement.value;
-            const chart = charts[`custom${chartNumber}`];
+            const chartKey = `custom${chartNumber}`;
+            let chart = charts[chartKey];
             
-            if (!chart || filteredData.length === 0) return;
+            if (!chart || filteredData.length === 0) {
+                console.log(`Cannot update chart ${chartNumber}: chart exists=${!!chart}, data count=${filteredData.length}`);
+                return;
+            }
             
+            console.log(`Updating chart ${chartNumber} to type: ${chartType}`);
+            
+            // Store the canvas reference
+            const canvas = chart.canvas;
+            
+            // Destroy the old chart
+            chart.destroy();
+            
+            // Create new chart with minimal configuration
+            charts[chartKey] = new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: []
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+            
+            // Get the new chart reference
+            chart = charts[chartKey];
+            
+            // Update with the selected chart type
             switch(chartType) {
                 case 'severity':
                     updateSeverityChart(chart);
@@ -992,27 +1032,45 @@
         // Update severity distribution chart
         function updateSeverityChart(chart) {
             const severityCounts = {
-                'Low': filteredData.filter(r => r.severity === 'Low').length,
-                'Medium': filteredData.filter(r => r.severity === 'Medium').length,
-                'High': filteredData.filter(r => r.severity === 'High').length,
-                'Critical': filteredData.filter(r => r.severity === 'Critical').length
+                'A': filteredData.filter(r => r.severity === 'A').length,
+                'B': filteredData.filter(r => r.severity === 'B').length,
+                'C': filteredData.filter(r => r.severity === 'C').length,
+                'D': filteredData.filter(r => r.severity === 'D').length
             };
             
             const nonZero = Object.entries(severityCounts).filter(([_, count]) => count > 0);
             
+            // Set chart type and options
             chart.config.type = 'doughnut';
-            chart.data.labels = nonZero.map(([severity]) => severity);
-            chart.data.datasets[0].data = nonZero.map(([, count]) => count);
-            chart.data.datasets[0].backgroundColor = nonZero.map(([severity]) => {
-                const colorMap = {
-                    'Low': '#4CAF50',
-                    'Medium': '#FFC107',
-                    'High': '#FF5722',
-                    'Critical': '#B71C1C'
-                };
-                return colorMap[severity];
-            });
-            chart.options.plugins.legend.display = true;
+            
+            chart.options = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true
+                    }
+                }
+            };
+            
+            // Set data
+            chart.data = {
+                labels: nonZero.map(([severity]) => `Severity ${severity}`),
+                datasets: [{
+                    data: nonZero.map(([, count]) => count),
+                    backgroundColor: nonZero.map(([severity]) => {
+                        const colorMap = {
+                            'A': '#B71C1C',
+                            'B': '#FF5722',
+                            'C': '#FFC107',
+                            'D': '#4CAF50'
+                        };
+                        return colorMap[severity];
+                    }),
+                    label: 'Incidents'
+                }]
+            };
+            
             chart.update();
         }
         
@@ -1028,14 +1086,48 @@
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 10);
             
+            console.log('Location chart data:', topLocations);
+            
+            // Set to horizontal bar chart
             chart.config.type = 'bar';
-            chart.data.labels = topLocations.map(([location]) => 
-                location.length > 30 ? location.substring(0, 30) + '...' : location
-            );
-            chart.data.datasets[0].data = topLocations.map(([, count]) => count);
-            chart.data.datasets[0].backgroundColor = '#232F3E';
-            chart.options.plugins.legend.display = false;
-            chart.options.indexAxis = 'y';
+            
+            // Configure options
+            chart.options = {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    },
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            };
+            
+            // Clear and set data
+            chart.data = {
+                labels: topLocations.map(([location]) => 
+                    location.length > 30 ? location.substring(0, 30) + '...' : location
+                ),
+                datasets: [{
+                    data: topLocations.map(([, count]) => count),
+                    backgroundColor: '#232F3E',
+                    borderColor: '#232F3E',
+                    borderWidth: 1,
+                    label: 'Incidents'
+                }]
+            };
+            
             chart.update();
         }
         
@@ -1051,12 +1143,39 @@
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 8);
             
+            // Set chart type and options
             chart.config.type = 'bar';
-            chart.data.labels = topPaths.map(([path]) => path);
-            chart.data.datasets[0].data = topPaths.map(([, count]) => count);
-            chart.data.datasets[0].backgroundColor = '#37475A';
-            chart.options.plugins.legend.display = false;
-            chart.options.indexAxis = undefined;
+            
+            chart.options = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true
+                    },
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            };
+            
+            // Set data
+            chart.data = {
+                labels: topPaths.map(([path]) => path),
+                datasets: [{
+                    data: topPaths.map(([, count]) => count),
+                    backgroundColor: '#37475A',
+                    borderColor: '#37475A',
+                    borderWidth: 1,
+                    label: 'Incidents'
+                }]
+            };
+            
             chart.update();
         }
         
@@ -1072,14 +1191,32 @@
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 6);
             
+            // Set chart type and options
             chart.config.type = 'pie';
-            chart.data.labels = topImpacts.map(([impact]) => impact);
-            chart.data.datasets[0].data = topImpacts.map(([, count]) => count);
-            chart.data.datasets[0].backgroundColor = [
-                '#FF9900', '#232F3E', '#37475A', '#FF5722', '#4CAF50', '#2196F3'
-            ];
-            chart.options.plugins.legend.display = true;
-            chart.options.plugins.legend.position = 'right';
+            
+            chart.options = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'right'
+                    }
+                }
+            };
+            
+            // Set data
+            chart.data = {
+                labels: topImpacts.map(([impact]) => impact),
+                datasets: [{
+                    data: topImpacts.map(([, count]) => count),
+                    backgroundColor: [
+                        '#FF9900', '#232F3E', '#37475A', '#FF5722', '#4CAF50', '#2196F3'
+                    ],
+                    label: 'Incidents'
+                }]
+            };
+            
             chart.update();
         }
         
@@ -1096,17 +1233,45 @@
             const sortedMonths = Object.keys(monthlyData).sort();
             const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
             
+            // Set chart type and options
             chart.config.type = 'line';
-            chart.data.labels = sortedMonths.map(m => {
-                const [year, month] = m.split('-');
-                return `${monthNames[parseInt(month)-1]} ${year}`;
-            });
-            chart.data.datasets[0].data = sortedMonths.map(m => monthlyData[m]);
-            chart.data.datasets[0].borderColor = '#FF9900';
-            chart.data.datasets[0].backgroundColor = 'rgba(255, 153, 0, 0.1)';
-            chart.data.datasets[0].tension = 0.3;
-            chart.options.plugins.legend.display = false;
-            chart.options.indexAxis = undefined;
+            
+            chart.options = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                }
+            };
+            
+            // Set data
+            chart.data = {
+                labels: sortedMonths.map(m => {
+                    const [year, month] = m.split('-');
+                    return `${monthNames[parseInt(month)-1]} ${year}`;
+                }),
+                datasets: [{
+                    data: sortedMonths.map(m => monthlyData[m]),
+                    borderColor: '#FF9900',
+                    backgroundColor: 'rgba(255, 153, 0, 0.1)',
+                    tension: 0.3,
+                    label: 'Incidents'
+                }]
+            };
+            
             chart.update();
         }
         
@@ -1121,14 +1286,40 @@
             const sites = Object.entries(siteCounts)
                 .sort((a, b) => b[1] - a[1]);
             
+            // Set chart type and options
             chart.config.type = 'bar';
-            chart.data.labels = sites.map(([site]) => site);
-            chart.data.datasets[0].data = sites.map(([, count]) => count);
-            chart.data.datasets[0].backgroundColor = sites.map((_, i) => 
-                i % 2 === 0 ? '#FF9900' : '#232F3E'
-            );
-            chart.options.plugins.legend.display = false;
-            chart.options.indexAxis = undefined;
+            
+            chart.options = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true
+                    },
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            };
+            
+            // Set data
+            chart.data = {
+                labels: sites.map(([site]) => site),
+                datasets: [{
+                    data: sites.map(([, count]) => count),
+                    backgroundColor: sites.map((_, i) => 
+                        i % 2 === 0 ? '#FF9900' : '#232F3E'
+                    ),
+                    borderWidth: 1,
+                    label: 'Incidents'
+                }]
+            };
+            
             chart.update();
         }
         
@@ -1148,8 +1339,16 @@
                     .sort((a, b) => b[1] - a[1])
                     .slice(0, 5);
                 
+                // Clear and set new data
+                charts.impact.data.labels = [];
+                charts.impact.data.datasets = [];
+                
                 charts.impact.data.labels = topImpacts.map(([impact]) => impact);
-                charts.impact.data.datasets[0].data = topImpacts.map(([, count]) => count);
+                charts.impact.data.datasets.push({
+                    data: topImpacts.map(([, count]) => count),
+                    backgroundColor: ['#FF9900', '#232F3E', '#37475A', '#FF5722', '#4CAF50'],
+                    label: 'Incidents'
+                });
                 charts.impact.update();
             }
             
@@ -1162,7 +1361,7 @@
         // Create risk matrix
         function createRiskMatrix() {
             const matrix = document.getElementById('riskMatrixGrid');
-            const severityLabels = ['', 'Critical', 'High', 'Medium', 'Low', 'Negligible'];
+            const severityLabels = ['', 'A', 'B', 'C', 'D', 'Negligible'];
             const likelihoodLabels = ['', 'Rare', 'Unlikely', 'Possible', 'Likely', 'Almost Certain'];
             
             for (let s = 0; s < 6; s++) {
@@ -1343,9 +1542,9 @@
             filteredData.forEach(row => {
                 const impact = row.initial_info_primary_impact || 'Unknown';
                 if (!impactSeverity[impact]) {
-                    impactSeverity[impact] = { High: 0, Critical: 0 };
+                    impactSeverity[impact] = { A: 0, B: 0 };
                 }
-                if (row.severity === 'High' || row.severity === 'Critical') {
+                if (row.severity === 'A' || row.severity === 'B') {
                     impactSeverity[impact][row.severity] += 1;
                 }
             });
@@ -1353,7 +1552,7 @@
             const topImpacts = Object.entries(impactSeverity)
                 .map(([impact, counts]) => ({
                     impact,
-                    highRisk: counts.High + counts.Critical
+                    highRisk: counts.A + counts.B
                 }))
                 .sort((a, b) => b.highRisk - a.highRisk)
                 .slice(0, 8);
@@ -1367,7 +1566,7 @@
         function loadActionItems() {
             const actionContent = document.getElementById('actionItems');
             const highRiskIncidents = filteredData.filter(r => 
-                r.severity === 'High' || r.severity === 'Critical' || parseFloat(r.risk) > 7
+                r.severity === 'A' || r.severity === 'B' || parseFloat(r.risk) > 7
             );
             
             const actions = generateActionItems(highRiskIncidents);
@@ -1405,7 +1604,7 @@
             // Process path analysis
             const processPathCounts = {};
             filteredData.forEach(r => {
-                if (r.initial_info_process_path && r.severity !== 'Low') {
+                if (r.initial_info_process_path && r.severity !== 'D') {
                     processPathCounts[r.initial_info_process_path] = (processPathCounts[r.initial_info_process_path] || 0) + 1;
                 }
             });
@@ -1474,13 +1673,13 @@
                 [''],
                 ['Total Incidents:', filteredData.length],
                 ['Average Risk Score:', document.getElementById('avgRisk').textContent],
-                ['High Severity Cases:', document.getElementById('highSeverityCount').textContent],
+                ['High Severity Cases (A & B):', document.getElementById('highSeverityCount').textContent],
                 [''],
                 ['Severity Distribution:'],
-                ['Low:', filteredData.filter(r => r.severity === 'Low').length],
-                ['Medium:', filteredData.filter(r => r.severity === 'Medium').length],
-                ['High:', filteredData.filter(r => r.severity === 'High').length],
-                ['Critical:', filteredData.filter(r => r.severity === 'Critical').length]
+                ['A - Critical:', filteredData.filter(r => r.severity === 'A').length],
+                ['B - High:', filteredData.filter(r => r.severity === 'B').length],
+                ['C - Medium:', filteredData.filter(r => r.severity === 'C').length],
+                ['D - Low:', filteredData.filter(r => r.severity === 'D').length]
             ];
             const ws2 = XLSX.utils.aoa_to_sheet(summary);
             XLSX.utils.book_append_sheet(wb, ws2, "Summary");
@@ -1531,14 +1730,14 @@
             
             const severityData = [
                 ['Severity Level', 'Count', 'Percentage'],
-                ['Low', filteredData.filter(r => r.severity === 'Low').length, 
-                 `${((filteredData.filter(r => r.severity === 'Low').length / filteredData.length) * 100).toFixed(1)}%`],
-                ['Medium', filteredData.filter(r => r.severity === 'Medium').length,
-                 `${((filteredData.filter(r => r.severity === 'Medium').length / filteredData.length) * 100).toFixed(1)}%`],
-                ['High', filteredData.filter(r => r.severity === 'High').length,
-                 `${((filteredData.filter(r => r.severity === 'High').length / filteredData.length) * 100).toFixed(1)}%`],
-                ['Critical', filteredData.filter(r => r.severity === 'Critical').length,
-                 `${((filteredData.filter(r => r.severity === 'Critical').length / filteredData.length) * 100).toFixed(1)}%`]
+                ['A - Critical', filteredData.filter(r => r.severity === 'A').length, 
+                 `${((filteredData.filter(r => r.severity === 'A').length / filteredData.length) * 100).toFixed(1)}%`],
+                ['B - High', filteredData.filter(r => r.severity === 'B').length,
+                 `${((filteredData.filter(r => r.severity === 'B').length / filteredData.length) * 100).toFixed(1)}%`],
+                ['C - Medium', filteredData.filter(r => r.severity === 'C').length,
+                 `${((filteredData.filter(r => r.severity === 'C').length / filteredData.length) * 100).toFixed(1)}%`],
+                ['D - Low', filteredData.filter(r => r.severity === 'D').length,
+                 `${((filteredData.filter(r => r.severity === 'D').length / filteredData.length) * 100).toFixed(1)}%`]
             ];
             
             doc.autoTable({
@@ -1580,7 +1779,7 @@
             
             // Action Items
             const highRiskIncidents = filteredData.filter(r => 
-                r.severity === 'High' || r.severity === 'Critical' || parseFloat(r.risk) > 7
+                r.severity === 'A' || r.severity === 'B' || parseFloat(r.risk) > 7
             );
             const actions = generateActionItems(highRiskIncidents);
             
@@ -1711,7 +1910,7 @@ Root Cause: ${incident.rca_primary_cause || 'Under investigation'}`;
                     initial_info_location_event: 'Warehouse Aisle 3',
                     initial_info_process_path: 'Inbound/Receiving',
                     initial_info_primary_impact: 'Associate Safety',
-                    potential_severity: 'High',
+                    potential_severity: 'B',
                     risk: 7.5,
                     initial_info_incident_description: 'Forklift near collision in warehouse aisle 3',
                     country: 'Austria',
@@ -1727,7 +1926,7 @@ Root Cause: ${incident.rca_primary_cause || 'Under investigation'}`;
                     initial_info_location_event: 'Storage Rack B4',
                     initial_info_process_path: 'Stow',
                     initial_info_primary_impact: 'Product Damage',
-                    potential_severity: 'Medium',
+                    potential_severity: 'C',
                     risk: 4.2,
                     initial_info_incident_description: 'Box fell from height, no injuries',
                     country: 'Austria',
@@ -1743,7 +1942,7 @@ Root Cause: ${incident.rca_primary_cause || 'Under investigation'}`;
                     initial_info_location_event: 'Main Entrance',
                     initial_info_process_path: 'General Facility',
                     initial_info_primary_impact: 'Associate Safety',
-                    potential_severity: 'Low',
+                    potential_severity: 'D',
                     risk: 2.1,
                     initial_info_incident_description: 'Wet floor without proper signage',
                     country: 'Austria',
@@ -1759,7 +1958,7 @@ Root Cause: ${incident.rca_primary_cause || 'Under investigation'}`;
                     initial_info_location_event: 'Emergency Exit West',
                     initial_info_process_path: 'Emergency Response',
                     initial_info_primary_impact: 'Life Safety',
-                    potential_severity: 'Critical',
+                    potential_severity: 'A',
                     risk: 9.0,
                     initial_info_incident_description: 'Emergency exit blocked by pallets',
                     country: 'Austria',
@@ -1775,7 +1974,7 @@ Root Cause: ${incident.rca_primary_cause || 'Under investigation'}`;
                     initial_info_location_event: 'Loading Dock 2',
                     initial_info_process_path: 'Outbound/Shipping',
                     initial_info_primary_impact: 'Vehicle Safety',
-                    potential_severity: 'Medium',
+                    potential_severity: 'C',
                     risk: 5.0,
                     initial_info_incident_description: 'Truck reversing without spotter',
                     country: 'Austria',
@@ -1783,9 +1982,38 @@ Root Cause: ${incident.rca_primary_cause || 'Under investigation'}`;
                     rca_primary_cause: 'Process Gap',
                     initial_risk_assessment_likeliness: 'Likely',
                     created_at: '2024-02-20'
+                },
+                {
+                    incident_id: 'NM-VIE-202402-006',
+                    nearmiss_date: '2024-02-22',
+                    site: 'Vienna DC1',
+                    initial_info_location_event: 'Pick Tower Floor 3',
+                    initial_info_process_path: 'Pick',
+                    initial_info_primary_impact: 'Associate Safety',
+                    potential_severity: 'C',
+                    risk: 4.5,
+                    initial_info_incident_description: 'Associate almost tripped on loose cable',
+                    country: 'Austria',
+                    region: 'EU',
+                    created_at: '2024-02-22'
+                },
+                {
+                    incident_id: 'NM-VIE-202402-007',
+                    nearmiss_date: '2024-02-25',
+                    site: 'Vienna DC1',
+                    initial_info_location_event: 'Dock Door 5',
+                    initial_info_process_path: 'Outbound/Shipping',
+                    initial_info_primary_impact: 'Equipment Damage',
+                    potential_severity: 'D',
+                    risk: 2.5,
+                    initial_info_incident_description: 'Dock plate not properly secured',
+                    country: 'Austria',
+                    region: 'EU',
+                    created_at: '2024-02-25'
                 }
             ];
             
+            console.log('Sample data loaded:', rawData.length, 'records');
             processData();
             populateFilters();
             applyFilters();
