@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Near Miss Analysis Tool - Amazon Austria WHS</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <style>
         * {
@@ -317,6 +318,7 @@
         .severity-medium { background: #FFC107; color: #333; }
         .severity-high { background: #FF5722; color: white; }
         .severity-critical { background: #B71C1C; color: white; }
+        .severity-unknown { background: #9E9E9E; color: white; }
     </style>
 </head>
 <body>
@@ -330,12 +332,13 @@
             <h2>Data Management</h2>
             <div class="button-group">
                 <div class="file-input-wrapper">
-                    <button>📁 Import CSV Data</button>
+                    <button title="Import CSV file with near miss data. Expected columns: region, country, site, severity, risk, status, etc.">📁 Import CSV Data</button>
                     <input type="file" id="csvInput" accept=".csv">
                 </div>
                 <button onclick="exportToExcel()">📊 Export to Excel</button>
                 <button onclick="generateReport()">📄 Generate Report</button>
                 <button onclick="refreshDashboard()">🔄 Refresh Dashboard</button>
+                <button onclick="testWithSampleData()">🧪 Test with Sample Data</button>
             </div>
             
             <div class="filter-section">
@@ -456,7 +459,10 @@
                         </thead>
                         <tbody id="tableBody">
                             <tr>
-                                <td colspan="8" class="loading">No data loaded. Please import a CSV file.</td>
+                                <td colspan="8" class="loading">
+                                    No data loaded. Please import a CSV file.<br>
+                                    <small>Expected format: CSV with columns including region, country, site, severity, risk, status, etc.</small>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -514,6 +520,17 @@
     </div>
     
     <script>
+        /* Near Miss Analysis Tool - Amazon Austria WHS
+         * Version 4.0
+         * 
+         * TROUBLESHOOTING:
+         * 1. If import doesn't work, check browser console (F12) for errors
+         * 2. CSV must have headers in first row
+         * 3. Use "Test with Sample Data" button to verify tool is working
+         * 4. Supported browsers: Chrome, Firefox, Safari, Edge (latest versions)
+         * 5. File size limit: ~50MB for smooth performance
+         */
+        
         // Global variables
         let rawData = [];
         let filteredData = [];
@@ -521,9 +538,11 @@
         
         // Initialize the application
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('Near Miss Analysis Tool v4.0 loaded');
             setupEventListeners();
             initializeCharts();
             createRiskMatrix();
+            console.log('Initialization complete. Ready to import data.');
         });
         
         // Setup event listeners
@@ -540,9 +559,21 @@
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (file) {
+                console.log('File selected:', file.name, 'Size:', file.size, 'Type:', file.type);
+                
+                if (!file.name.endsWith('.csv')) {
+                    alert('Please select a CSV file');
+                    return;
+                }
+                
                 const reader = new FileReader();
                 reader.onload = function(e) {
+                    console.log('File loaded, parsing CSV...');
                     parseCSV(e.target.result);
+                };
+                reader.onerror = function(error) {
+                    console.error('File reading error:', error);
+                    alert('Error reading file: ' + error);
                 };
                 reader.readAsText(file);
             }
@@ -550,56 +581,97 @@
         
         // Parse CSV data
         function parseCSV(csvText) {
-            const lines = csvText.split('\n');
-            const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-            
-            rawData = [];
-            for (let i = 1; i < lines.length; i++) {
-                if (lines[i].trim()) {
-                    const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
-                    const row = {};
-                    headers.forEach((header, index) => {
-                        row[header] = values[index] || '';
-                    });
-                    rawData.push(row);
-                }
+            try {
+                // Use Papa Parse for proper CSV parsing
+                Papa.parse(csvText, {
+                    header: true,
+                    dynamicTyping: true,
+                    skipEmptyLines: true,
+                    complete: function(results) {
+                        if (results.errors.length > 0) {
+                            console.error('CSV parsing errors:', results.errors);
+                            alert('Warning: Some rows had parsing errors. Data may be incomplete.');
+                        }
+                        
+                        rawData = results.data;
+                        console.log(`Loaded ${rawData.length} rows of data`);
+                        console.log('First row structure:', rawData[0]);
+                        console.log('Available columns:', Object.keys(rawData[0] || {}));
+                        
+                        // Process and enhance data
+                        processData();
+                        populateFilters();
+                        applyFilters();
+                        
+                        alert(`Successfully loaded ${rawData.length} near miss records!`);
+                    },
+                    error: function(error) {
+                        console.error('CSV parsing failed:', error);
+                        alert('Failed to parse CSV file. Please check the file format.');
+                    }
+                });
+            } catch (error) {
+                console.error('Error in parseCSV:', error);
+                alert('Error processing CSV file: ' + error.message);
             }
-            
-            // Process and enhance data
-            processData();
-            populateFilters();
-            applyFilters();
         }
         
         // Process and enhance data
         function processData() {
-            rawData.forEach(row => {
-                // Parse dates
-                if (row.nearmiss_date) {
-                    row.parsedDate = new Date(row.nearmiss_date);
-                }
-                
-                // Calculate risk score if not present
-                if (!row.risk || row.risk === '') {
-                    row.risk = calculateRiskScore(row);
-                }
-                
-                // Standardize severity
-                row.severity = standardizeSeverity(row.severity || row.potential_severity);
-                
-                // Generate incident ID if not present
-                if (!row.incident_id) {
-                    row.incident_id = generateIncidentId(row);
+            rawData.forEach((row, index) => {
+                try {
+                    // Parse dates
+                    if (row.nearmiss_date) {
+                        const dateStr = row.nearmiss_date.toString();
+                        row.parsedDate = new Date(dateStr);
+                        
+                        // If invalid date, try alternative formats
+                        if (isNaN(row.parsedDate.getTime())) {
+                            // Try DD/MM/YYYY or DD-MM-YYYY format
+                            const parts = dateStr.split(/[-\/]/);
+                            if (parts.length === 3) {
+                                // Assume DD/MM/YYYY format if day > 12
+                                if (parseInt(parts[0]) > 12) {
+                                    row.parsedDate = new Date(parts[2], parts[1] - 1, parts[0]);
+                                } else {
+                                    // Try MM/DD/YYYY format
+                                    row.parsedDate = new Date(parts[2], parts[0] - 1, parts[1]);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Calculate risk score if not present
+                    if (!row.risk || row.risk === '' || row.risk === 0) {
+                        row.risk = calculateRiskScore(row);
+                    }
+                    
+                    // Standardize severity
+                    row.severity = standardizeSeverity(row.severity || row.potential_severity);
+                    
+                    // Generate incident ID if not present
+                    if (!row.incident_id) {
+                        row.incident_id = generateIncidentId(row);
+                    }
+                    
+                    // Ensure status field exists
+                    if (!row.status) {
+                        row.status = 'Open';
+                    }
+                } catch (error) {
+                    console.error(`Error processing row ${index}:`, error);
                 }
             });
+            
+            console.log('Data processing complete. Sample row:', rawData[0]);
         }
         
         // Calculate risk score based on severity and likelihood
         function calculateRiskScore(row) {
-            const severityMap = { 'Low': 1, 'Medium': 3, 'High': 5, 'Critical': 8 };
+            const severityMap = { 'Low': 1, 'Medium': 3, 'High': 5, 'Critical': 8, 'Unknown': 2 };
             const likelihoodMap = { 'Rare': 1, 'Unlikely': 2, 'Possible': 3, 'Likely': 4, 'Almost Certain': 5 };
             
-            const severity = severityMap[row.severity] || 3;
+            const severity = severityMap[row.severity] || 2;
             const likelihood = likelihoodMap[row.initial_risk_assessment_likeliness] || 3;
             
             return ((severity * likelihood) / 5).toFixed(1);
@@ -607,12 +679,13 @@
         
         // Standardize severity levels
         function standardizeSeverity(severity) {
-            if (!severity) return 'Medium';
-            const lower = severity.toLowerCase();
+            if (!severity || severity === '' || severity === null || severity === undefined) return 'Unknown';
+            const lower = String(severity).toLowerCase();
             if (lower.includes('low') || lower.includes('minor')) return 'Low';
             if (lower.includes('high') || lower.includes('major')) return 'High';
             if (lower.includes('critical') || lower.includes('severe')) return 'Critical';
-            return 'Medium';
+            if (lower.includes('medium') || lower.includes('moderate')) return 'Medium';
+            return 'Unknown';
         }
         
         // Generate incident ID
@@ -635,6 +708,11 @@
         
         // Apply filters
         function applyFilters() {
+            if (rawData.length === 0) {
+                console.log('No data to filter');
+                return;
+            }
+            
             const siteFilter = document.getElementById('siteFilter').value;
             const severityFilter = document.getElementById('severityFilter').value;
             const dateFrom = document.getElementById('dateFrom').value;
@@ -645,10 +723,19 @@
                 if (siteFilter && row.site !== siteFilter) return false;
                 if (severityFilter && row.severity !== severityFilter) return false;
                 if (statusFilter && row.status !== statusFilter) return false;
-                if (dateFrom && row.parsedDate < new Date(dateFrom)) return false;
-                if (dateTo && row.parsedDate > new Date(dateTo)) return false;
+                
+                if (dateFrom || dateTo) {
+                    const rowDate = row.parsedDate;
+                    if (!rowDate || isNaN(rowDate)) return false;
+                    
+                    if (dateFrom && rowDate < new Date(dateFrom)) return false;
+                    if (dateTo && rowDate > new Date(dateTo)) return false;
+                }
+                
                 return true;
             });
+            
+            console.log(`Filtered data: ${filteredData.length} of ${rawData.length} records`);
             
             updateDashboard();
             updateTable();
@@ -661,14 +748,22 @@
             document.getElementById('totalCount').textContent = filteredData.length;
             
             // Average risk
-            const risks = filteredData.map(row => parseFloat(row.risk)).filter(r => !isNaN(r));
-            const avgRisk = risks.length > 0 ? (risks.reduce((a, b) => a + b, 0) / risks.length).toFixed(1) : 0;
+            const risks = filteredData
+                .map(row => parseFloat(row.risk))
+                .filter(r => !isNaN(r) && r > 0);
+            const avgRisk = risks.length > 0 
+                ? (risks.reduce((a, b) => a + b, 0) / risks.length).toFixed(1) 
+                : '0.0';
             document.getElementById('avgRisk').textContent = avgRisk;
             
             // Open investigations
-            const openCount = filteredData.filter(row => row.status === 'Open' || row.status === 'In Progress').length;
+            const openCount = filteredData.filter(row => 
+                row.status === 'Open' || row.status === 'In Progress'
+            ).length;
             document.getElementById('openCount').textContent = openCount;
-            const openPercentage = filteredData.length > 0 ? ((openCount / filteredData.length) * 100).toFixed(1) : 0;
+            const openPercentage = filteredData.length > 0 
+                ? ((openCount / filteredData.length) * 100).toFixed(1) 
+                : '0.0';
             document.getElementById('openPercentage').textContent = `${openPercentage}% of total`;
             
             // High severity
@@ -687,21 +782,31 @@
                 return;
             }
             
-            tbody.innerHTML = filteredData.slice(0, 10).map(row => `
-                <tr>
-                    <td>${row.incident_id}</td>
-                    <td>${row.nearmiss_date || 'N/A'}</td>
-                    <td>${row.site || 'N/A'}</td>
-                    <td><span class="severity-badge severity-${row.severity.toLowerCase()}">${row.severity}</span></td>
-                    <td>${row.risk || 'N/A'}</td>
-                    <td>${row.status || 'Open'}</td>
-                    <td>${(row.initial_info_incident_description || 'No description').substring(0, 50)}...</td>
-                    <td>
-                        <button onclick="viewDetails('${row.incident_id}')">View</button>
-                        <button onclick="editIncident('${row.incident_id}')">Edit</button>
-                    </td>
-                </tr>
-            `).join('');
+            tbody.innerHTML = filteredData.slice(0, 10).map(row => {
+                const incidentId = row.incident_id || 'N/A';
+                const date = row.nearmiss_date || 'N/A';
+                const site = row.site || 'N/A';
+                const severity = row.severity || 'Unknown';
+                const risk = row.risk || 'N/A';
+                const status = row.status || 'Open';
+                const description = (row.initial_info_incident_description || 'No description').substring(0, 50);
+                
+                return `
+                    <tr>
+                        <td>${incidentId}</td>
+                        <td>${date}</td>
+                        <td>${site}</td>
+                        <td><span class="severity-badge severity-${severity.toLowerCase()}">${severity}</span></td>
+                        <td>${risk}</td>
+                        <td>${status}</td>
+                        <td>${description}...</td>
+                        <td>
+                            <button onclick="viewDetails('${incidentId.replace(/'/g, "\\'")}')">View</button>
+                            <button onclick="editIncident('${incidentId.replace(/'/g, "\\'")}')">Edit</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
         }
         
         // Initialize charts
@@ -711,10 +816,10 @@
             charts.severity = new Chart(severityCtx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Low', 'Medium', 'High', 'Critical'],
+                    labels: [],
                     datasets: [{
-                        data: [0, 0, 0, 0],
-                        backgroundColor: ['#4CAF50', '#FFC107', '#FF5722', '#B71C1C']
+                        data: [],
+                        backgroundColor: []
                     }]
                 },
                 options: {
@@ -808,15 +913,39 @@
         
         // Update charts with data
         function updateCharts() {
+            if (!charts.severity || filteredData.length === 0) {
+                console.log('No data to update charts');
+                return;
+            }
+            
             // Update severity distribution
             const severityCounts = {
                 'Low': filteredData.filter(r => r.severity === 'Low').length,
                 'Medium': filteredData.filter(r => r.severity === 'Medium').length,
                 'High': filteredData.filter(r => r.severity === 'High').length,
-                'Critical': filteredData.filter(r => r.severity === 'Critical').length
+                'Critical': filteredData.filter(r => r.severity === 'Critical').length,
+                'Unknown': filteredData.filter(r => r.severity === 'Unknown').length
             };
-            charts.severity.data.datasets[0].data = Object.values(severityCounts);
-            charts.severity.update();
+            
+            // Only show non-zero severities
+            const nonZeroSeverities = Object.entries(severityCounts)
+                .filter(([severity, count]) => count > 0);
+            
+            if (nonZeroSeverities.length > 0) {
+                charts.severity.data.labels = nonZeroSeverities.map(([severity]) => severity);
+                charts.severity.data.datasets[0].data = nonZeroSeverities.map(([, count]) => count);
+                charts.severity.data.datasets[0].backgroundColor = nonZeroSeverities.map(([severity]) => {
+                    const colorMap = {
+                        'Low': '#4CAF50',
+                        'Medium': '#FFC107',
+                        'High': '#FF5722',
+                        'Critical': '#B71C1C',
+                        'Unknown': '#9E9E9E'
+                    };
+                    return colorMap[severity] || '#9E9E9E';
+                });
+                charts.severity.update();
+            }
             
             // Update monthly trend
             const monthlyData = {};
@@ -1009,7 +1138,7 @@
             if (!charts.factors) {
                 const factorsCtx = document.getElementById('factorsChart').getContext('2d');
                 charts.factors = new Chart(factorsCtx, {
-                    type: 'horizontalBar',
+                    type: 'bar',
                     data: {
                         labels: [],
                         datasets: [{
@@ -1018,6 +1147,7 @@
                         }]
                     },
                     options: {
+                        indexAxis: 'y',
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
@@ -1287,6 +1417,90 @@
         
         function editIncident(incidentId) {
             alert(`Edit functionality for incident ${incidentId} - Would open edit form`);
+        }
+        
+        // Test with sample data
+        function testWithSampleData() {
+            rawData = [
+                {
+                    incident_id: 'NM-VIE-202401-001',
+                    nearmiss_date: '2024-01-15',
+                    site: 'Vienna DC1',
+                    severity: 'High',
+                    risk: 7.5,
+                    status: 'Open',
+                    initial_info_incident_description: 'Forklift near collision in warehouse aisle 3',
+                    country: 'Austria',
+                    region: 'EU',
+                    rca_primary_cause: 'Human Error',
+                    initial_risk_assessment_likeliness: 'Likely',
+                    initial_info_phase_status: 'Complete',
+                    investigation_phase_status: 'In Progress',
+                    rca_phase_status: 'Not Started',
+                    rca_contributing_factor_human_behaviour: 'Rushing',
+                    rca_contributing_factor_org_process: 'Training Gap',
+                    created_at: '2024-01-15'
+                },
+                {
+                    incident_id: 'NM-VIE-202401-002',
+                    nearmiss_date: '2024-01-20',
+                    site: 'Vienna DC1',
+                    severity: 'Medium',
+                    risk: 4.2,
+                    status: 'In Progress',
+                    initial_info_incident_description: 'Box fell from height, no injuries',
+                    country: 'Austria',
+                    region: 'EU',
+                    rca_primary_cause: 'Equipment Failure',
+                    initial_risk_assessment_likeliness: 'Possible',
+                    initial_info_phase_status: 'Complete',
+                    investigation_phase_status: 'Complete',
+                    rca_phase_status: 'In Progress',
+                    rca_contributing_factor_tech_equipment: 'Worn Equipment',
+                    created_at: '2024-01-20'
+                },
+                {
+                    incident_id: 'NM-GRZ-202401-003',
+                    nearmiss_date: '2024-02-01',
+                    site: 'Graz FC',
+                    severity: 'Low',
+                    risk: 2.1,
+                    status: 'Closed',
+                    initial_info_incident_description: 'Wet floor without proper signage',
+                    country: 'Austria',
+                    region: 'EU',
+                    rca_primary_cause: 'Process Gap',
+                    initial_risk_assessment_likeliness: 'Unlikely',
+                    initial_info_phase_status: 'Complete',
+                    investigation_phase_status: 'Complete',
+                    rca_phase_status: 'Complete',
+                    rca_contributing_factor_org_process: 'Communication Gap',
+                    created_at: '2024-02-01'
+                },
+                {
+                    incident_id: 'NM-VIE-202402-004',
+                    nearmiss_date: '2024-02-15',
+                    site: 'Vienna DC2',
+                    severity: 'Critical',
+                    risk: 9.0,
+                    status: 'Open',
+                    initial_info_incident_description: 'Emergency exit blocked by pallets',
+                    country: 'Austria',
+                    region: 'EU',
+                    rca_primary_cause: 'Leadership Gap',
+                    initial_risk_assessment_likeliness: 'Almost Certain',
+                    initial_info_phase_status: 'Complete',
+                    investigation_phase_status: 'Not Started',
+                    rca_phase_status: 'Not Started',
+                    created_at: '2024-02-15'
+                }
+            ];
+            
+            console.log('Loaded sample data:', rawData);
+            processData();
+            populateFilters();
+            applyFilters();
+            alert('Sample data loaded successfully! You can now explore the dashboard.');
         }
     </script>
 </body>
