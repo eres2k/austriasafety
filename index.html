@@ -4700,7 +4700,7 @@
         setTimeout(checkForUpdates, 2000);
 
         // Performance monitoring
-      if ('performance' in window) {
+    if ('performance' in window) {
     window.addEventListener('load', () => {
         // Use navigation timing API v2 if available
         if (window.performance.getEntriesByType) {
