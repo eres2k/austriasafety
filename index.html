@@ -6,6 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#ff9900">
+    <link rel="manifest" href="/manifest.json">
     <title>WHS Safety Audit - Amazon Austria</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -165,6 +166,9 @@
             border-radius: 16px;
             padding: 2rem;
             box-shadow: var(--shadow-lg);
+            max-width: 400px;
+            margin: 0 auto;
+            width: 100%;
         }
 
         .login-logo {
@@ -181,6 +185,24 @@
         .login-logo p {
             color: var(--gray);
             font-size: 0.875rem;
+        }
+
+        .demo-accounts {
+            background: var(--light);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1.5rem;
+            font-size: 0.875rem;
+        }
+
+        .demo-accounts h4 {
+            margin-bottom: 0.5rem;
+            color: var(--dark);
+        }
+
+        .demo-accounts p {
+            margin: 0.25rem 0;
+            color: var(--gray);
         }
 
         /* Form Elements */
@@ -568,6 +590,11 @@
             color: var(--danger);
         }
 
+        .alert-info {
+            background: rgba(23, 162, 184, 0.1);
+            color: var(--info);
+        }
+
         /* Modal */
         .modal {
             position: fixed;
@@ -621,6 +648,41 @@
             margin-top: 1.5rem;
         }
 
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 3000;
+        }
+
+        .toast {
+            background: var(--white);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            box-shadow: var(--shadow-lg);
+            min-width: 250px;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.success {
+            border-left: 4px solid var(--success);
+        }
+
+        .toast.error {
+            border-left: 4px solid var(--danger);
+        }
+
+        .toast.info {
+            border-left: 4px solid var(--info);
+        }
+
         /* Responsive */
         @media (min-width: 768px) {
             .stats-grid {
@@ -667,8 +729,8 @@
                 </div>
                 <form id="loginForm">
                     <div class="form-group">
-                        <label class="form-label" for="username">Benutzername</label>
-                        <input type="text" id="username" class="form-control" required>
+                        <label class="form-label" for="username">Email</label>
+                        <input type="email" id="username" class="form-control" required placeholder="z.B. admin@amazon.at">
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="password">Passwort</label>
@@ -679,6 +741,12 @@
                     </button>
                 </form>
                 <div id="loginError" class="alert alert-danger mt-2 hidden"></div>
+                <div class="demo-accounts">
+                    <h4>Demo Accounts:</h4>
+                    <p>admin@amazon.at / admin123</p>
+                    <p>safety@amazon.at / safety123</p>
+                    <p>manager@amazon.at / manager123</p>
+                </div>
             </div>
         </div>
 
@@ -689,12 +757,12 @@
                 <div class="header-content">
                     <h1 class="header-title" id="pageTitle">Dashboard</h1>
                     <div class="header-actions">
-                        <button class="icon-btn" onclick="syncData()">
+                        <button class="icon-btn" onclick="syncData()" title="Daten synchronisieren">
                             <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                             </svg>
                         </button>
-                        <button class="icon-btn" onclick="showUserMenu()">
+                        <button class="icon-btn" onclick="showUserMenu()" title="Benutzermenü">
                             <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                             </svg>
@@ -731,7 +799,7 @@
                         <div id="recentAudits"></div>
                     </div>
 
-                    <button class="fab" onclick="startNewAudit()">
+                    <button class="fab" onclick="startNewAudit()" title="Neues Audit starten">
                         <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                         </svg>
@@ -746,18 +814,22 @@
                             <div class="form-group">
                                 <label class="form-label" for="location">Location</label>
                                 <select id="location" class="form-control" required>
-                                    <option value="DVI1">DVI1</option>
-                                    <option value="DVI2">DVI2</option>
-                                    <option value="DVI3">DVI3</option>
+                                    <option value="">Wählen Sie eine Location...</option>
+                                    <option value="DVI1">DVI1 - Wien</option>
+                                    <option value="DVI2">DVI2 - Wien</option>
+                                    <option value="DVI3">DVI3 - Wien</option>
+                                    <option value="DAP5">DAP5 - Graz</option>
+                                    <option value="DAP8">DAP8 - Klagenfurt</option>
                                 </select>
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="area">Bereich</label>
-                                <input type="text" id="area" class="form-control" placeholder="z.B. Versand, Lager">
+                                <input type="text" id="area" class="form-control" placeholder="z.B. Versand, Lager" required>
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="shift">Schicht</label>
                                 <select id="shift" class="form-control" required>
+                                    <option value="">Wählen Sie eine Schicht...</option>
                                     <option value="Frühschicht">Frühschicht</option>
                                     <option value="Spätschicht">Spätschicht</option>
                                     <option value="Nachtschicht">Nachtschicht</option>
@@ -816,7 +888,7 @@
                                 Fragen exportieren (JSON)
                             </button>
                             <button class="btn btn-secondary btn-sm mt-1" onclick="exportAllAudits()">
-                                Alle Audits exportieren (ZIP)
+                                Alle Audits exportieren
                             </button>
                         </div>
 
@@ -867,11 +939,14 @@
                 <div class="modal-actions" id="modalActions"></div>
             </div>
         </div>
+
+        <!-- Toast Container -->
+        <div class="toast-container" id="toastContainer"></div>
     </div>
 
     <script>
         // API Configuration
-        const API_BASE = '/.netlify/functions';
+        const API_BASE = '/api';
         
         // Audit Questions
         const auditQuestions = {
@@ -1260,23 +1335,44 @@
         document.addEventListener('DOMContentLoaded', () => {
             checkAuth();
             setupEventListeners();
+            registerServiceWorker();
             
             // Check online status
             window.addEventListener('online', () => {
                 isOnline = true;
                 syncData();
+                showNotification('Wieder online', 'info');
             });
             
             window.addEventListener('offline', () => {
                 isOnline = false;
-                showNotification('Offline-Modus aktiv');
+                showNotification('Offline-Modus aktiv', 'info');
             });
         });
+
+        // Register Service Worker
+        async function registerServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                try {
+                    const registration = await navigator.serviceWorker.register('/sw.js');
+                    console.log('Service Worker registered:', registration);
+                } catch (error) {
+                    console.error('Service Worker registration failed:', error);
+                }
+            }
+        }
 
         // Event Listeners
         function setupEventListeners() {
             document.getElementById('loginForm').addEventListener('submit', handleLogin);
             document.getElementById('auditForm').addEventListener('submit', handleAuditForm);
+            
+            // Close modal on background click
+            document.getElementById('modal').addEventListener('click', (e) => {
+                if (e.target.id === 'modal') {
+                    hideModal();
+                }
+            });
         }
 
         // Authentication
@@ -1320,19 +1416,24 @@
                     localStorage.setItem('currentUser', JSON.stringify(data.user));
                     currentUser = data.user;
                     showApp();
+                    showNotification(`Willkommen ${data.user.name}!`, 'success');
                 } else {
                     showError('Ungültige Anmeldedaten');
                 }
             } catch (error) {
                 // Fallback to local auth for demo
-                if (username === 'admin' && password === 'admin123') {
-                    currentUser = { username: 'admin', role: 'admin' };
+                const demoUsers = {
+                    'admin@amazon.at': { password: 'admin123', data: { username: 'admin@amazon.at', role: 'admin', name: 'Admin User' } },
+                    'safety@amazon.at': { password: 'safety123', data: { username: 'safety@amazon.at', role: 'auditor', name: 'Safety Officer' } },
+                    'manager@amazon.at': { password: 'manager123', data: { username: 'manager@amazon.at', role: 'viewer', name: 'Area Manager' } }
+                };
+                
+                const user = demoUsers[username];
+                if (user && user.password === password) {
+                    currentUser = user.data;
                     localStorage.setItem('currentUser', JSON.stringify(currentUser));
                     showApp();
-                } else if (username === 'user' && password === 'user123') {
-                    currentUser = { username: 'user', role: 'user' };
-                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                    showApp();
+                    showNotification(`Willkommen ${currentUser.name}! (Offline-Modus)`, 'info');
                 } else {
                     showError('Ungültige Anmeldedaten');
                 }
@@ -1344,6 +1445,7 @@
             localStorage.removeItem('currentUser');
             currentUser = null;
             showLogin();
+            showNotification('Erfolgreich abgemeldet', 'info');
         }
 
         // UI Functions
@@ -1355,7 +1457,7 @@
         function showApp() {
             document.getElementById('loginScreen').classList.add('hidden');
             document.getElementById('mainApp').classList.remove('hidden');
-            document.getElementById('userInfo').textContent = `${currentUser.username} (${currentUser.role})`;
+            document.getElementById('userInfo').textContent = `${currentUser.name} (${currentUser.role})`;
             loadDashboard();
         }
 
@@ -1372,6 +1474,7 @@
             document.querySelectorAll('.nav-item').forEach(item => {
                 item.classList.remove('active');
             });
+            event.currentTarget.classList.add('active');
             
             // Update header title
             const titles = {
@@ -1472,7 +1575,7 @@
                 id: Date.now().toString(),
                 date: new Date().toISOString(),
                 location: document.getElementById('location').value,
-                area: document.getElementById('area').value || 'N/A',
+                area: document.getElementById('area').value,
                 shift: document.getElementById('shift').value,
                 auditor: currentUser.username,
                 answers: {},
@@ -1591,14 +1694,14 @@
             // Save audit
             try {
                 await apiCall('/audits', 'POST', currentAudit);
-                showNotification('Audit erfolgreich gespeichert');
+                showNotification('Audit erfolgreich gespeichert', 'success');
             } catch (error) {
                 // Save locally if offline
                 const localAudits = JSON.parse(localStorage.getItem('localAudits') || '[]');
                 localAudits.push(currentAudit);
                 localStorage.setItem('localAudits', JSON.stringify(localAudits));
                 localStorage.setItem('pendingSync', 'true');
-                showNotification('Audit lokal gespeichert (wird synchronisiert)');
+                showNotification('Audit lokal gespeichert (wird synchronisiert)', 'info');
             }
             
             // Generate PDF
@@ -1717,6 +1820,7 @@
             
             // Save PDF
             doc.save(`audit_${audit.location}_${new Date(audit.date).toISOString().split('T')[0]}.pdf`);
+            showNotification('PDF wurde erstellt', 'success');
         }
 
         // API Helper
@@ -1746,24 +1850,35 @@
 
         // Data Sync
         async function syncData() {
-            if (!isOnline) return;
+            if (!isOnline) {
+                showNotification('Keine Internetverbindung', 'error');
+                return;
+            }
+            
+            showNotification('Synchronisiere Daten...', 'info');
             
             const pendingSync = localStorage.getItem('pendingSync');
             if (pendingSync) {
                 const localAudits = JSON.parse(localStorage.getItem('localAudits') || '[]');
+                let syncCount = 0;
                 
                 for (const audit of localAudits) {
                     try {
                         await apiCall('/audits', 'POST', audit);
+                        syncCount++;
                     } catch (error) {
                         console.error('Sync failed for audit:', audit.id);
                     }
                 }
                 
-                localStorage.removeItem('pendingSync');
-                localStorage.removeItem('localAudits');
-                showNotification('Daten erfolgreich synchronisiert');
-                loadDashboard();
+                if (syncCount > 0) {
+                    localStorage.removeItem('pendingSync');
+                    localStorage.removeItem('localAudits');
+                    showNotification(`${syncCount} Audits erfolgreich synchronisiert`, 'success');
+                    loadDashboard();
+                }
+            } else {
+                showNotification('Keine ausstehenden Daten', 'info');
             }
         }
 
@@ -1776,6 +1891,7 @@
             a.download = 'audit_questions.json';
             a.click();
             URL.revokeObjectURL(url);
+            showNotification('Fragen exportiert', 'success');
         }
 
         function importQuestions(event) {
@@ -1787,9 +1903,11 @@
                 try {
                     const questions = JSON.parse(e.target.result);
                     // Validate and save questions
-                    showNotification('Fragen erfolgreich importiert');
+                    showNotification('Fragen erfolgreich importiert', 'success');
+                    document.getElementById('importMessage').innerHTML = '<p class="alert alert-success">Import erfolgreich!</p>';
                 } catch (error) {
                     showError('Fehler beim Importieren der Datei');
+                    document.getElementById('importMessage').innerHTML = '<p class="alert alert-danger">Import fehlgeschlagen!</p>';
                 }
             };
             reader.readAsText(file);
@@ -1798,13 +1916,15 @@
         async function exportAllAudits() {
             try {
                 const response = await apiCall('/audits/export', 'GET');
-                const blob = await response.blob();
+                const data = await response.json();
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `audits_export_${new Date().toISOString().split('T')[0]}.zip`;
+                a.download = `audits_export_${new Date().toISOString().split('T')[0]}.json`;
                 a.click();
                 URL.revokeObjectURL(url);
+                showNotification('Export erfolgreich', 'success');
             } catch (error) {
                 showError('Export fehlgeschlagen');
             }
@@ -1839,8 +1959,21 @@
         }
 
         function showNotification(message, type = 'success') {
-            // You can implement a toast notification here
-            console.log(`${type}: ${message}`);
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            
+            const container = document.getElementById('toastContainer');
+            container.appendChild(toast);
+            
+            // Trigger animation
+            setTimeout(() => toast.classList.add('show'), 10);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
         }
 
         function showError(message) {
@@ -1856,8 +1989,12 @@
 
         function showUserMenu() {
             showModal('Benutzer', `
-                <p><strong>${currentUser.username}</strong></p>
+                <p><strong>${currentUser.name}</strong></p>
+                <p>Email: ${currentUser.username}</p>
                 <p>Rolle: ${currentUser.role}</p>
+                <p style="margin-top: 1rem; color: var(--gray); font-size: 0.875rem;">
+                    ${isOnline ? '🟢 Online' : '🔴 Offline'}
+                </p>
             `, [
                 { text: 'Abmelden', onclick: logout, class: 'btn-danger' },
                 { text: 'Schließen', onclick: hideModal, class: 'btn-secondary' }
