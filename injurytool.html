@@ -2134,7 +2134,6 @@ function updateOTRAnalysisChart(chart) {
         }
         
         // Generate PDF Report
-       // Generate PDF Report
 function generatePDFReport() {
     if (filteredData.length === 0) {
         alert('No data to generate report. Please load data first.');
@@ -2296,6 +2295,49 @@ function generatePDFReport() {
         bodyPartCounts[part] = (bodyPartCounts[part] || 0) + 1;
     });
     
+    const topBodyParts = Object.entries(bodyPartCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
+    
+    // Table headers
+    yPos += 8;
+    doc.setFillColor(35, 47, 62);
+    doc.rect(15, yPos, 180, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.text('Body Part', 20, yPos + 5);
+    doc.text('Cases', 130, yPos + 5);
+    doc.text('Rate', 155, yPos + 5);
+    doc.text('Severity', 175, yPos + 5);
+    
+    // Table rows
+    yPos += 8;
+    doc.setFont(undefined, 'normal');
+    topBodyParts.forEach(([part, count], index) => {
+        if (index % 2 === 0) {
+            doc.setFillColor(250, 250, 250);
+            doc.rect(15, yPos, 180, 7, 'F');
+        }
+        
+        setDarkColor();
+        doc.setFontSize(9);
+        const shortPart = part.length > 40 ? part.substring(0, 40) + '...' : part;
+        doc.text(shortPart, 20, yPos + 5);
+        doc.text(count.toString(), 130, yPos + 5);
+        
+        // Calculate percentage
+        const percentage = ((count / filteredData.length) * 100).toFixed(1);
+        doc.text(`${percentage}%`, 155, yPos + 5);
+        
+        // Average severity indicator
+        const avgSeverity = getBodyPartAverageSeverity(part);
+        const severityColor = getSeverityColor(avgSeverity);
+        doc.setFillColor(...severityColor);
+        doc.circle(180, yPos + 3.5, 2, 'F');
+        
+        yPos += 7;
+    });
     
     // Footer for page 1
     doc.setFontSize(8);
@@ -2530,12 +2572,6 @@ function getMonthlyTrendSummary() {
     
     return `Most recent month shows ${recentMonth} incidents, ${change > 0 ? 'an increase' : 'a decrease'} of ${Math.abs(change)}% from the previous month. Average monthly incidents: ${(Object.values(monthlyData).reduce((a, b) => a + b, 0) / sortedMonths.length).toFixed(1)}.`;
 }
-            
-            // Save the PDF
-            doc.save(`InjuryIllnessReport_${new Date().toISOString().split('T')[0]}.pdf`);
-            
-            showStatus('PDF report generated successfully!', 'success');
-        }
         
         function refreshDashboard() {
             if (rawData.length > 0) {
@@ -2656,6 +2692,7 @@ Status: ${incident.status || 'N/A'}`;
                     rca_contributing_factor_category: 'Process Gap',
                     initial_info_impact_type_primary: 'Lifting/Lowering',
                     initial_info_process_path: 'Stow',
+                    initial_info_incident_on_the_road: 'no',
                     status: 'Closed',
                     created_at: '2024-01-15',
                     initial_risk_assessment_likeliness: 'Likely'
@@ -2680,6 +2717,7 @@ Status: ${incident.status || 'N/A'}`;
                     rca_contributing_factor_category: 'PPE',
                     initial_info_impact_type_primary: 'Cut/Puncture',
                     initial_info_process_path: 'Pack',
+                    initial_info_incident_on_the_road: 'no',
                     status: 'Closed',
                     created_at: '2024-01-20',
                     initial_risk_assessment_likeliness: 'Possible'
@@ -2704,6 +2742,7 @@ Status: ${incident.status || 'N/A'}`;
                     rca_contributing_factor_category: 'Housekeeping',
                     initial_info_impact_type_primary: 'Fall - Same Level',
                     initial_info_process_path: 'General Facility',
+                    initial_info_incident_on_the_road: 'no',
                     status: 'Open',
                     created_at: '2024-02-01',
                     initial_risk_assessment_likeliness: 'Unlikely'
@@ -2728,6 +2767,7 @@ Status: ${incident.status || 'N/A'}`;
                     rca_contributing_factor_category: 'Work Design',
                     initial_info_impact_type_primary: 'Repetitive Motion',
                     initial_info_process_path: 'Pick',
+                    initial_info_incident_on_the_road: 'no',
                     status: 'Open',
                     created_at: '2024-02-15',
                     initial_risk_assessment_likeliness: 'Almost Certain'
@@ -2752,9 +2792,35 @@ Status: ${incident.status || 'N/A'}`;
                     rca_contributing_factor_category: 'Maintenance',
                     initial_info_impact_type_primary: 'Struck By Object',
                     initial_info_process_path: 'Sortation',
+                    initial_info_incident_on_the_road: 'no',
                     status: 'Closed',
                     created_at: '2024-02-20',
                     initial_risk_assessment_likeliness: 'Rare'
+                },
+                {
+                    case_number: 'INJ-VIE-202403-006',
+                    incident_date: '2024-03-05',
+                    incident_time: '8:00 AM',
+                    site: 'Vienna DC1',
+                    region: 'EU',
+                    country: 'Austria',
+                    initial_info_principal_body_part: 'Multiple Body Parts',
+                    initial_info_detailed_body_part: 'Head, Arms',
+                    type: 'Vehicle Accident',
+                    severity: 'A',
+                    potential_severity: 'A',
+                    recordable: 1,
+                    total_dafw_days: 15,
+                    total_rwa_days: 30,
+                    initial_info_incident_description: 'Delivery vehicle accident on highway',
+                    rca_primary_cause: 'Human Error',
+                    rca_contributing_factor_category: 'Training',
+                    initial_info_impact_type_primary: 'Vehicle Collision',
+                    initial_info_process_path: 'Transportation',
+                    initial_info_incident_on_the_road: 'yes',
+                    status: 'Open',
+                    created_at: '2024-03-05',
+                    initial_risk_assessment_likeliness: 'Unlikely'
                 }
             ];
             
