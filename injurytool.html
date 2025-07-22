@@ -776,29 +776,31 @@
                     }
                     
               // Extract body part
+
 row.bodyPart = row.initial_info_principal_body_part || row.initial_info_detailed_body_part || 'Unknown';
 
-// Extract OTR status
 // Extract OTR status from initial_info_incident_on_the_road column
-row.otr = row.initial_info_incident_on_the_road || 'no';
-if (typeof row.otr === 'string') {
-    row.otr = row.otr.toLowerCase();
-}
-// Normalize various OTR values to yes/no
-if (row.otr === '1' || row.otr === 'true' || row.otr === 'yes' || row.otr === 'y') {
+// Handle boolean values first (from Papa Parse with dynamicTyping)
+if (row.initial_info_incident_on_the_road === true) {
     row.otr = 'yes';
-} else if (row.otr === '0' || row.otr === 'false' || row.otr === 'no' || row.otr === 'n' || !row.otr) {
+} else if (row.initial_info_incident_on_the_road === false) {
     row.otr = 'no';
+} else {
+    // Handle string values and other cases
+    row.otr = row.initial_info_incident_on_the_road || 'no';
+    if (typeof row.otr === 'string') {
+        row.otr = row.otr.toLowerCase();
+    }
+    // Normalize various string OTR values to yes/no
+    if (row.otr === '1' || row.otr === 'true' || row.otr === 'yes' || row.otr === 'y') {
+        row.otr = 'yes';
+    } else {
+        row.otr = 'no';
+    }
 }
 
 // Extract root cause
 row.rootCause = row.rca_primary_cause || 'Under Investigation';
-                    
-                } catch (error) {
-                    console.error(`Error processing row ${index}:`, error);
-                }
-            });
-        }
         
         // Standardize severity levels
         function standardizeSeverity(severity) {
