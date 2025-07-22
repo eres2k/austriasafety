@@ -1,9 +1,12 @@
 {
   "name": "WHS Safety Audit System",
   "short_name": "WHS Audit",
+  "description": "Amazon Austria Workplace Health & Safety Audit System",
   "start_url": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "theme_color": "#ff9900",
   "background_color": "#ffffff",
-  "icons": []
-}
+  "icons": [
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgdmlld0JveD0iMCAwIDE5MiAxOTIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxOTIiIGhlaWdodD0iMTkyIiByeD0iMzIiIGZpbGw9IiNGRjk5MDAiLz4KPHBhdGggZD0iTTk2IDQwQzExOS4xOTYgNDAgMTM4IDU4LjgwNCAxMzggODJDMTM4IDEwMC4wNTQgMTI1LjQ3MyAxMTUuMzY2IDEwOC4xM
