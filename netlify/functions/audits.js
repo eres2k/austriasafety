@@ -30,10 +30,14 @@ exports.handler = async (event, context) => {
   const storage = await getStorage(context);
 
   // Parse path to determine action
-  const pathSegments = event.path.split('/').filter(Boolean);
+  // Remove /api/ prefix if present due to redirect
+  const cleanPath = event.path.replace(/^\/api\//, '');
+  const pathSegments = cleanPath.split('/').filter(Boolean);
+  
+  // The path structure after /api/ redirect would be: audits/[action or id]
   const isStats = pathSegments[pathSegments.length - 1] === 'stats';
   const isExport = pathSegments[pathSegments.length - 1] === 'export';
-  const auditId = pathSegments.length > 3 && !isStats && !isExport ? pathSegments[pathSegments.length - 1] : null;
+  const auditId = pathSegments.length >= 2 && !isStats && !isExport ? pathSegments[pathSegments.length - 1] : null;
 
   try {
     if (event.httpMethod === 'GET') {
