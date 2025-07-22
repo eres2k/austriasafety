@@ -2296,49 +2296,6 @@ function generatePDFReport() {
         bodyPartCounts[part] = (bodyPartCounts[part] || 0) + 1;
     });
     
-    const topBodyParts = Object.entries(bodyPartCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5);
-    
-    // Table headers
-    yPos += 8;
-    doc.setFillColor(35, 47, 62);
-    doc.rect(15, yPos, 180, 8, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'bold');
-    doc.text('Body Part', 20, yPos + 5);
-    doc.text('Cases', 130, yPos + 5);
-    doc.text('Rate', 155, yPos + 5);
-    doc.text('Severity', 175, yPos + 5);
-    
-    // Table rows
-    yPos += 8;
-    doc.setFont(undefined, 'normal');
-    topBodyParts.forEach(([part, count], index) => {
-        if (index % 2 === 0) {
-            doc.setFillColor(250, 250, 250);
-            doc.rect(15, yPos, 180, 7, 'F');
-        }
-        
-        setDarkColor();
-        doc.setFontSize(9);
-        const shortPart = part.length > 40 ? part.substring(0, 40) + '...' : part;
-        doc.text(shortPart, 20, yPos + 5);
-        doc.text(count.toString(), 130, yPos + 5);
-        
-        // Calculate percentage
-        const percentage = ((count / filteredData.length) * 100).toFixed(1);
-        doc.text(`${percentage}%`, 155, yPos + 5);
-        
-        // Average severity indicator
-        const avgSeverity = getBodyPartAverageSeverity(part);
-        const severityColor = getSeverityColor(avgSeverity);
-        doc.setFillColor(...severityColor);
-        doc.circle(180, yPos + 3.5, 2, 'F');
-        
-        yPos += 7;
-    });
     
     // Footer for page 1
     doc.setFontSize(8);
