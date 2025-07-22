@@ -2382,27 +2382,37 @@
         let notifications = [];
 
         // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            isOnline = navigator.onLine;
-            checkAuth();
-            setupEventListeners();
-            registerServiceWorker();
-            initializeDatabase();
-            
-            // Check online status
-            window.addEventListener('online', () => {
-                isOnline = true;
-                updateOnlineStatus();
-                syncData();
-                showNotification('Wieder online', 'info');
-            });
-            
-            window.addEventListener('offline', () => {
-                isOnline = false;
-                updateOnlineStatus();
-                showNotification('Offline-Modus aktiv', 'info');
-            });
-        });
+   document.addEventListener('DOMContentLoaded', () => {
+    isOnline = navigator.onLine;
+    
+    // Initialize status after DOM is ready
+    updateOnlineStatus();
+    
+    // Continue with other initialization
+    checkAuth();
+    setupEventListeners();
+    registerServiceWorker();
+    initializeDatabase().catch(error => {
+        console.error('Failed to initialize database:', error);
+    });
+    
+    // Initialize demo data
+    initializeDemoData();
+    
+    // Setup online/offline listeners
+    window.addEventListener('online', () => {
+        isOnline = true;
+        updateOnlineStatus();
+        syncData();
+        showNotification('Wieder online', 'info');
+    });
+    
+    window.addEventListener('offline', () => {
+        isOnline = false;
+        updateOnlineStatus();
+        showNotification('Offline-Modus aktiv', 'info');
+    });
+});
 
         // Initialize IndexedDB for photos and offline storage
         async function initializeDatabase() {
@@ -2465,20 +2475,25 @@
         }
 
         // Update online status indicator
-        function updateOnlineStatus() {
-            const statusDot = document.getElementById('statusDot');
-            const statusText = document.getElementById('statusText');
-            
-            if (isOnline) {
-                statusDot.classList.remove('offline');
-                statusText.textContent = 'Online';
-            } else {
-                statusDot.classList.add('offline');
-                statusText.textContent = 'Offline';
-            }
-            
-            updateSyncButtonStatus();
+       function updateOnlineStatus() {
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    
+    if (statusDot && statusText) {
+        if (isOnline) {
+            statusDot.classList.remove('offline');
+            statusText.textContent = 'Online';
+        } else {
+            statusDot.classList.add('offline');
+            statusText.textContent = 'Offline';
         }
+    }
+    
+    // Only call updateSyncButtonStatus if DOM is ready
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        updateSyncButtonStatus();
+    }
+}
 
         // Update sync button status
         function updateSyncButtonStatus() {
@@ -2523,93 +2538,50 @@
         }
 
         // Event Listeners
-        function setupEventListeners() {
-            document.getElementById('loginForm').addEventListener('submit', handleLogin);
-            document.getElementById('auditForm').addEventListener('submit', handleAuditForm);
-            
-            // Close modal on background click
-            document.getElementById('modal').addEventListener('click', (e) => {
-                if (e.target.id === 'modal') {
-                    hideModal();
-                }
-            });
-            
-            // Close action sheet on background click
-            document.getElementById('actionSheet').addEventListener('click', (e) => {
-                if (e.target.id === 'actionSheet') {
-                    hideActionSheet();
-                }
-            });
-            
-            // Add file input for photos
-            const photoInput = document.createElement('input');
-            photoInput.type = 'file';
-            photoInput.id = 'photoInput';
-            photoInput.accept = 'image/*';
-            photoInput.multiple = true;
-            photoInput.style.display = 'none';
-            photoInput.addEventListener('change', handlePhotoUpload);
-            document.body.appendChild(photoInput);
-        }
-
-        // Authentication
-        async function checkAuth() {
-            const token = localStorage.getItem('authToken');
-            const savedUser = localStorage.getItem('currentUser');
-            
-            if (savedUser) {
-                // We have a saved user, use it
-                currentUser = JSON.parse(savedUser);
-                showApp();
-                console.log('Logged in as:', currentUser.name);
-                
-                // Try to verify token if online
-                if (isOnline && token) {
-                    // ... optional verification
-                }
-            } else {
-                showLogin();
+    function setupEventListeners() {
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', handleLogin);
+    }
+    
+    const auditForm = document.getElementById('auditForm');
+    if (auditForm) {
+        auditForm.addEventListener('submit', handleAuditForm);
+    }
+    
+    // Close modal on background click
+    const modal = document.getElementById('modal');
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target.id === 'modal') {
+                hideModal();
             }
-        }
-
-        async function handleLogin(e) {
-            e.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            
-            try {
-                const response = await apiCall('/auth', 'POST', { username, password });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    localStorage.setItem('authToken', data.token);
-                    localStorage.setItem('currentUser', JSON.stringify(data.user));
-                    currentUser = data.user;
-                    showApp();
-                    showNotification(`Willkommen ${data.user.name}!`, 'success');
-                } else {
-                    showError('Ungültige Anmeldedaten');
-                }
-            } catch (error) {
-                // Fallback to local auth for demo
-                const demoUsers = {
-                    'admin@amazon.at': { password: 'admin123', data: { id: '1', username: 'admin@amazon.at', role: 'admin', name: 'Admin User' } },
-                    'safety@amazon.at': { password: 'safety123', data: { id: '2', username: 'safety@amazon.at', role: 'auditor', name: 'Safety Officer' } },
-                    'manager@amazon.at': { password: 'manager123', data: { id: '3', username: 'manager@amazon.at', role: 'viewer', name: 'Area Manager' } }
-                };
-                
-                const user = demoUsers[username];
-                if (user && user.password === password) {
-                    currentUser = user.data;
-                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                    showApp();
-                    showNotification(`Willkommen ${currentUser.name}! (Offline-Modus)`, 'info');
-                } else {
-                    showError('Ungültige Anmeldedaten');
-                }
+        });
+    }
+    
+    // Close action sheet on background click
+    const actionSheet = document.getElementById('actionSheet');
+    if (actionSheet) {
+        actionSheet.addEventListener('click', (e) => {
+            if (e.target.id === 'actionSheet') {
+                hideActionSheet();
             }
-        }
-
+        });
+    }
+    
+    // Add file input for photos - check if it exists first
+    let photoInput = document.getElementById('photoInput');
+    if (!photoInput) {
+        photoInput = document.createElement('input');
+        photoInput.type = 'file';
+        photoInput.id = 'photoInput';
+        photoInput.accept = 'image/*';
+        photoInput.multiple = true;
+        photoInput.style.display = 'none';
+        photoInput.addEventListener('change', handlePhotoUpload);
+        document.body.appendChild(photoInput);
+    }
+}
         function logout() {
             localStorage.removeItem('authToken');
             localStorage.removeItem('currentUser');
@@ -4122,8 +4094,7 @@
         }
 
         // Data Sync
-        async function syncData() {
-         async function syncData() {
+      async function syncData() {
     if (!isOnline) {
         showNotification('Keine Internetverbindung', 'error');
         return;
@@ -4136,7 +4107,12 @@
         const db = await initializeDatabase();
         const tx = db.transaction('pending_audits', 'readwrite');
         const store = tx.objectStore('pending_audits');
-        const pendingAudits = await store.getAll();
+        const pendingRequest = store.getAll();
+        
+        const pendingAudits = await new Promise((resolve, reject) => {
+            pendingRequest.onsuccess = () => resolve(pendingRequest.result || []);
+            pendingRequest.onerror = () => reject(pendingRequest.error);
+        });
         
         let syncCount = 0;
         if (pendingAudits && pendingAudits.length > 0) {
@@ -4161,7 +4137,7 @@
         }
         
         // Sync users if admin
-        if (currentUser.role === 'admin') {
+        if (currentUser && currentUser.role === 'admin') {
             try {
                 const userTx = db.transaction('users', 'readonly');
                 const userStore = userTx.objectStore('users');
@@ -4266,42 +4242,53 @@
         }
 
         // API Helper
-        async function apiCall(endpoint, method = 'GET', body = null) {
-            const token = localStorage.getItem('authToken');
-            const options = {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': token ? `Bearer ${token}` : ''
-                }
-            };
-            
-            if (body) {
-                options.body = JSON.stringify(body);
-            }
-            
-            try {
-                const response = await fetch(API_BASE + endpoint, options);
-                
-                if (!response.ok && response.status === 401) {
-                    // Only logout if this is the auth verification endpoint
-                    if (endpoint === '/auth') {
-                        logout();
-                        throw new Error('Unauthorized');
-                    }
-                    // For other endpoints, just throw error without logging out
-                    throw new Error('Unauthorized request');
-                }
-                
-                return response;
-            } catch (error) {
-                // If offline, throw error but don't logout
-                if (!isOnline) {
-                    throw new Error('Offline mode');
-                }
-                throw error;
-            }
+     async function apiCall(endpoint, method = 'GET', body = null) {
+    const token = localStorage.getItem('authToken');
+    const options = {
+        method,
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : ''
         }
+    };
+    
+    if (body) {
+        options.body = JSON.stringify(body);
+    }
+    
+    try {
+        // Check if we're running locally without Netlify Dev
+        if (API_BASE.includes('localhost:8888') && !window.location.href.includes('localhost:8888')) {
+            console.warn('API calls to localhost:8888 will fail. Use Netlify Dev or update API_BASE.');
+        }
+        
+        const response = await fetch(API_BASE + endpoint, options);
+        
+        if (!response.ok && response.status === 401) {
+            // Only logout if this is the auth verification endpoint
+            if (endpoint === '/auth/verify') {
+                logout();
+                throw new Error('Unauthorized');
+            }
+            // For other endpoints, just throw error without logging out
+            throw new Error('Unauthorized request');
+        }
+        
+        return response;
+    } catch (error) {
+        // If offline, throw error but don't logout
+        if (!isOnline) {
+            throw new Error('Offline mode');
+        }
+        // If fetch failed completely (network error)
+        if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+            console.error('Network error - API might not be running');
+            throw new Error('Network error - please check your connection');
+        }
+        throw error;
+    }
+}
+
 
         // UI Helpers
         function showModal(title, content, actions = [], subtitle = '') {
@@ -4632,40 +4619,8 @@
             cleanupOldPhotos();
         }
 
-        async function cleanupOldPhotos() {
-          async function cleanupOldPhotos() {
-    try {
-        const db = await initializeDatabase();
-        const tx = db.transaction('photos', 'readwrite');
-        const store = tx.objectStore('photos');
-        const photosRequest = store.getAll();
         
-        const photos = await new Promise((resolve, reject) => {
-            photosRequest.onsuccess = () => resolve(photosRequest.result || []);
-            photosRequest.onerror = () => reject(photosRequest.error);
-        });
         
-        if (!photos || photos.length === 0) return;
-        
-        const maxAge = 90 * 24 * 60 * 60 * 1000; // 90 days
-        const now = Date.now();
-        let deletedCount = 0;
-        
-        for (const photo of photos) {
-            const photoDate = new Date(photo.timestamp).getTime();
-            if ((now - photoDate) > maxAge) {
-                await store.delete(photo.id);
-                deletedCount++;
-            }
-        }
-        
-        if (deletedCount > 0) {
-            console.log(`Cleaned up ${deletedCount} old photos`);
-        }
-    } catch (error) {
-        console.error('Error cleaning up photos:', error);
-    }
-}
 
         // Run cleanup on startup
         setTimeout(cleanupOldData, 5000);
@@ -4700,17 +4655,19 @@
         setTimeout(checkForUpdates, 2000);
 
         // Performance monitoring
-    if ('performance' in window) {
+ if ('performance' in window) {
     window.addEventListener('load', () => {
         // Use navigation timing API v2 if available
         if (window.performance.getEntriesByType) {
             const navEntries = window.performance.getEntriesByType('navigation');
             if (navEntries.length > 0) {
                 const pageLoadTime = navEntries[0].loadEventEnd - navEntries[0].fetchStart;
-                console.log(`Page load time: ${Math.round(pageLoadTime)}ms`);
-                
-                if (pageLoadTime > 3000) {
-                    console.warn('Page load time is high. Consider optimizing resources.');
+                if (pageLoadTime > 0) {
+                    console.log(`Page load time: ${Math.round(pageLoadTime)}ms`);
+                    
+                    if (pageLoadTime > 3000) {
+                        console.warn('Page load time is high. Consider optimizing resources.');
+                    }
                 }
             }
         } else if (window.performance.timing) {
@@ -4725,7 +4682,7 @@
                         console.warn('Page load time is high. Consider optimizing resources.');
                     }
                 }
-            }, 0);
+            }, 100); // Small delay to ensure loadEventEnd is populated
         }
     });
 }
