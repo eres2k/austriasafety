@@ -408,6 +408,12 @@
             <div id="statusMessage" style="margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 5px; display: none;"></div>
             
             <div class="filter-section">
+                 <div class="filter-group">
+                    <label>Site:</label>
+                    <select id="siteFilter">
+                        <option value="">All Sites</option>
+                    </select>
+                </div>
                 <div class="filter-group">
                     <label>Severity:</label>
                     <select id="severityFilter">
@@ -418,12 +424,7 @@
                         <option value="D">D - Low</option>
                     </select>
                 </div>
-                <div class="filter-group">
-                    <label>Body Part:</label>
-                    <select id="bodyPartFilter">
-                        <option value="">All Body Parts</option>
-                    </select>
-                </div>
+                
                 <div class="filter-group">
                     <label>Recordable:</label>
                     <select id="recordableFilter">
@@ -433,11 +434,12 @@
                     </select>
                 </div>
                 <div class="filter-group">
-                    <label>Site:</label>
-                    <select id="siteFilter">
-                        <option value="">All Sites</option>
+                    <label>Body Part:</label>
+                    <select id="bodyPartFilter">
+                        <option value="">All Body Parts</option>
                     </select>
                 </div>
+               
                 <div class="filter-group">
                     <label>Date From:</label>
                     <input type="date" id="dateFrom">
@@ -478,10 +480,11 @@
             <div class="card">
                 <h3>Chart 1: Severity Distribution</h3>
                 <select id="chart1Select" onchange="updateChart(1)" style="width: 100%; margin-bottom: 10px;">
+                     <option value="site">Site Comparison</option>
                     <option value="severity">Severity Distribution</option>
                     <option value="bodyPart">Body Parts Affected</option>
                     <option value="rootCause">Root Causes</option>
-                    <option value="site">Site Comparison</option>
+                   
                     <option value="trend">Monthly Trend</option>
                     <option value="processPath">Process Paths</option>
                 </select>
