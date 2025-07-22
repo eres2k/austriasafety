@@ -753,75 +753,81 @@
         }
         
         // Process and enhance data
-        function processData() {
-            rawData.forEach((row, index) => {
-                try {
-                    // Parse dates
-                    if (row.incident_date) {
-                        row.parsedDate = new Date(row.incident_date);
-                    }
-                    
-                    // Standardize severity
-                    row.standardSeverity = standardizeSeverity(row.severity || row.potential_severity);
-                    
-                    // Ensure recordable is numeric
-                    row.recordable = parseInt(row.recordable) || 0;
-                    
-                    // Ensure DAFW days is numeric
-                    row.total_dafw_days = parseInt(row.total_dafw_days) || 0;
-                    
-                    // Generate case ID if not present
-                    if (!row.case_number) {
-                        row.case_number = `CASE-${index + 1}`;
-                    }
-                    
-              // Extract body part
 
-row.bodyPart = row.initial_info_principal_body_part || row.initial_info_detailed_body_part || 'Unknown';
+function processData() {
+    rawData.forEach((row, index) => {
+        try {
+            // Parse dates
+            if (row.incident_date) {
+                row.parsedDate = new Date(row.incident_date);
+            }
+            
+            // Standardize severity
+            row.standardSeverity = standardizeSeverity(row.severity || row.potential_severity);
+            
+            // Ensure recordable is numeric
+            row.recordable = parseInt(row.recordable) || 0;
+            
+            // Ensure DAFW days is numeric
+            row.total_dafw_days = parseInt(row.total_dafw_days) || 0;
+            
+            // Generate case ID if not present
+            if (!row.case_number) {
+                row.case_number = `CASE-${index + 1}`;
+            }
+            
+            // Extract body part
+            row.bodyPart = row.initial_info_principal_body_part || row.initial_info_detailed_body_part || 'Unknown';
 
-// Extract OTR status from initial_info_incident_on_the_road column
-// Handle boolean values first (from Papa Parse with dynamicTyping)
-if (row.initial_info_incident_on_the_road === true) {
-    row.otr = 'yes';
-} else if (row.initial_info_incident_on_the_road === false) {
-    row.otr = 'no';
-} else {
-    // Handle string values and other cases
-    row.otr = row.initial_info_incident_on_the_road || 'no';
-    if (typeof row.otr === 'string') {
-        row.otr = row.otr.toLowerCase();
-    }
-    // Normalize various string OTR values to yes/no
-    if (row.otr === '1' || row.otr === 'true' || row.otr === 'yes' || row.otr === 'y') {
-        row.otr = 'yes';
-    } else {
-        row.otr = 'no';
-    }
+            // Extract OTR status from initial_info_incident_on_the_road column
+            // Handle boolean values first (from Papa Parse with dynamicTyping)
+            if (row.initial_info_incident_on_the_road === true) {
+                row.otr = 'yes';
+            } else if (row.initial_info_incident_on_the_road === false) {
+                row.otr = 'no';
+            } else {
+                // Handle string values and other cases
+                row.otr = row.initial_info_incident_on_the_road || 'no';
+                if (typeof row.otr === 'string') {
+                    row.otr = row.otr.toLowerCase();
+                }
+                // Normalize various string OTR values to yes/no
+                if (row.otr === '1' || row.otr === 'true' || row.otr === 'yes' || row.otr === 'y') {
+                    row.otr = 'yes';
+                } else {
+                    row.otr = 'no';
+                }
+            }
+
+            // Extract root cause
+            row.rootCause = row.rca_primary_cause || 'Under Investigation';
+            
+        } catch (error) {
+            console.error(`Error processing row ${index}:`, error);
+        }
+    });
 }
 
-// Extract root cause
-row.rootCause = row.rca_primary_cause || 'Under Investigation';
-        
-        // Standardize severity levels
-        function standardizeSeverity(severity) {
-            if (!severity) return 'Unknown';
-            const severityStr = String(severity).toUpperCase().trim();
-            
-            // Handle A-D severity scale
-            if (severityStr === 'A') return 'A';
-            if (severityStr === 'B') return 'B';
-            if (severityStr === 'C') return 'C';
-            if (severityStr === 'D') return 'D';
-            
-            // Fallback for other formats
-            const lower = severityStr.toLowerCase();
-            if (lower.includes('critical') || lower.includes('severe')) return 'A';
-            if (lower.includes('high') || lower.includes('major')) return 'B';
-            if (lower.includes('medium') || lower.includes('moderate')) return 'C';
-            if (lower.includes('low') || lower.includes('minor')) return 'D';
-            
-            return 'Unknown';
-        }
+// Standardize severity levels - This should be OUTSIDE processData function
+function standardizeSeverity(severity) {
+    if (!severity) return 'Unknown';
+    const severityStr = String(severity).toUpperCase().trim();
+    
+    // Handle A-D severity scale
+    if (severityStr === 'A') return 'A';
+    if (severityStr === 'B') return 'B';
+    if (severityStr === 'C') return 'C';
+    if (severityStr === 'D') return 'D';
+    
+    // Fallback for other formats
+    const lower = severityStr.toLowerCase();
+    if (lower.includes('critical') || lower.includes('severe')) return 'A';
+    if (lower.includes('high') || lower.includes('major')) return 'B';
+    if (lower.includes('medium') || lower.includes('moderate')) return 'C';
+    if (lower.includes('low') || lower.includes('minor')) return 'D';
+    
+    return 'Unknown';
+}
         
         // Populate filter dropdowns
         function populateFilters() {
