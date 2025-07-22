@@ -1,0 +1,9 @@
+{
+  "name": "WHS Safety Audit System",
+  "short_name": "WHS Audit",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#ff9900",
+  "background_color": "#ffffff",
+  "icons": []
+}
