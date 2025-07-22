@@ -472,13 +472,11 @@
                 <div class="sub-metric">DAFW Cases</div>
             </div>
             
-          <div class="card">
-    <h3>Days Away From Work (DAFW) Analysis</h3>
-    <div class="sub-metric" id="totalDafwDays" style="margin-bottom: 10px; text-align: center;">Total: 0 days lost</div>
-    <div class="chart-container">
-        <canvas id="dafwChart"></canvas>
-    </div>
-</div>
+            <div class="card">
+                <h3>Days Away From Work</h3>
+                <div class="metric" id="dafwDaysMetric">0</div>
+                <div class="sub-metric">Total Days Lost</div>
+            </div>
             
             <div class="card">
                 <h3>Chart 1</h3>
@@ -516,6 +514,7 @@
                     <option value="site">Site Comparison</option>
                     <option value="recordableRate">Recordable Rate by Site</option>
                     <option value="severityBySite">Severity by Site</option>
+                    <option value="dafwAnalysis">DAFW Analysis</option>
                 </select>
                 <div class="chart-container">
                     <canvas id="customChart3"></canvas>
@@ -882,6 +881,10 @@ function standardizeSeverity(severity) {
             
             const lostTimeCount = filteredData.filter(row => row.total_dafw_days > 0).length;
             document.getElementById('lostTimeCount').textContent = lostTimeCount;
+            
+            // Calculate total DAFW days
+            const totalDafwDays = filteredData.reduce((sum, row) => sum + (row.total_dafw_days || 0), 0);
+            document.getElementById('dafwDaysMetric').textContent = totalDafwDays;
         }
         
         // Update data table
@@ -926,43 +929,7 @@ function standardizeSeverity(severity) {
         }
         
         // Initialize charts
-// Initialize charts
-function initializeCharts() {
-    // Initialize DAFW chart
-    const dafwCtx = document.getElementById('dafwChart');
-    if (dafwCtx) {
-        charts.dafw = new Chart(dafwCtx.getContext('2d'), {
-            type: 'doughnut',
-            data: {
-                labels: [],
-                datasets: [{
-                    data: [],
-                    backgroundColor: ['#4CAF50', '#FFC107', '#FF9900', '#FF5722', '#B71C1C', '#37475A']
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom'
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const label = context.label || '';
-                                const value = context.parsed || 0;
-                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                const percentage = ((value / total) * 100).toFixed(1);
-                                return `${label}: ${value} cases (${percentage}%)`;
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    }
-            
+        function initializeCharts() {
             // Initialize customizable charts
             for (let i = 1; i <= 4; i++) {
                 const ctx = document.getElementById(`customChart${i}`).getContext('2d');
@@ -1099,9 +1066,12 @@ function updateOTRAnalysisChart(chart) {
                 case 'impactType':
                     updateImpactTypeChart(chart);
                     break;
-                    case 'otrAnalysis':
-    updateOTRAnalysisChart(chart);
-    break;
+                case 'otrAnalysis':
+                    updateOTRAnalysisChart(chart);
+                    break;
+                case 'dafwAnalysis':
+                    updateDAFWAnalysisChart(chart);
+                    break;
             }
         }
         
@@ -1217,23 +1187,46 @@ function updateOTRAnalysisChart(chart) {
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 8);
             
-            // Set chart type and options
+            // Set to horizontal bar chart for better readability
             chart.config.type = 'bar';
             
             chart.options = {
                 responsive: true,
                 maintainAspectRatio: false,
+                indexAxis: 'y', // This makes it horizontal
                 plugins: {
                     legend: {
                         display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function(context) {
+                                // Show full text in tooltip
+                                const index = context[0].dataIndex;
+                                return topCauses[index][0];
+                            }
+                        }
                     }
                 },
                 scales: {
                     x: {
-                        beginAtZero: true
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
                     },
                     y: {
-                        beginAtZero: true
+                        ticks: {
+                            autoSkip: false,
+                            callback: function(value, index) {
+                                // Truncate labels for display
+                                const label = this.getLabelForValue(value);
+                                if (label.length > 25) {
+                                    return label.substring(0, 25) + '...';
+                                }
+                                return label;
+                            }
+                        }
                     }
                 }
             };
@@ -1725,72 +1718,95 @@ function updateOTRAnalysisChart(chart) {
             chart.update();
         }
         
-     // Update charts with data
-function updateCharts() {
-    if (filteredData.length === 0) return;
-    
-    // Update DAFW chart
-    if (charts.dafw) {
-        const dafwRanges = {
-            '0 Days (No Lost Time)': 0,
-            '1-3 Days': 0,
-            '4-7 Days': 0,
-            '8-14 Days': 0,
-            '15-30 Days': 0,
-            '30+ Days': 0
-        };
-        
-        let totalDafwDays = 0;
-        
-        filteredData.forEach(row => {
-            const days = row.total_dafw_days || 0;
-            totalDafwDays += days;
+        // Update DAFW Analysis chart
+        function updateDAFWAnalysisChart(chart) {
+            const dafwRanges = {
+                '0 Days (No Lost Time)': 0,
+                '1-3 Days': 0,
+                '4-7 Days': 0,
+                '8-14 Days': 0,
+                '15-30 Days': 0,
+                '30+ Days': 0
+            };
             
-            if (days === 0) {
-                dafwRanges['0 Days (No Lost Time)']++;
-            } else if (days <= 3) {
-                dafwRanges['1-3 Days']++;
-            } else if (days <= 7) {
-                dafwRanges['4-7 Days']++;
-            } else if (days <= 14) {
-                dafwRanges['8-14 Days']++;
-            } else if (days <= 30) {
-                dafwRanges['15-30 Days']++;
-            } else {
-                dafwRanges['30+ Days']++;
-            }
-        });
-        
-        // Update total DAFW days display
-        const totalDafwElement = document.getElementById('totalDafwDays');
-        if (totalDafwElement) {
-            totalDafwElement.textContent = `Total: ${totalDafwDays} days lost`;
+            let totalDafwDays = 0;
+            
+            filteredData.forEach(row => {
+                const days = row.total_dafw_days || 0;
+                totalDafwDays += days;
+                
+                if (days === 0) {
+                    dafwRanges['0 Days (No Lost Time)']++;
+                } else if (days <= 3) {
+                    dafwRanges['1-3 Days']++;
+                } else if (days <= 7) {
+                    dafwRanges['4-7 Days']++;
+                } else if (days <= 14) {
+                    dafwRanges['8-14 Days']++;
+                } else if (days <= 30) {
+                    dafwRanges['15-30 Days']++;
+                } else {
+                    dafwRanges['30+ Days']++;
+                }
+            });
+            
+            // Set chart type and options
+            chart.config.type = 'doughnut';
+            
+            chart.options = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${label}: ${value} cases (${percentage}%)`;
+                            }
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: `Total: ${totalDafwDays} days lost`
+                    }
+                }
+            };
+            
+            // Filter out ranges with zero cases
+            const nonZeroRanges = Object.entries(dafwRanges).filter(([_, count]) => count > 0);
+            
+            // Set data
+            chart.data = {
+                labels: nonZeroRanges.map(([range]) => range),
+                datasets: [{
+                    data: nonZeroRanges.map(([, count]) => count),
+                    backgroundColor: ['#4CAF50', '#FFC107', '#FF9900', '#FF5722', '#B71C1C', '#37475A'],
+                    label: 'Cases'
+                }]
+            };
+            
+            chart.update();
         }
         
-        // Clear and set new data
-        charts.dafw.data.labels = [];
-        charts.dafw.data.datasets = [];
+        // Update charts with data
+        function updateCharts() {
+            if (filteredData.length === 0) return;
+            
+            // Update customizable charts
+            for (let i = 1; i <= 4; i++) {
+                updateChart(i);
+            }
+        }
         
-        // Filter out ranges with zero cases for cleaner visualization
-        const nonZeroRanges = Object.entries(dafwRanges).filter(([_, count]) => count > 0);
-        
-        charts.dafw.data.labels = nonZeroRanges.map(([range]) => range);
-        charts.dafw.data.datasets.push({
-            data: nonZeroRanges.map(([, count]) => count),
-            backgroundColor: ['#4CAF50', '#FFC107', '#FF9900', '#FF5722', '#B71C1C', '#37475A'],
-            label: 'Cases'
-        });
-        charts.dafw.update();
-    }
-    
-    // Update customizable charts
-    for (let i = 1; i <= 4; i++) {
-        updateChart(i);
-    }
-}
-
-// Create risk matrix
-function createRiskMatrix() {
+        // Create risk matrix
+        function createRiskMatrix() {
             const matrix = document.getElementById('riskMatrixGrid');
             const severityLabels = ['', 'A', 'B', 'C', 'D', 'Negligible'];
             const likelihoodLabels = ['', 'Rare', 'Unlikely', 'Possible', 'Likely', 'Almost Certain'];
