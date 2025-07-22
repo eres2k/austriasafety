@@ -433,17 +433,11 @@
             
             <div class="filter-section">
                 <div class="filter-group">
-                    <label>Site:</label>
-                    <select id="siteFilter">
-                        <option value="">All Sites</option>
-                        <option value="DVI1">DVI1 - Vienna DC1</option>
-                        <option value="DAP8">DAP8 - Vienna DC2</option>
-                        <option value="DAP5">DAP5 - Graz FC</option>
-                        <option value="DGZ1">DGZ1 - Graz DC</option>
-                        <option value="DVI2">DVI2 - Vienna FC</option>
-                        <option value="DVI3">DVI3 - Vienna SC</option>
-                    </select>
-                </div>
+    <label>Site:</label>
+    <select id="siteFilter">
+        <option value="">All Sites</option>
+    </select>
+</div>
                 <div class="filter-group">
                     <label>Potential Severity:</label>
                     <select id="potentialSeverityFilter">
@@ -853,6 +847,14 @@
         
         // Populate filter dropdowns
         function populateFilters() {
+             // ADD THIS SECTION AT THE BEGINNING:
+    // Site
+    const sites = [...new Set(rawData.map(row => row.site).filter(Boolean))];
+    const siteFilter = document.getElementById('siteFilter');
+    siteFilter.innerHTML = '<option value="">All Sites</option>';
+    sites.sort().forEach(site => {
+        siteFilter.innerHTML += `<option value="${site}">${site}</option>`;
+    });
             // Primary Impact
             const impacts = [...new Set(rawData.map(row => row.initial_info_primary_impact).filter(Boolean))];
             const impactFilter = document.getElementById('primaryImpactFilter');
@@ -924,9 +926,7 @@
             
             // Update label based on selected site
             const selectedSite = document.getElementById('siteFilter').value;
-            const siteLabel = selectedSite ? 
-                document.getElementById('siteFilter').options[document.getElementById('siteFilter').selectedIndex].text :
-                'All Sites - Year to Date';
+           const siteLabel = selectedSite ? `${selectedSite} - Year to Date` : 'All Sites - Year to Date';
             document.getElementById('totalCountLabel').textContent = siteLabel;
             
             const risks = filteredData
@@ -1845,9 +1845,7 @@
             doc.setFontSize(14);
             doc.setFont(undefined, 'normal');
             const selectedSite = document.getElementById('siteFilter').value;
-            const siteName = selectedSite ? 
-                document.getElementById('siteFilter').options[document.getElementById('siteFilter').selectedIndex].text :
-                'All Sites - Austria Region';
+            const siteName = selectedSite || 'All Sites - Austria Region';
             doc.text(siteName, 105, 22, { align: 'center' });
             
             // Report info section
