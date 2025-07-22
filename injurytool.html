@@ -472,12 +472,13 @@
                 <div class="sub-metric">DAFW Cases</div>
             </div>
             
-            <div class="card">
-                <h3>Body Part Distribution</h3>
-                <div class="chart-container">
-                    <canvas id="bodyPartChart"></canvas>
-                </div>
-            </div>
+          <div class="card">
+    <h3>Days Away From Work (DAFW) Analysis</h3>
+    <div class="sub-metric" id="totalDafwDays" style="margin-bottom: 10px; text-align: center;">Total: 0 days lost</div>
+    <div class="chart-container">
+        <canvas id="dafwChart"></canvas>
+    </div>
+</div>
             
             <div class="card">
                 <h3>Chart 1</h3>
@@ -925,30 +926,42 @@ function standardizeSeverity(severity) {
         }
         
         // Initialize charts
-        function initializeCharts() {
-            // Initialize body part chart
-            const bodyPartCtx = document.getElementById('bodyPartChart');
-            if (bodyPartCtx) {
-                charts.bodyPart = new Chart(bodyPartCtx.getContext('2d'), {
-                    type: 'doughnut',
-                    data: {
-                        labels: [],
-                        datasets: [{
-                            data: [],
-                            backgroundColor: ['#FF9900', '#232F3E', '#37475A', '#FF5722', '#4CAF50', '#2196F3']
-                        }]
+// Initialize charts
+function initializeCharts() {
+    // Initialize DAFW chart
+    const dafwCtx = document.getElementById('dafwChart');
+    if (dafwCtx) {
+        charts.dafw = new Chart(dafwCtx.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: [],
+                datasets: [{
+                    data: [],
+                    backgroundColor: ['#4CAF50', '#FFC107', '#FF9900', '#FF5722', '#B71C1C', '#37475A']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
                     },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'bottom'
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${label}: ${value} cases (${percentage}%)`;
                             }
                         }
                     }
-                });
+                }
             }
+        });
+    }
             
             // Initialize customizable charts
             for (let i = 1; i <= 4; i++) {
@@ -1712,40 +1725,63 @@ function updateOTRAnalysisChart(chart) {
             chart.update();
         }
         
-        // Update charts with data
-        function updateCharts() {
-            if (filteredData.length === 0) return;
+      // Update charts with data
+function updateCharts() {
+    if (filteredData.length === 0) return;
+    
+    // Update DAFW chart
+    if (charts.dafw) {
+        const dafwRanges = {
+            '0 Days (No Lost Time)': 0,
+            '1-3 Days': 0,
+            '4-7 Days': 0,
+            '8-14 Days': 0,
+            '15-30 Days': 0,
+            '30+ Days': 0
+        };
+        
+        let totalDafwDays = 0;
+        
+        filteredData.forEach(row => {
+            const days = row.total_dafw_days || 0;
+            totalDafwDays += days;
             
-            // Update body part chart
-            if (charts.bodyPart) {
-                const bodyPartCounts = {};
-                filteredData.forEach(row => {
-                    const part = row.bodyPart || 'Unknown';
-                    bodyPartCounts[part] = (bodyPartCounts[part] || 0) + 1;
-                });
-                
-                const topParts = Object.entries(bodyPartCounts)
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 6);
-                
-                // Clear and set new data
-                charts.bodyPart.data.labels = [];
-                charts.bodyPart.data.datasets = [];
-                
-                charts.bodyPart.data.labels = topParts.map(([part]) => part);
-                charts.bodyPart.data.datasets.push({
-                    data: topParts.map(([, count]) => count),
-                    backgroundColor: ['#FF9900', '#232F3E', '#37475A', '#FF5722', '#4CAF50', '#2196F3'],
-                    label: 'Cases'
-                });
-                charts.bodyPart.update();
+            if (days === 0) {
+                dafwRanges['0 Days (No Lost Time)']++;
+            } else if (days <= 3) {
+                dafwRanges['1-3 Days']++;
+            } else if (days <= 7) {
+                dafwRanges['4-7 Days']++;
+            } else if (days <= 14) {
+                dafwRanges['8-14 Days']++;
+            } else if (days <= 30) {
+                dafwRanges['15-30 Days']++;
+            } else {
+                dafwRanges['30+ Days']++;
             }
-            
-            // Update customizable charts
-            for (let i = 1; i <= 4; i++) {
-                updateChart(i);
-            }
+        });
+        
+        // Update total DAFW days display
+        const totalDafwElement = document.getElementById('totalDafwDays');
+        if (totalDafwElement) {
+            totalDafwElement.textContent = `Total: ${totalDafwDays} days lost`;
         }
+        
+        // Clear and set new data
+        charts.dafw.data.labels = [];
+        charts.dafw.data.datasets = [];
+        
+        // Filter out ranges with zero cases for cleaner visualization
+        const nonZeroRanges = Object.entries(dafwRanges).filter(([_, count]) => count > 0);
+        
+        charts.dafw.data.labels = nonZeroRanges.map(([range]) => range);
+        charts.dafw.data.datasets.push({
+            data: nonZeroRanges.map(([, count]) => count),
+            backgroundColor: ['#4CAF50', '#FFC107', '#FF9900', '#FF5722', '#B71C1C', '#37475A'],
+            label: 'Cases'
+        });
+        charts.dafw.update();
+    }
         
         // Create risk matrix
         function createRiskMatrix() {
