@@ -388,8 +388,8 @@
         <div class="control-panel">
             <h2>Data Management</h2>
             <div style="background: #e3f2fd; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
-                <strong>📌 Quick Start:</strong> Click "Choose File" to upload your Injury & Illness CSV file, or try "Test with Sample Data" to see the dashboard in action.
-                <br><small>Supports CSV files with injury/illness tracking data including severity, body parts, causes, and recordability.</small>
+               <strong>📌 Quick Start:</strong> Click "Choose File" to upload your Injury & Illness CSV file, or try "Test with Sample Data" to see the dashboard in action.
+<br><small>Supports CSV files with injury/illness tracking data including severity, body parts, causes, recordability, and OTR status.</small>
             </div>
             
             <div class="button-group">
@@ -779,9 +779,16 @@
 row.bodyPart = row.initial_info_principal_body_part || row.initial_info_detailed_body_part || 'Unknown';
 
 // Extract OTR status
-row.otr = row.otr || row.on_the_road || 'no';
+// Extract OTR status from initial_info_incident_on_the_road column
+row.otr = row.initial_info_incident_on_the_road || 'no';
 if (typeof row.otr === 'string') {
     row.otr = row.otr.toLowerCase();
+}
+// Normalize various OTR values to yes/no
+if (row.otr === '1' || row.otr === 'true' || row.otr === 'yes' || row.otr === 'y') {
+    row.otr = 'yes';
+} else if (row.otr === '0' || row.otr === 'false' || row.otr === 'no' || row.otr === 'n' || !row.otr) {
+    row.otr = 'no';
 }
 
 // Extract root cause
@@ -1077,6 +1084,9 @@ function updateOTRAnalysisChart(chart) {
                 case 'impactType':
                     updateImpactTypeChart(chart);
                     break;
+                    case 'otrAnalysis':
+    updateOTRAnalysisChart(chart);
+    break;
             }
         }
         
