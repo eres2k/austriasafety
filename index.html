@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#ff9900">
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="manifest.json">
     <title>WHS Safety Audit - Amazon Austria</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -838,7 +838,7 @@
                             <button type="submit" class="btn btn-primary">
                                 Audit starten
                             </button>
-                            <button type="button" class="btn btn-secondary mt-1" onclick="showPage('dashboard')">
+                            <button type="button" class="btn btn-secondary mt-1" onclick="showPage('dashboard', null)">
                                 Abbrechen
                             </button>
                         </form>
@@ -907,19 +907,19 @@
 
             <!-- Bottom Navigation -->
             <nav class="bottom-nav">
-                <a href="#" class="nav-item active" onclick="showPage('dashboard')">
+                <a href="#" class="nav-item active" onclick="showPage('dashboard', this); return false;">
                     <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
                     </svg>
                     <span class="nav-label">Start</span>
                 </a>
-                <a href="#" class="nav-item" onclick="showPage('audits')">
+                <a href="#" class="nav-item" onclick="showPage('audits', this); return false;">
                     <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
                     </svg>
                     <span class="nav-label">Audits</span>
                 </a>
-                <a href="#" class="nav-item" onclick="showPage('settings')">
+                <a href="#" class="nav-item" onclick="showPage('settings', this); return false;">
                     <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -1333,6 +1333,8 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
+            // Set initial online status
+            isOnline = navigator.onLine;
             checkAuth();
             setupEventListeners();
             registerServiceWorker();
@@ -1354,7 +1356,7 @@
         async function registerServiceWorker() {
             if ('serviceWorker' in navigator) {
                 try {
-                    const registration = await navigator.serviceWorker.register('/sw.js');
+                    const registration = await navigator.serviceWorker.register('./sw.js');
                     console.log('Service Worker registered:', registration);
                 } catch (error) {
                     console.error('Service Worker registration failed:', error);
@@ -1378,24 +1380,33 @@
         // Authentication
         async function checkAuth() {
             const token = localStorage.getItem('authToken');
-            if (token) {
-                try {
-                    const response = await apiCall('/auth', 'GET');
-                    if (response.ok) {
-                        currentUser = await response.json();
-                        showApp();
-                    } else {
-                        showLogin();
+            const savedUser = localStorage.getItem('currentUser');
+            
+            if (token || savedUser) {
+                if (isOnline && token) {
+                    try {
+                        const response = await apiCall('/auth', 'GET');
+                        if (response.ok) {
+                            currentUser = await response.json();
+                            showApp();
+                        } else {
+                            showLogin();
+                        }
+                    } catch (error) {
+                        // If offline or error, check local storage
+                        if (savedUser) {
+                            currentUser = JSON.parse(savedUser);
+                            showApp();
+                        } else {
+                            showLogin();
+                        }
                     }
-                } catch (error) {
-                    // Offline mode - check local storage
-                    const savedUser = localStorage.getItem('currentUser');
-                    if (savedUser) {
-                        currentUser = JSON.parse(savedUser);
-                        showApp();
-                    } else {
-                        showLogin();
-                    }
+                } else if (savedUser) {
+                    // Offline mode - use saved user
+                    currentUser = JSON.parse(savedUser);
+                    showApp();
+                } else {
+                    showLogin();
                 }
             } else {
                 showLogin();
@@ -1458,10 +1469,11 @@
             document.getElementById('loginScreen').classList.add('hidden');
             document.getElementById('mainApp').classList.remove('hidden');
             document.getElementById('userInfo').textContent = `${currentUser.name} (${currentUser.role})`;
-            loadDashboard();
+            // Don't call loadDashboard here, showPage will do it
+            showPage('dashboard', null);
         }
 
-        function showPage(pageName) {
+        function showPage(pageName, navElement) {
             // Hide all pages
             document.querySelectorAll('.page').forEach(page => {
                 page.classList.add('hidden');
@@ -1474,7 +1486,22 @@
             document.querySelectorAll('.nav-item').forEach(item => {
                 item.classList.remove('active');
             });
-            event.currentTarget.classList.add('active');
+            
+            // Set active nav item
+            if (navElement) {
+                navElement.classList.add('active');
+            } else {
+                // Find the nav item by page name
+                const navMap = {
+                    'dashboard': 0,
+                    'audits': 1,
+                    'settings': 2
+                };
+                const navItems = document.querySelectorAll('.nav-item');
+                if (navMap[pageName] !== undefined && navItems[navMap[pageName]]) {
+                    navItems[navMap[pageName]].classList.add('active');
+                }
+            }
             
             // Update header title
             const titles = {
@@ -1497,38 +1524,52 @@
 
         // Dashboard
         async function loadDashboard() {
-            try {
-                const response = await apiCall('/audits/stats', 'GET');
-                const stats = await response.json();
+            // Always try to load from local storage first
+            const localAudits = JSON.parse(localStorage.getItem('localAudits') || '[]');
+            const today = new Date().toDateString();
+            const todayAudits = localAudits.filter(a => new Date(a.date).toDateString() === today);
+            
+            // Set initial values from local data
+            document.getElementById('todayAudits').textContent = todayAudits.length;
+            document.getElementById('totalAudits').textContent = localAudits.length;
+            
+            if (localAudits.length > 0) {
+                const avgScore = Math.round(localAudits.reduce((sum, a) => sum + (a.score || 0), 0) / localAudits.length);
+                document.getElementById('avgScore').textContent = `${avgScore}%`;
                 
-                document.getElementById('todayAudits').textContent = stats.todayCount || 0;
-                document.getElementById('avgScore').textContent = `${stats.avgScore || 0}%`;
-                document.getElementById('criticalCount').textContent = stats.criticalCount || 0;
-                document.getElementById('totalAudits').textContent = stats.totalCount || 0;
-                
-                // Load recent audits
-                const auditsResponse = await apiCall('/audits?limit=5', 'GET');
-                const recentAudits = await auditsResponse.json();
-                displayRecentAudits(recentAudits);
-                
-            } catch (error) {
-                // Offline mode - load from local storage
-                const audits = JSON.parse(localStorage.getItem('localAudits') || '[]');
-                const today = new Date().toDateString();
-                const todayAudits = audits.filter(a => new Date(a.date).toDateString() === today);
-                
-                document.getElementById('todayAudits').textContent = todayAudits.length;
-                document.getElementById('totalAudits').textContent = audits.length;
-                
-                if (audits.length > 0) {
-                    const avgScore = Math.round(audits.reduce((sum, a) => sum + a.score, 0) / audits.length);
-                    document.getElementById('avgScore').textContent = `${avgScore}%`;
-                    
-                    const criticalCount = audits.reduce((sum, a) => sum + a.criticalFailures, 0);
-                    document.getElementById('criticalCount').textContent = criticalCount;
+                const criticalCount = localAudits.reduce((sum, a) => sum + (a.criticalFailures || 0), 0);
+                document.getElementById('criticalCount').textContent = criticalCount;
+            } else {
+                document.getElementById('avgScore').textContent = '0%';
+                document.getElementById('criticalCount').textContent = '0';
+            }
+            
+            // Display local audits first
+            displayRecentAudits(localAudits.slice(-5).reverse());
+            
+            // Then try to get fresh data from server if online
+            if (isOnline) {
+                try {
+                    const response = await apiCall('/audits/stats', 'GET');
+                    if (response.ok) {
+                        const stats = await response.json();
+                        
+                        document.getElementById('todayAudits').textContent = stats.todayCount || 0;
+                        document.getElementById('avgScore').textContent = `${stats.avgScore || 0}%`;
+                        document.getElementById('criticalCount').textContent = stats.criticalCount || 0;
+                        document.getElementById('totalAudits').textContent = stats.totalCount || 0;
+                        
+                        // Load recent audits from server
+                        const auditsResponse = await apiCall('/audits?limit=5', 'GET');
+                        if (auditsResponse.ok) {
+                            const recentAudits = await auditsResponse.json();
+                            displayRecentAudits(recentAudits);
+                        }
+                    }
+                } catch (error) {
+                    console.log('Failed to load from server, using local data:', error);
+                    // Local data is already displayed, so no action needed
                 }
-                
-                displayRecentAudits(audits.slice(-5).reverse());
             }
         }
 
@@ -1555,7 +1596,7 @@
                                 <span>${audit.shift}</span>
                             </div>
                         </div>
-                        <div class="audit-score">${audit.score}%</div>
+                        <div class="audit-score">${audit.score || 0}%</div>
                     </div>
                 `;
                 
@@ -1565,7 +1606,7 @@
 
         // New Audit
         function startNewAudit() {
-            showPage('newAudit');
+            showPage('newAudit', null);
         }
 
         async function handleAuditForm(e) {
@@ -1583,7 +1624,7 @@
             };
             
             displayQuestions();
-            showPage('questions');
+            showPage('questions', null);
         }
 
         // Questions
@@ -1708,13 +1749,13 @@
             generatePDF(currentAudit);
             
             currentAudit = null;
-            showPage('dashboard');
+            showPage('dashboard', null);
         }
 
         function cancelAudit() {
             if (confirm('Möchten Sie das Audit wirklich abbrechen? Alle Daten gehen verloren.')) {
                 currentAudit = null;
-                showPage('dashboard');
+                showPage('dashboard', null);
             }
         }
 
@@ -1723,14 +1764,22 @@
             const container = document.getElementById('auditList');
             container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
             
-            try {
-                const response = await apiCall('/audits', 'GET');
-                const audits = await response.json();
-                displayAuditList(audits);
-            } catch (error) {
-                // Load from local storage
-                const audits = JSON.parse(localStorage.getItem('localAudits') || '[]');
-                displayAuditList(audits);
+            // First load from local storage
+            const localAudits = JSON.parse(localStorage.getItem('localAudits') || '[]');
+            displayAuditList(localAudits);
+            
+            // Then try to get fresh data if online
+            if (isOnline) {
+                try {
+                    const response = await apiCall('/audits', 'GET');
+                    if (response.ok) {
+                        const audits = await response.json();
+                        displayAuditList(audits);
+                    }
+                } catch (error) {
+                    console.log('Failed to load audits from server, using local data:', error);
+                    // Local data is already displayed
+                }
             }
         }
 
@@ -1743,7 +1792,9 @@
                 return;
             }
             
-            audits.reverse().forEach(audit => {
+            // Create a copy and reverse to avoid mutating the original array
+            const sortedAudits = [...audits].reverse();
+            sortedAudits.forEach(audit => {
                 const item = document.createElement('div');
                 item.className = 'audit-item';
                 item.onclick = () => viewAudit(audit.id);
@@ -1751,14 +1802,14 @@
                 item.innerHTML = `
                     <div class="audit-header">
                         <div>
-                            <div style="font-weight: 600;">${audit.location} - ${audit.area}</div>
+                            <div style="font-weight: 600;">${audit.location} - ${audit.area || 'N/A'}</div>
                             <div class="audit-meta">
                                 <span>${new Date(audit.date).toLocaleDateString('de-AT')}</span>
                                 <span>${audit.shift}</span>
                                 <span>${audit.auditor}</span>
                             </div>
                         </div>
-                        <div class="audit-score">${audit.score}%</div>
+                        <div class="audit-score">${audit.score || 0}%</div>
                     </div>
                 `;
                 
@@ -1815,8 +1866,8 @@
             
             // Overall Assessment
             doc.text('OVERALL ASSESSMENT', 20, 145);
-            doc.text(`Workplace Condition: ${audit.overallCondition}`, 20, 155);
-            doc.text(`Overall Result: ${audit.overallResult}`, 20, 160);
+            doc.text(`Workplace Condition: ${audit.overallCondition || 'N/A'}`, 20, 155);
+            doc.text(`Overall Result: ${audit.overallResult || 'N/A'}`, 20, 160);
             
             // Save PDF
             doc.save(`audit_${audit.location}_${new Date(audit.date).toISOString().split('T')[0]}.pdf`);
@@ -1838,14 +1889,27 @@
                 options.body = JSON.stringify(body);
             }
             
-            const response = await fetch(API_BASE + endpoint, options);
-            
-            if (!response.ok && response.status === 401) {
-                logout();
-                throw new Error('Unauthorized');
+            try {
+                const response = await fetch(API_BASE + endpoint, options);
+                
+                if (!response.ok && response.status === 401) {
+                    // Only logout if this is the auth verification endpoint
+                    if (endpoint === '/auth') {
+                        logout();
+                        throw new Error('Unauthorized');
+                    }
+                    // For other endpoints, just throw error without logging out
+                    throw new Error('Unauthorized request');
+                }
+                
+                return response;
+            } catch (error) {
+                // If offline, throw error but don't logout
+                if (!isOnline) {
+                    throw new Error('Offline mode');
+                }
+                throw error;
             }
-            
-            return response;
         }
 
         // Data Sync
