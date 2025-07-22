@@ -1968,7 +1968,7 @@
 
     <script>
         // API Configuration
-        const API_BASE = '/api';
+       const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:8888/api' : '/api';
         
         // Audit Questions (same as before)
         const auditQuestions = {
@@ -2486,38 +2486,24 @@
         }
 
         // Authentication
-        async function checkAuth() {
-            const token = localStorage.getItem('authToken');
-            const savedUser = localStorage.getItem('currentUser');
-            
-            if (token || savedUser) {
-                if (isOnline && token) {
-                    try {
-                        const response = await apiCall('/auth', 'GET');
-                        if (response.ok) {
-                            currentUser = await response.json();
-                            showApp();
-                        } else {
-                            showLogin();
-                        }
-                    } catch (error) {
-                        if (savedUser) {
-                            currentUser = JSON.parse(savedUser);
-                            showApp();
-                        } else {
-                            showLogin();
-                        }
-                    }
-                } else if (savedUser) {
-                    currentUser = JSON.parse(savedUser);
-                    showApp();
-                } else {
-                    showLogin();
-                }
-            } else {
-                showLogin();
-            }
+       async function checkAuth() {
+    const token = localStorage.getItem('authToken');
+    const savedUser = localStorage.getItem('currentUser');
+    
+    if (savedUser) {
+        // We have a saved user, use it
+        currentUser = JSON.parse(savedUser);
+        showApp();
+        console.log('Logged in as:', currentUser.name);
+        
+        // Try to verify token if online
+        if (isOnline && token) {
+            // ... optional verification
         }
+    } else {
+        showLogin();
+    }
+}
 
         async function handleLogin(e) {
             e.preventDefault();
@@ -2556,7 +2542,35 @@
                 }
             }
         }
-
+// NEU - Visueller Sync-Indikator:
+function updateSyncButtonStatus() {
+    const syncButton = document.getElementById('syncButton');
+    if (!syncButton) return;
+    
+    const hasPendingSync = localStorage.getItem('pendingSync') === 'true';
+    
+    if (!isOnline) {
+        syncButton.style.opacity = '0.5';
+        syncButton.style.cursor = 'not-allowed';
+        syncButton.title = 'Offline - Keine Synchronisation möglich';
+    } else if (!hasPendingSync) {
+        syncButton.style.opacity = '0.5';
+        syncButton.title = 'Keine ausstehenden Daten';
+    } else {
+        syncButton.style.opacity = '1';
+        syncButton.style.cursor = 'pointer';
+        syncButton.title = 'Daten synchronisieren';
+        
+        // Badge für ausstehende Sync
+        if (!syncButton.querySelector('.notification-badge')) {
+            const badge = document.createElement('span');
+            badge.className = 'notification-badge';
+            badge.textContent = '!';
+            badge.style.background = 'var(--warning)';
+            syncButton.appendChild(badge);
+        }
+    }
+}
         function logout() {
             localStorage.removeItem('authToken');
             localStorage.removeItem('currentUser');
