@@ -1725,7 +1725,7 @@ function updateOTRAnalysisChart(chart) {
             chart.update();
         }
         
-      // Update charts with data
+     // Update charts with data
 function updateCharts() {
     if (filteredData.length === 0) return;
     
@@ -1782,9 +1782,15 @@ function updateCharts() {
         });
         charts.dafw.update();
     }
-        
-        // Create risk matrix
-        function createRiskMatrix() {
+    
+    // Update customizable charts
+    for (let i = 1; i <= 4; i++) {
+        updateChart(i);
+    }
+}
+
+// Create risk matrix
+function createRiskMatrix() {
             const matrix = document.getElementById('riskMatrixGrid');
             const severityLabels = ['', 'A', 'B', 'C', 'D', 'Negligible'];
             const likelihoodLabels = ['', 'Rare', 'Unlikely', 'Possible', 'Likely', 'Almost Certain'];
