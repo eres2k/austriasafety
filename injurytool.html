@@ -480,15 +480,14 @@
             </div>
             
             <div class="card">
-                <h3>Chart 1: Severity Distribution</h3>
+                <h3>Chart 1</h3>
                 <select id="chart1Select" onchange="updateChart(1)" style="width: 100%; margin-bottom: 10px;">
-                     <option value="site">Site Comparison</option>
+                    <option value="site">Site Comparison</option>
                     <option value="severity">Severity Distribution</option>
-                    <option value="bodyPart">Body Parts Affected</option>
                     <option value="rootCause">Root Causes</option>
-                   
-                    <option value="trend">Monthly Trend</option>
+                    <option value="bodyPart">Body Parts Affected</option>
                     <option value="processPath">Process Paths</option>
+                    <option value="contributingFactors">Contributing Factors</option>      
                     <option value="otrAnalysis">OTR Analysis</option>
                 </select>
                 <div class="chart-container">
@@ -497,14 +496,15 @@
             </div>
             
             <div class="card">
-                <h3>Chart 2: Root Cause Analysis</h3>
+                <h3>Chart 2</h3>
                 <select id="chart2Select" onchange="updateChart(2)" style="width: 100%; margin-bottom: 10px;">
-                    <option value="rootCause">Root Causes</option>
-                    <option value="severity">Severity Distribution</option>
-                    <option value="bodyPart">Body Parts Affected</option>
                     <option value="site">Site Comparison</option>
-                    <option value="trend">Monthly Trend</option>
-                    <option value="contributingFactors">Contributing Factors</option>
+                    <option value="severity">Severity Distribution</option>
+                    <option value="rootCause">Root Causes</option>
+                    <option value="bodyPart">Body Parts Affected</option>
+                    <option value="processPath">Process Paths</option>
+                    <option value="contributingFactors">Contributing Factors</option>      
+                    <option value="otrAnalysis">OTR Analysis</option>
                 </select>
                 <div class="chart-container">
                     <canvas id="customChart2"></canvas>
@@ -517,8 +517,6 @@
                     <option value="site">Site Comparison</option>
                     <option value="recordableRate">Recordable Rate by Site</option>
                     <option value="severityBySite">Severity by Site</option>
-                    <option value="bodyPart">Body Parts Affected</option>
-                    <option value="trend">Monthly Trend</option>
                 </select>
                 <div class="chart-container">
                     <canvas id="customChart3"></canvas>
@@ -531,8 +529,6 @@
                     <option value="trend">Monthly Trend</option>
                     <option value="recordableTrend">Recordable Trend</option>
                     <option value="dafwTrend">Lost Time Trend</option>
-                    <option value="severity">Severity Distribution</option>
-                    <option value="impactType">Impact Types</option>
                 </select>
                 <div class="chart-container">
                     <canvas id="customChart4"></canvas>
