@@ -848,7 +848,7 @@ row.rootCause = row.rca_primary_cause || 'Under Investigation';
             
             filteredData = rawData.filter(row => {
                 if (severityFilter && row.standardSeverity !== severityFilter) return false;
-                if (otrFilter && row.otr !== otrFilter) return false
+                if (otrFilter && row.otr !== otrFilter) return false;
                 if (recordableFilter !== '' && row.recordable != recordableFilter) return false;
                 if (siteFilter && row.site !== siteFilter) return false;
                 
@@ -2134,128 +2134,445 @@ function updateOTRAnalysisChart(chart) {
         }
         
         // Generate PDF Report
-        function generatePDFReport() {
-            if (filteredData.length === 0) {
-                alert('No data to generate report. Please load data first.');
-                return;
-            }
-            
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            
-            // Title
-            doc.setFontSize(20);
-            doc.setTextColor(35, 47, 62);
-            doc.text('Injury & Illness Analysis Report', 105, 20, { align: 'center' });
-            
-            // Subtitle
-            doc.setFontSize(14);
-            doc.setTextColor(100);
-            doc.text('Amazon Austria WHS', 105, 30, { align: 'center' });
-            
-            // Date
-            doc.setFontSize(10);
-            doc.text(`Generated: ${new Date().toLocaleString()}`, 105, 38, { align: 'center' });
-            
-            // Executive Summary
-            doc.setFontSize(16);
-            doc.setTextColor(35, 47, 62);
-            doc.text('Executive Summary', 20, 55);
-            
-            const recordableCount = filteredData.filter(r => r.recordable === 1).length;
-            const lostTimeCount = filteredData.filter(r => r.total_dafw_days > 0).length;
-            const totalDaysLost = filteredData.reduce((sum, r) => sum + (r.total_dafw_days || 0), 0);
-            
-            doc.setFontSize(10);
-            doc.setTextColor(50);
-            const summaryY = 65;
-            doc.text(`Total Incidents: ${filteredData.length}`, 20, summaryY);
-            doc.text(`Recordable Cases: ${recordableCount}`, 20, summaryY + 7);
-            doc.text(`Lost Time Cases: ${lostTimeCount}`, 20, summaryY + 14);
-            doc.text(`Total Days Lost: ${totalDaysLost}`, 20, summaryY + 21);
-            
-            // Severity Distribution
-            doc.setFontSize(14);
-            doc.setTextColor(35, 47, 62);
-            doc.text('Severity Distribution', 20, summaryY + 35);
-            
-            const severityData = [
-                ['Severity Level', 'Count', 'Percentage'],
-                ['A - Critical', filteredData.filter(r => r.standardSeverity === 'A').length, 
-                 `${((filteredData.filter(r => r.standardSeverity === 'A').length / filteredData.length) * 100).toFixed(1)}%`],
-                ['B - High', filteredData.filter(r => r.standardSeverity === 'B').length,
-                 `${((filteredData.filter(r => r.standardSeverity === 'B').length / filteredData.length) * 100).toFixed(1)}%`],
-                ['C - Medium', filteredData.filter(r => r.standardSeverity === 'C').length,
-                 `${((filteredData.filter(r => r.standardSeverity === 'C').length / filteredData.length) * 100).toFixed(1)}%`],
-                ['D - Low', filteredData.filter(r => r.standardSeverity === 'D').length,
-                 `${((filteredData.filter(r => r.standardSeverity === 'D').length / filteredData.length) * 100).toFixed(1)}%`]
-            ];
-            
-            doc.autoTable({
-                startY: summaryY + 40,
-                head: [severityData[0]],
-                body: severityData.slice(1),
-                theme: 'striped',
-                headStyles: { fillColor: [35, 47, 62] }
-            });
-            
-            // Top Body Parts
-            doc.addPage();
-            doc.setFontSize(16);
-            doc.setTextColor(35, 47, 62);
-            doc.text('Top Affected Body Parts', 20, 20);
-            
-            const bodyPartCounts = {};
-            filteredData.forEach(row => {
-                const part = row.bodyPart || 'Unknown';
-                bodyPartCounts[part] = (bodyPartCounts[part] || 0) + 1;
-            });
-            
-            const topBodyParts = Object.entries(bodyPartCounts)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 10)
-                .map(([part, count]) => [
-                    part.substring(0, 50) + (part.length > 50 ? '...' : ''),
-                    count,
-                    `${((count / filteredData.length) * 100).toFixed(1)}%`
-                ]);
-            
-            doc.autoTable({
-                startY: 30,
-                head: [['Body Part', 'Cases', 'Percentage']],
-                body: topBodyParts,
-                theme: 'striped',
-                headStyles: { fillColor: [35, 47, 62] }
-            });
-            
-            // Action Items
-            const criticalIncidents = filteredData.filter(r => 
-                r.standardSeverity === 'A' || r.standardSeverity === 'B' || r.recordable === 1
-            );
-            const actions = generateActionItems(criticalIncidents);
-            
-            doc.setFontSize(16);
-            doc.setTextColor(35, 47, 62);
-            let yPos = doc.lastAutoTable.finalY + 20;
-            doc.text('Action Items', 20, yPos);
-            
-            doc.setFontSize(12);
-            yPos += 10;
-            doc.setTextColor(255, 87, 34);
-            doc.text('Immediate Actions:', 20, yPos);
-            
-            doc.setFontSize(10);
-            doc.setTextColor(50);
-            yPos += 7;
-            actions.immediate.forEach(action => {
-                if (yPos > 270) {
-                    doc.addPage();
-                    yPos = 20;
-                }
-                const lines = doc.splitTextToSize(`• ${action}`, 170);
-                doc.text(lines, 25, yPos);
-                yPos += lines.length * 5;
-            });
+       // Generate PDF Report
+function generatePDFReport() {
+    if (filteredData.length === 0) {
+        alert('No data to generate report. Please load data first.');
+        return;
+    }
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Helper functions for Amazon orange color
+    const setOrangeColor = () => doc.setTextColor(255, 153, 0);
+    const setDarkColor = () => doc.setTextColor(35, 47, 62);
+    const setGrayColor = () => doc.setTextColor(100, 100, 100);
+    
+    // Add Amazon logo area (orange bar at top)
+    doc.setFillColor(255, 153, 0);
+    doc.rect(0, 0, 210, 25, 'F');
+    
+    // Title on orange background
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont(undefined, 'bold');
+    doc.text('Injury & Illness Analysis Report', 105, 15, { align: 'center' });
+    
+    // Subtitle
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'normal');
+    const selectedSite = document.getElementById('siteFilter').value;
+    const siteName = selectedSite || 'All Sites - Austria Region';
+    doc.text(siteName, 105, 22, { align: 'center' });
+    
+    // Report info section
+    doc.setFillColor(245, 245, 245);
+    doc.rect(0, 25, 210, 20, 'F');
+    
+    setDarkColor();
+    doc.setFontSize(10);
+    doc.text(`Report Generated: ${new Date().toLocaleString('en-GB')}`, 15, 35);
+    doc.text(`Period: ${getReportPeriod()}`, 15, 40);
+    doc.text(`Total Incidents: ${filteredData.length}`, 120, 35);
+    doc.text(`Generated for: EHS Manager`, 120, 40);
+    
+    // Executive Summary Box
+    let yPos = 55;
+    doc.setFillColor(255, 249, 240);
+    doc.rect(10, yPos, 190, 55, 'F');
+    doc.setDrawColor(255, 153, 0);
+    doc.setLineWidth(0.5);
+    doc.rect(10, yPos, 190, 55);
+    
+    setDarkColor();
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text('Executive Summary', 15, yPos + 8);
+    
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'normal');
+    const recordableCount = filteredData.filter(r => r.recordable === 1).length;
+    const lostTimeCount = filteredData.filter(r => r.total_dafw_days > 0).length;
+    const totalDaysLost = filteredData.reduce((sum, r) => sum + (r.total_dafw_days || 0), 0);
+    const recordableRate = filteredData.length > 0 ? ((recordableCount / filteredData.length) * 100).toFixed(1) : '0';
+    const otrCount = filteredData.filter(r => r.otr === 'yes').length;
+    
+    doc.text(`• Total Injury & Illness Cases: ${filteredData.length}`, 15, yPos + 18);
+    doc.text(`• OSHA Recordable Cases: ${recordableCount} (${recordableRate}% of total)`, 15, yPos + 25);
+    doc.text(`• Lost Time Cases (DAFW): ${lostTimeCount} cases, ${totalDaysLost} total days lost`, 15, yPos + 32);
+    doc.text(`• On The Road (OTR) Incidents: ${otrCount}`, 15, yPos + 39);
+    doc.text(`• Most Affected Body Part: ${getTopBodyPart()}`, 15, yPos + 46);
+    
+    // Key Metrics Dashboard
+    yPos = 120;
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    setDarkColor();
+    doc.text('Key Performance Indicators', 15, yPos);
+    
+    // Create 4 metric boxes
+    yPos += 10;
+    const boxWidth = 45;
+    const boxHeight = 25;
+    const metrics = [
+        { label: 'Total Cases', value: filteredData.length, color: [35, 47, 62] },
+        { label: 'Recordable', value: recordableCount, color: [255, 87, 34] },
+        { label: 'Lost Time', value: lostTimeCount, color: [183, 28, 28] },
+        { label: 'Days Lost', value: totalDaysLost, color: [255, 153, 0] }
+    ];
+    
+    metrics.forEach((metric, index) => {
+        const xPos = 10 + (index * (boxWidth + 2));
+        
+        // Box background
+        doc.setFillColor(250, 250, 250);
+        doc.rect(xPos, yPos, boxWidth, boxHeight, 'F');
+        
+        // Colored top bar
+        doc.setFillColor(...metric.color);
+        doc.rect(xPos, yPos, boxWidth, 3, 'F');
+        
+        // Metric value
+        doc.setFontSize(20);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(...metric.color);
+        doc.text(metric.value.toString(), xPos + boxWidth/2, yPos + 14, { align: 'center' });
+        
+        // Label
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        setGrayColor();
+        doc.text(metric.label, xPos + boxWidth/2, yPos + 20, { align: 'center' });
+    });
+    
+    // Severity Distribution Chart
+    yPos = 165;
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    setDarkColor();
+    doc.text('Severity Distribution Analysis', 15, yPos);
+    
+    yPos += 10;
+    const severityData = [
+        { level: 'A - Critical', count: filteredData.filter(r => r.standardSeverity === 'A').length, color: [183, 28, 28] },
+        { level: 'B - High', count: filteredData.filter(r => r.standardSeverity === 'B').length, color: [255, 87, 34] },
+        { level: 'C - Medium', count: filteredData.filter(r => r.standardSeverity === 'C').length, color: [255, 193, 7] },
+        { level: 'D - Low', count: filteredData.filter(r => r.standardSeverity === 'D').length, color: [76, 175, 80] }
+    ];
+    
+    const maxCount = Math.max(...severityData.map(s => s.count), 1);
+    severityData.forEach((sev, index) => {
+        const barY = yPos + (index * 12);
+        const barWidth = (sev.count / maxCount) * 120;
+        const percentage = filteredData.length > 0 ? ((sev.count / filteredData.length) * 100).toFixed(1) : '0';
+        
+        // Label
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        setDarkColor();
+        doc.text(sev.level, 15, barY + 5);
+        
+        // Bar
+        doc.setFillColor(...sev.color);
+        doc.rect(55, barY, barWidth || 1, 8, 'F');
+        
+        // Count and percentage
+        doc.setFontSize(9);
+        setGrayColor();
+        doc.text(`${sev.count} (${percentage}%)`, 180, barY + 5);
+    });
+    
+    // Top Body Parts Table
+    yPos = 230;
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    setDarkColor();
+    doc.text('Top 5 Affected Body Parts', 15, yPos);
+    
+    const bodyPartCounts = {};
+    filteredData.forEach(row => {
+        const part = row.bodyPart || 'Unknown';
+        bodyPartCounts[part] = (bodyPartCounts[part] || 0) + 1;
+    });
+    
+    const topBodyParts = Object.entries(bodyPartCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
+    
+    // Table headers
+    yPos += 8;
+    doc.setFillColor(35, 47, 62);
+    doc.rect(15, yPos, 180, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.text('Body Part', 20, yPos + 5);
+    doc.text('Cases', 130, yPos + 5);
+    doc.text('Rate', 155, yPos + 5);
+    doc.text('Severity', 175, yPos + 5);
+    
+    // Table rows
+    yPos += 8;
+    doc.setFont(undefined, 'normal');
+    topBodyParts.forEach(([part, count], index) => {
+        if (index % 2 === 0) {
+            doc.setFillColor(250, 250, 250);
+            doc.rect(15, yPos, 180, 7, 'F');
+        }
+        
+        setDarkColor();
+        doc.setFontSize(9);
+        const shortPart = part.length > 40 ? part.substring(0, 40) + '...' : part;
+        doc.text(shortPart, 20, yPos + 5);
+        doc.text(count.toString(), 130, yPos + 5);
+        
+        // Calculate percentage
+        const percentage = ((count / filteredData.length) * 100).toFixed(1);
+        doc.text(`${percentage}%`, 155, yPos + 5);
+        
+        // Average severity indicator
+        const avgSeverity = getBodyPartAverageSeverity(part);
+        const severityColor = getSeverityColor(avgSeverity);
+        doc.setFillColor(...severityColor);
+        doc.circle(180, yPos + 3.5, 2, 'F');
+        
+        yPos += 7;
+    });
+    
+    // Footer for page 1
+    doc.setFontSize(8);
+    setGrayColor();
+    doc.text('Amazon WHS - Injury & Illness Analysis Tool', 105, 285, { align: 'center' });
+    doc.text('Page 1 of 2', 195, 285);
+    
+    // Add new page for detailed analysis
+    doc.addPage();
+    
+    // Header for page 2
+    doc.setFillColor(255, 153, 0);
+    doc.rect(0, 0, 210, 15, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text('Root Cause Analysis & Action Plan', 105, 10, { align: 'center' });
+    
+    // Root Cause Analysis
+    yPos = 30;
+    setDarkColor();
+    doc.setFontSize(14);
+    doc.text('Primary Root Causes', 15, yPos);
+    
+    const rootCauseCounts = {};
+    filteredData.forEach(row => {
+        const cause = row.rootCause || 'Under Investigation';
+        rootCauseCounts[cause] = (rootCauseCounts[cause] || 0) + 1;
+    });
+    
+    const topCauses = Object.entries(rootCauseCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6);
+    
+    yPos += 10;
+    topCauses.forEach(([cause, count], index) => {
+        const percentage = ((count / filteredData.length) * 100).toFixed(1);
+        
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        const shortCause = cause.length > 30 ? cause.substring(0, 30) + '...' : cause;
+        doc.text(`${shortCause}:`, 20, yPos);
+        
+        // Progress bar
+        const barWidth = (count / filteredData.length) * 100;
+        doc.setFillColor(255, 153, 0);
+        doc.rect(80, yPos - 4, barWidth, 4, 'F');
+        doc.setDrawColor(200, 200, 200);
+        doc.rect(80, yPos - 4, 100, 4);
+        
+        doc.text(`${count} (${percentage}%)`, 185, yPos);
+        
+        yPos += 8;
+    });
+    
+    // OTR Analysis Section
+    yPos += 10;
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    setDarkColor();
+    doc.text('On The Road (OTR) Analysis', 15, yPos);
+    
+    yPos += 8;
+    const otrYes = filteredData.filter(r => r.otr === 'yes').length;
+    const otrNo = filteredData.filter(r => r.otr === 'no').length;
+    const otrPercentage = filteredData.length > 0 ? ((otrYes / filteredData.length) * 100).toFixed(1) : '0';
+    
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(`OTR Incidents: ${otrYes} (${otrPercentage}%)`, 20, yPos);
+    doc.text(`Non-OTR Incidents: ${otrNo} (${100 - parseFloat(otrPercentage)}%)`, 110, yPos);
+    
+    // Action Recommendations
+    yPos += 20;
+    doc.setFillColor(255, 249, 240);
+    doc.rect(10, yPos, 190, 90, 'F');
+    doc.setDrawColor(255, 153, 0);
+    doc.setLineWidth(0.5);
+    doc.rect(10, yPos, 190, 90);
+    
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    setOrangeColor();
+    doc.text('Recommended Actions', 15, yPos + 8);
+    
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    setDarkColor();
+    
+    const criticalIncidents = filteredData.filter(r => 
+        r.standardSeverity === 'A' || r.standardSeverity === 'B' || r.recordable === 1
+    );
+    const actions = generateActionItems(criticalIncidents);
+    const recommendations = [];
+    
+    // Generate specific recommendations
+    if (recordableCount > 5) {
+        recommendations.push(`Immediate safety stand-down required for ${recordableCount} recordable cases`);
+    }
+    if (lostTimeCount > 0) {
+        recommendations.push(`Review return-to-work programs for ${lostTimeCount} DAFW cases`);
+    }
+    if (otrYes > 2) {
+        recommendations.push(`Implement driver safety training to address ${otrYes} OTR incidents`);
+    }
+    
+    // Add top body part recommendation
+    const topBodyPart = getTopBodyPart();
+    if (topBodyPart !== 'N/A') {
+        recommendations.push(`Ergonomic assessment needed for "${topBodyPart}" injuries`);
+    }
+    
+    // Add top root cause recommendation
+    if (topCauses.length > 0 && topCauses[0][1] > 2) {
+        recommendations.push(`Address "${topCauses[0][0]}" root cause (${topCauses[0][1]} cases)`);
+    }
+    
+    let recY = yPos + 18;
+    recommendations.slice(0, 6).forEach((rec, index) => {
+        if (recY > yPos + 85) return; // Stay within box
+        doc.text(`${index + 1}. ${rec}`, 15, recY, { maxWidth: 180 });
+        recY += 12;
+    });
+    
+    // Trend Summary
+    yPos = 200;
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    setDarkColor();
+    doc.text('Monthly Trend Summary', 15, yPos);
+    
+    yPos += 8;
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    const trendSummary = getMonthlyTrendSummary();
+    doc.text(trendSummary, 15, yPos, { maxWidth: 180 });
+    
+    // Site-specific metrics if filtered
+    if (selectedSite) {
+        yPos += 20;
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text(`${selectedSite} Specific Metrics:`, 15, yPos);
+        
+        yPos += 8;
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        const siteRecordableRate = recordableCount > 0 ? ((recordableCount / filteredData.length) * 200000 / 40).toFixed(2) : '0.00';
+        doc.text(`• Estimated TRIR: ${siteRecordableRate} (per 200,000 hours)`, 20, yPos);
+        doc.text(`• DAFW Rate: ${(lostTimeCount / filteredData.length * 100).toFixed(1)}%`, 20, yPos + 7);
+    }
+    
+    // Footer
+    doc.setFontSize(8);
+    setGrayColor();
+    doc.text('Amazon WHS - Injury & Illness Analysis Tool', 105, 285, { align: 'center' });
+    doc.text('Page 2 of 2', 195, 285);
+    
+    // Save the PDF
+    doc.save(`InjuryIllnessReport_${selectedSite || 'AllSites'}_${new Date().toISOString().split('T')[0]}.pdf`);
+    
+    showStatus('Professional PDF report generated successfully!', 'success');
+}
+
+// Helper functions for PDF generation
+function getReportPeriod() {
+    if (filteredData.length === 0) return 'No data';
+    
+    const dates = filteredData
+        .map(r => r.parsedDate)
+        .filter(d => d && !isNaN(d))
+        .sort((a, b) => a - b);
+    
+    if (dates.length === 0) return 'Date range not available';
+    
+    const start = dates[0].toLocaleDateString('en-GB');
+    const end = dates[dates.length - 1].toLocaleDateString('en-GB');
+    
+    return `${start} - ${end}`;
+}
+
+function getTopBodyPart() {
+    const bodyPartCounts = {};
+    filteredData.forEach(row => {
+        const part = row.bodyPart || 'Unknown';
+        bodyPartCounts[part] = (bodyPartCounts[part] || 0) + 1;
+    });
+    
+    const sorted = Object.entries(bodyPartCounts).sort((a, b) => b[1] - a[1]);
+    return sorted.length > 0 ? sorted[0][0] : 'N/A';
+}
+
+function getBodyPartAverageSeverity(bodyPart) {
+    const partIncidents = filteredData.filter(r => r.bodyPart === bodyPart);
+    
+    let severityScore = 0;
+    let count = 0;
+    
+    partIncidents.forEach(incident => {
+        const severityMap = { 'A': 4, 'B': 3, 'C': 2, 'D': 1 };
+        if (severityMap[incident.standardSeverity]) {
+            severityScore += severityMap[incident.standardSeverity];
+            count++;
+        }
+    });
+    
+    return count > 0 ? severityScore / count : 0;
+}
+
+function getSeverityColor(avgSeverity) {
+    if (avgSeverity >= 3.5) return [183, 28, 28]; // Red
+    if (avgSeverity >= 2.5) return [255, 87, 34]; // Orange
+    if (avgSeverity >= 1.5) return [255, 193, 7]; // Yellow
+    return [76, 175, 80]; // Green
+}
+
+function getMonthlyTrendSummary() {
+    const monthlyData = {};
+    filteredData.forEach(row => {
+        if (row.parsedDate && !isNaN(row.parsedDate)) {
+            const monthKey = `${row.parsedDate.getFullYear()}-${String(row.parsedDate.getMonth() + 1).padStart(2, '0')}`;
+            monthlyData[monthKey] = (monthlyData[monthKey] || 0) + 1;
+        }
+    });
+    
+    const sortedMonths = Object.keys(monthlyData).sort();
+    if (sortedMonths.length < 2) return 'Insufficient data for trend analysis.';
+    
+    const recentMonth = monthlyData[sortedMonths[sortedMonths.length - 1]];
+    const previousMonth = monthlyData[sortedMonths[sortedMonths.length - 2]];
+    const change = ((recentMonth - previousMonth) / previousMonth * 100).toFixed(1);
+    
+    return `Most recent month shows ${recentMonth} incidents, ${change > 0 ? 'an increase' : 'a decrease'} of ${Math.abs(change)}% from the previous month. Average monthly incidents: ${(Object.values(monthlyData).reduce((a, b) => a + b, 0) / sortedMonths.length).toFixed(1)}.`;
+}
             
             // Save the PDF
             doc.save(`InjuryIllnessReport_${new Date().toISOString().split('T')[0]}.pdf`);
