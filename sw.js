@@ -42,6 +42,11 @@ self.addEventListener('fetch', event => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // Skip chrome-extension and other non-http(s) requests
+  if (!request.url.startsWith('http')) {
+    return;
+  }
+
   // API calls - network first, fallback to cache
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/.netlify/functions/')) {
     event.respondWith(
@@ -122,7 +127,12 @@ async function syncAudits() {
     const db = await openDB();
     const tx = db.transaction('pending_audits', 'readonly');
     const store = tx.objectStore('pending_audits');
-    const pendingAudits = await store.getAll();
+    const request = store.getAll();
+    
+    const pendingAudits = await new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
     
     for (const audit of pendingAudits) {
       try {
@@ -152,7 +162,7 @@ async function syncAudits() {
 // Helper to open IndexedDB
 function openDB() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('WHSAuditDB', 1);
+    const request = indexedDB.open('WHSAuditDB', 2);
     
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
