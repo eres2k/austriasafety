@@ -496,12 +496,11 @@
                 <div class="sub-metric">Requires immediate action</div>
             </div>
             
-            <div class="card">
-                <h3>Primary Impact Distribution</h3>
-                <div class="chart-container">
-                    <canvas id="impactChart"></canvas>
-                </div>
-            </div>
+         <div class="card">
+    <h3>Repeat Locations</h3>
+    <div class="metric" id="repeatLocationCount">0</div>
+    <div class="sub-metric" id="repeatLocationLabel">Locations with 2+ incidents</div>
+</div>
             
             <div class="card">
                 <h3>Chart 1</h3>
@@ -919,30 +918,65 @@
             updateCharts();
             updateRiskMatrix();
         }
-        
-        // Update dashboard metrics
-        function updateDashboard() {
-            document.getElementById('totalCount').textContent = filteredData.length;
-            
-            // Update label based on selected site
-            const selectedSite = document.getElementById('siteFilter').value;
-           const siteLabel = selectedSite ? `${selectedSite} - Year to Date` : 'All Sites - Year to Date';
-            document.getElementById('totalCountLabel').textContent = siteLabel;
-            
-            const risks = filteredData
-                .map(row => parseFloat(row.risk))
-                .filter(r => !isNaN(r) && r > 0);
-            const avgRisk = risks.length > 0 
-                ? (risks.reduce((a, b) => a + b, 0) / risks.length).toFixed(1) 
-                : '0.0';
-            document.getElementById('avgRisk').textContent = avgRisk;
-            
-            // High severity cases (A and B)
-            const highSeverityCount = filteredData.filter(row => 
-                row.severity === 'A' || row.severity === 'B'
-            ).length;
-            document.getElementById('highSeverityCount').textContent = highSeverityCount;
-        }
+
+        // Calculate locations with multiple incidents
+function calculateRepeatLocations() {
+    if (filteredData.length === 0) {
+        document.getElementById('repeatLocationCount').textContent = '0';
+        document.getElementById('repeatLocationLabel').textContent = 'Locations with 2+ incidents';
+        return;
+    }
+    
+    // Count incidents per location
+    const locationCounts = {};
+    filteredData.forEach(row => {
+        const location = row.initial_info_location_event || 'Unknown';
+        locationCounts[location] = (locationCounts[location] || 0) + 1;
+    });
+    
+    // Count locations with 2 or more incidents
+    const repeatLocations = Object.entries(locationCounts)
+        .filter(([location, count]) => count >= 2);
+    
+    const repeatCount = repeatLocations.length;
+    const totalRepeatIncidents = repeatLocations.reduce((sum, [, count]) => sum + count, 0);
+    
+    document.getElementById('repeatLocationCount').textContent = repeatCount;
+    
+    if (repeatCount > 0) {
+        const percentage = ((totalRepeatIncidents / filteredData.length) * 100).toFixed(0);
+        document.getElementById('repeatLocationLabel').textContent = 
+            `${percentage}% of all incidents`;
+    } else {
+        document.getElementById('repeatLocationLabel').textContent = 'No repeat locations';
+    }
+}
+  // Update dashboard metrics
+function updateDashboard() {
+    document.getElementById('totalCount').textContent = filteredData.length;
+    
+    // Update label based on selected site
+    const selectedSite = document.getElementById('siteFilter').value;
+    const siteLabel = selectedSite ? `${selectedSite} - Year to Date` : 'All Sites - Year to Date';
+    document.getElementById('totalCountLabel').textContent = siteLabel;
+    
+    const risks = filteredData
+        .map(row => parseFloat(row.risk))
+        .filter(r => !isNaN(r) && r > 0);
+    const avgRisk = risks.length > 0 
+        ? (risks.reduce((a, b) => a + b, 0) / risks.length).toFixed(1) 
+        : '0.0';
+    document.getElementById('avgRisk').textContent = avgRisk;
+    
+    // High severity cases (A and B)
+    const highSeverityCount = filteredData.filter(row => 
+        row.severity === 'A' || row.severity === 'B'
+    ).length;
+    document.getElementById('highSeverityCount').textContent = highSeverityCount;
+    
+    // Repeat locations count
+    calculateRepeatLocations();
+}
         
         // Update data table
         function updateTable() {
@@ -981,50 +1015,26 @@
             }).join('');
         }
         
-        // Initialize charts
-        function initializeCharts() {
-            // Initialize impact chart
-            const impactCtx = document.getElementById('impactChart');
-            if (impactCtx) {
-                charts.impact = new Chart(impactCtx.getContext('2d'), {
-                    type: 'doughnut',
-                    data: {
-                        labels: [],
-                        datasets: [{
-                            data: [],
-                            backgroundColor: ['#FF9900', '#232F3E', '#37475A', '#FF5722', '#4CAF50']
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'bottom'
-                            }
-                        }
-                    }
-                });
+      // Initialize charts
+function initializeCharts() {
+    // Initialize customizable charts
+    for (let i = 1; i <= 4; i++) {
+        const ctx = document.getElementById(`customChart${i}`).getContext('2d');
+        charts[`custom${i}`] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
             }
-            
-            // Initialize customizable charts
-            for (let i = 1; i <= 4; i++) {
-                const ctx = document.getElementById(`customChart${i}`).getContext('2d');
-                charts[`custom${i}`] = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: [],
-                        datasets: []
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false
-                    }
-                });
-            }
-            
-            console.log('Charts initialized');
-        }
+        });
+    }
+    
+    console.log('Charts initialized');
+}
         
         // Update specific chart based on selection
         function updateChart(chartNumber) {
@@ -1379,34 +1389,15 @@
             chart.update();
         }
         
-        // Update charts with data
-        function updateCharts() {
-            if (filteredData.length === 0) return;
-            
-            // Update impact chart
-            if (charts.impact) {
-                const impactCounts = {};
-                filteredData.forEach(row => {
-                    const impact = row.initial_info_primary_impact || 'Unknown';
-                    impactCounts[impact] = (impactCounts[impact] || 0) + 1;
-                });
-                
-                const topImpacts = Object.entries(impactCounts)
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 5);
-                
-                // Clear and set new data
-                charts.impact.data.labels = [];
-                charts.impact.data.datasets = [];
-                
-                charts.impact.data.labels = topImpacts.map(([impact]) => impact);
-                charts.impact.data.datasets.push({
-                    data: topImpacts.map(([, count]) => count),
-                    backgroundColor: ['#FF9900', '#232F3E', '#37475A', '#FF5722', '#4CAF50'],
-                    label: 'Incidents'
-                });
-                charts.impact.update();
-            }
+      // Update charts with data
+function updateCharts() {
+    if (filteredData.length === 0) return;
+    
+    // Update customizable charts
+    for (let i = 1; i <= 4; i++) {
+        updateChart(i);
+    }
+}
             
             // Update customizable charts
             for (let i = 1; i <= 4; i++) {
