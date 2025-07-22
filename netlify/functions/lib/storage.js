@@ -1,7 +1,13 @@
 // netlify/functions/lib/storage.js
 // Persistent storage service using Netlify Blobs or fallback options
 
-const { getStore } = require("@netlify/blobs");
+let getStore;
+try {
+  const netlifyBlobs = require("@netlify/blobs");
+  getStore = netlifyBlobs.getStore;
+} catch (error) {
+  console.log('Netlify Blobs not available, using fallback storage');
+}
 
 class StorageService {
   constructor(context) {
@@ -12,16 +18,22 @@ class StorageService {
   async initialize() {
     try {
       // Try to use Netlify Blobs if available
-      if (this.context && this.context.blobs) {
-        this.store = getStore("whs-audit-data");
+      if (this.context && typeof getStore === 'function') {
+        this.store = getStore({
+          name: "whs-audit-data",
+          consistency: "strong"
+        });
         this.storageType = 'netlify-blobs';
+        console.log('Using Netlify Blobs storage');
       } else {
         // Fallback to environment variable storage for demo
         this.storageType = 'env-fallback';
+        console.log('Using environment variable fallback storage');
       }
     } catch (error) {
       console.error('Storage initialization error:', error);
       this.storageType = 'memory';
+      console.log('Using in-memory storage');
     }
   }
 
@@ -63,6 +75,13 @@ class StorageService {
 
   async append(key, item) {
     const data = (await this.get(key)) || [];
+    
+    // Ensure we have an array
+    if (!Array.isArray(data)) {
+      console.error(`Expected array for key ${key}, got:`, typeof data);
+      return false;
+    }
+    
     data.push(item);
     return await this.set(key, data);
   }
@@ -76,10 +95,22 @@ class StorageService {
           username: 'admin@amazon.at',
           role: 'admin',
           name: 'Admin User'
+        },
+        { 
+          id: '2',
+          username: 'safety@amazon.at',
+          role: 'auditor',
+          name: 'Safety Officer'
+        },
+        { 
+          id: '3',
+          username: 'manager@amazon.at',
+          role: 'viewer',
+          name: 'Area Manager'
         }
       ],
       metadata: {
-        version: '1.0.0',
+        version: '2.0.0',
         lastSync: new Date().toISOString()
       }
     };
