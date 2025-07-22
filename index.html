@@ -3,10 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#ff9900">
     <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="icon-192.svg">
+    <link rel="apple-touch-icon" href="icon-192.svg">
     <title>WHS Safety Audit - Amazon Austria</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -1480,6 +1483,28 @@
             font-weight: 500;
         }
 
+        /* Demo Accounts */
+        .demo-accounts {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #e1e4e8;
+            font-size: 0.875rem;
+            color: var(--gray);
+            text-align: center;
+        }
+
+        .demo-accounts h4 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--secondary);
+        }
+
+        .demo-accounts p {
+            margin: 0.25rem 0;
+            font-family: monospace;
+        }
+
         /* Responsive */
         @media (min-width: 768px) {
             .stats-grid {
@@ -1650,7 +1675,7 @@
                             </svg>
                             <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
                         </button>
-                        <button class="icon-btn" onclick="syncData()" title="Daten synchronisieren">
+                        <button class="icon-btn" id="syncButton" onclick="syncData()" title="Daten synchronisieren">
                             <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                             </svg>
@@ -1968,9 +1993,9 @@
 
     <script>
         // API Configuration
-       const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:8888/api' : '/api';
+        const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:8888/api' : '/api';
         
-        // Audit Questions (same as before)
+        // Audit Questions (same as before but can be imported)
         const auditQuestions = {
             "1": {
                 "title": "ALLGEMEINE SICHERHEIT",
@@ -2407,26 +2432,36 @@
 
         // Save photo to IndexedDB
         async function savePhoto(photoData) {
-            const db = await initializeDatabase();
-            const tx = db.transaction('photos', 'readwrite');
-            const store = tx.objectStore('photos');
-            
-            const photo = {
-                id: Date.now().toString(),
-                data: photoData,
-                timestamp: new Date().toISOString()
-            };
-            
-            await store.add(photo);
-            return photo.id;
+            try {
+                const db = await initializeDatabase();
+                const tx = db.transaction('photos', 'readwrite');
+                const store = tx.objectStore('photos');
+                
+                const photo = {
+                    id: Date.now().toString(),
+                    data: photoData,
+                    timestamp: new Date().toISOString()
+                };
+                
+                await store.add(photo);
+                return photo.id;
+            } catch (error) {
+                console.error('Error saving photo:', error);
+                return null;
+            }
         }
 
         // Get photo from IndexedDB
         async function getPhoto(id) {
-            const db = await initializeDatabase();
-            const tx = db.transaction('photos', 'readonly');
-            const store = tx.objectStore('photos');
-            return await store.get(id);
+            try {
+                const db = await initializeDatabase();
+                const tx = db.transaction('photos', 'readonly');
+                const store = tx.objectStore('photos');
+                return await store.get(id);
+            } catch (error) {
+                console.error('Error getting photo:', error);
+                return null;
+            }
         }
 
         // Update online status indicator
@@ -2440,6 +2475,38 @@
             } else {
                 statusDot.classList.add('offline');
                 statusText.textContent = 'Offline';
+            }
+            
+            updateSyncButtonStatus();
+        }
+
+        // Update sync button status
+        function updateSyncButtonStatus() {
+            const syncButton = document.getElementById('syncButton');
+            if (!syncButton) return;
+            
+            const hasPendingSync = localStorage.getItem('pendingSync') === 'true';
+            
+            if (!isOnline) {
+                syncButton.style.opacity = '0.5';
+                syncButton.style.cursor = 'not-allowed';
+                syncButton.title = 'Offline - Keine Synchronisation möglich';
+            } else if (!hasPendingSync) {
+                syncButton.style.opacity = '0.5';
+                syncButton.title = 'Keine ausstehenden Daten';
+            } else {
+                syncButton.style.opacity = '1';
+                syncButton.style.cursor = 'pointer';
+                syncButton.title = 'Daten synchronisieren';
+                
+                // Badge für ausstehende Sync
+                if (!syncButton.querySelector('.notification-badge')) {
+                    const badge = document.createElement('span');
+                    badge.className = 'notification-badge';
+                    badge.textContent = '!';
+                    badge.style.background = 'var(--warning)';
+                    syncButton.appendChild(badge);
+                }
             }
         }
 
@@ -2486,24 +2553,24 @@
         }
 
         // Authentication
-       async function checkAuth() {
-    const token = localStorage.getItem('authToken');
-    const savedUser = localStorage.getItem('currentUser');
-    
-    if (savedUser) {
-        // We have a saved user, use it
-        currentUser = JSON.parse(savedUser);
-        showApp();
-        console.log('Logged in as:', currentUser.name);
-        
-        // Try to verify token if online
-        if (isOnline && token) {
-            // ... optional verification
+        async function checkAuth() {
+            const token = localStorage.getItem('authToken');
+            const savedUser = localStorage.getItem('currentUser');
+            
+            if (savedUser) {
+                // We have a saved user, use it
+                currentUser = JSON.parse(savedUser);
+                showApp();
+                console.log('Logged in as:', currentUser.name);
+                
+                // Try to verify token if online
+                if (isOnline && token) {
+                    // ... optional verification
+                }
+            } else {
+                showLogin();
+            }
         }
-    } else {
-        showLogin();
-    }
-}
 
         async function handleLogin(e) {
             e.preventDefault();
@@ -2542,35 +2609,7 @@
                 }
             }
         }
-// NEU - Visueller Sync-Indikator:
-function updateSyncButtonStatus() {
-    const syncButton = document.getElementById('syncButton');
-    if (!syncButton) return;
-    
-    const hasPendingSync = localStorage.getItem('pendingSync') === 'true';
-    
-    if (!isOnline) {
-        syncButton.style.opacity = '0.5';
-        syncButton.style.cursor = 'not-allowed';
-        syncButton.title = 'Offline - Keine Synchronisation möglich';
-    } else if (!hasPendingSync) {
-        syncButton.style.opacity = '0.5';
-        syncButton.title = 'Keine ausstehenden Daten';
-    } else {
-        syncButton.style.opacity = '1';
-        syncButton.style.cursor = 'pointer';
-        syncButton.title = 'Daten synchronisieren';
-        
-        // Badge für ausstehende Sync
-        if (!syncButton.querySelector('.notification-badge')) {
-            const badge = document.createElement('span');
-            badge.className = 'notification-badge';
-            badge.textContent = '!';
-            badge.style.background = 'var(--warning)';
-            syncButton.appendChild(badge);
-        }
-    }
-}
+
         function logout() {
             localStorage.removeItem('authToken');
             localStorage.removeItem('currentUser');
@@ -2926,15 +2965,17 @@ function updateSyncButtonStatus() {
                     const photoData = e.target.result;
                     const photoId = await savePhoto(photoData);
                     
-                    currentAudit.photos[currentPhotoQuestionId].push(photoId);
-                    
-                    const photoItem = document.createElement('div');
-                    photoItem.className = 'photo-item';
-                    photoItem.innerHTML = `
-                        <img src="${photoData}" alt="Audit Photo" onclick="viewPhoto('${photoData}')">
-                        <button class="photo-remove" onclick="removePhoto('${currentPhotoQuestionId}', '${photoId}', this)">×</button>
-                    `;
-                    photoGrid.appendChild(photoItem);
+                    if (photoId) {
+                        currentAudit.photos[currentPhotoQuestionId].push(photoId);
+                        
+                        const photoItem = document.createElement('div');
+                        photoItem.className = 'photo-item';
+                        photoItem.innerHTML = `
+                            <img src="${photoData}" alt="Audit Photo" onclick="viewPhoto('${photoData}')">
+                            <button class="photo-remove" onclick="removePhoto('${currentPhotoQuestionId}', '${photoId}', this)">×</button>
+                        `;
+                        photoGrid.appendChild(photoItem);
+                    }
                 };
                 reader.readAsDataURL(file);
             }
@@ -3035,11 +3076,18 @@ function updateSyncButtonStatus() {
                     localAudits.push(currentAudit);
                     localStorage.setItem('localAudits', JSON.stringify(localAudits));
                     localStorage.setItem('pendingSync', 'true');
+                    updateSyncButtonStatus();
                     showNotification('Audit lokal gespeichert', 'info', 'Wird bei Verbindung synchronisiert');
                 }
             } catch (error) {
                 console.error('Failed to save audit:', error);
-                showNotification('Fehler beim Speichern', 'error');
+                // Save locally as fallback
+                const localAudits = JSON.parse(localStorage.getItem('localAudits') || '[]');
+                localAudits.push(currentAudit);
+                localStorage.setItem('localAudits', JSON.stringify(localAudits));
+                localStorage.setItem('pendingSync', 'true');
+                updateSyncButtonStatus();
+                showNotification('Audit lokal gespeichert', 'info');
             }
             
             // Generate PDF
@@ -3677,11 +3725,20 @@ function updateSyncButtonStatus() {
                     const db = await initializeDatabase();
                     const tx = db.transaction('users', 'readonly');
                     const store = tx.objectStore('users');
-                    users = await store.getAll();
+                    const localUsers = await store.getAll();
+                    users = localUsers.length > 0 ? localUsers : [
+                        { id: '1', username: 'admin@amazon.at', name: 'Admin User', role: 'admin' },
+                        { id: '2', username: 'safety@amazon.at', name: 'Safety Officer', role: 'auditor' },
+                        { id: '3', username: 'manager@amazon.at', name: 'Area Manager', role: 'viewer' }
+                    ];
                 }
             } catch (error) {
                 console.error('Failed to load users:', error);
-                users = [];
+                users = [
+                    { id: '1', username: 'admin@amazon.at', name: 'Admin User', role: 'admin' },
+                    { id: '2', username: 'safety@amazon.at', name: 'Safety Officer', role: 'auditor' },
+                    { id: '3', username: 'manager@amazon.at', name: 'Area Manager', role: 'viewer' }
+                ];
             }
         }
 
@@ -4081,18 +4138,21 @@ function updateSyncButtonStatus() {
                 const pendingAudits = await store.getAll();
                 
                 let syncCount = 0;
-                for (const audit of pendingAudits) {
-                    try {
-                        await apiCall('/audits', 'POST', audit);
-                        await store.delete(audit.id);
-                        syncCount++;
-                    } catch (error) {
-                        console.error('Failed to sync audit:', audit.id);
+                if (pendingAudits && pendingAudits.length > 0) {
+                    for (const audit of pendingAudits) {
+                        try {
+                            await apiCall('/audits', 'POST', audit);
+                            await store.delete(audit.id);
+                            syncCount++;
+                        } catch (error) {
+                            console.error('Failed to sync audit:', audit.id);
+                        }
                     }
                 }
                 
                 if (syncCount > 0) {
                     localStorage.removeItem('pendingSync');
+                    updateSyncButtonStatus();
                     showNotification(`${syncCount} Audits synchronisiert`, 'success');
                     loadDashboard();
                 } else {
@@ -4340,7 +4400,6 @@ function updateSyncButtonStatus() {
                 <div class="action-sheet-option" onclick="showPage('settings', null); hideActionSheet();">
                     <svg class="action-sheet-option-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                     </svg>
                     <span class="action-sheet-option-text">Einstellungen</span>
@@ -4458,12 +4517,12 @@ function updateSyncButtonStatus() {
         // Error handling
         window.addEventListener('error', (e) => {
             console.error('Application error:', e.error);
-            showNotification('Ein Fehler ist aufgetreten', 'error');
+            // Don't show notification for every error to avoid annoying the user
         });
 
         window.addEventListener('unhandledrejection', (e) => {
             console.error('Unhandled promise rejection:', e.reason);
-            showNotification('Ein unerwarteter Fehler ist aufgetreten', 'error');
+            // Don't show notification for every rejection
         });
 
         // Initialize demo data for first time users
@@ -4559,25 +4618,31 @@ function updateSyncButtonStatus() {
         }
 
         async function cleanupOldPhotos() {
-            const db = await initializeDatabase();
-            const tx = db.transaction('photos', 'readwrite');
-            const store = tx.objectStore('photos');
-            const photos = await store.getAll();
-            
-            const maxAge = 90 * 24 * 60 * 60 * 1000; // 90 days
-            const now = Date.now();
-            let deletedCount = 0;
-            
-            for (const photo of photos) {
-                const photoDate = new Date(photo.timestamp).getTime();
-                if ((now - photoDate) > maxAge) {
-                    await store.delete(photo.id);
-                    deletedCount++;
+            try {
+                const db = await initializeDatabase();
+                const tx = db.transaction('photos', 'readwrite');
+                const store = tx.objectStore('photos');
+                const photos = await store.getAll();
+                
+                if (!photos || photos.length === 0) return;
+                
+                const maxAge = 90 * 24 * 60 * 60 * 1000; // 90 days
+                const now = Date.now();
+                let deletedCount = 0;
+                
+                for (const photo of photos) {
+                    const photoDate = new Date(photo.timestamp).getTime();
+                    if ((now - photoDate) > maxAge) {
+                        await store.delete(photo.id);
+                        deletedCount++;
+                    }
                 }
-            }
-            
-            if (deletedCount > 0) {
-                console.log(`Cleaned up ${deletedCount} old photos`);
+                
+                if (deletedCount > 0) {
+                    console.log(`Cleaned up ${deletedCount} old photos`);
+                }
+            } catch (error) {
+                console.error('Error cleaning up photos:', error);
             }
         }
 
