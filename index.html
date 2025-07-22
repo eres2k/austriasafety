@@ -2537,6 +2537,106 @@
             }
         }
 
+        async function checkAuth() {
+            const token = localStorage.getItem('authToken');
+            
+            if (token) {
+                try {
+                    // Try to verify token with the server if online
+                    if (isOnline) {
+                        const response = await apiCall('/auth/verify', 'GET');
+                        if (response.ok) {
+                            const userData = await response.json();
+                            currentUser = userData;
+                            showApp();
+                        } else {
+                            // Token invalid, clear it
+                            localStorage.removeItem('authToken');
+                            localStorage.removeItem('currentUser');
+                            showLogin();
+                        }
+                    } else {
+                        // Offline - use cached user data
+                        const cachedUser = localStorage.getItem('currentUser');
+                        if (cachedUser) {
+                            currentUser = JSON.parse(cachedUser);
+                            showApp();
+                        } else {
+                            showLogin();
+                        }
+                    }
+                } catch (error) {
+                    console.log('Auth check failed, using cached data:', error);
+                    // If API call fails, try to use cached user
+                    const cachedUser = localStorage.getItem('currentUser');
+                    if (cachedUser) {
+                        currentUser = JSON.parse(cachedUser);
+                        showApp();
+                    } else {
+                        showLogin();
+                    }
+                }
+            } else {
+                showLogin();
+            }
+        }
+            async function handleLogin(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                // For local development without backend, use demo credentials
+                const demoUsers = {
+                    'admin@amazon.at': { password: 'admin123', name: 'Admin User', role: 'admin' },
+                    'safety@amazon.at': { password: 'safety123', name: 'Safety Officer', role: 'auditor' },
+                    'manager@amazon.at': { password: 'manager123', name: 'Area Manager', role: 'viewer' }
+                };
+                
+                // First try API if online
+                if (isOnline) {
+                    try {
+                        const response = await apiCall('/auth/login', 'POST', { username, password });
+                        if (response.ok) {
+                            const data = await response.json();
+                            localStorage.setItem('authToken', data.token);
+                            currentUser = data.user;
+                            localStorage.setItem('currentUser', JSON.stringify(data.user));
+                            showApp();
+                            showNotification('Erfolgreich angemeldet', 'success');
+                            return;
+                        } else {
+                            throw new Error('Invalid credentials');
+                        }
+                    } catch (apiError) {
+                        console.log('API login failed, trying demo mode:', apiError);
+                        // Fall through to demo mode
+                    }
+                }
+                
+                // Demo mode fallback for local development
+                const demoUser = demoUsers[username.toLowerCase()];
+                if (demoUser && password === demoUser.password) {
+                    const token = btoa(JSON.stringify({ username, exp: Date.now() + 86400000 }));
+                    localStorage.setItem('authToken', token);
+                    currentUser = {
+                        username: username.toLowerCase(),
+                        name: demoUser.name,
+                        role: demoUser.role
+                    };
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    showApp();
+                    showNotification('Erfolgreich angemeldet (Demo-Modus)', 'success');
+                } else {
+                    throw new Error('Invalid credentials');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showError('Ungültige Anmeldedaten');
+            }
+        }
+
         // Event Listeners
     function setupEventListeners() {
     const loginForm = document.getElementById('loginForm');
@@ -4619,7 +4719,29 @@
             cleanupOldPhotos();
         }
 
-        
+         // Clean up old photos from IndexedDB
+        async function cleanupOldPhotos() {
+            try {
+                const db = await initializeDatabase();
+                const tx = db.transaction('photos', 'readwrite');
+                const store = tx.objectStore('photos');
+                const maxAge = 90 * 24 * 60 * 60 * 1000; // 90 days
+                const now = Date.now();
+                
+                // Get all photos
+                const allPhotos = await store.getAll();
+                
+                // Delete old photos
+                for (const photo of allPhotos) {
+                    const photoDate = new Date(photo.timestamp).getTime();
+                    if ((now - photoDate) > maxAge) {
+                        await store.delete(photo.id);
+                    }
+                }
+            } catch (error) {
+                console.error('Error cleaning up old photos:', error);
+            }
+        }
         
 
         // Run cleanup on startup
