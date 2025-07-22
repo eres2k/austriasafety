@@ -433,12 +433,14 @@
                         <option value="0">Non-Recordable Only</option>
                     </select>
                 </div>
-                <div class="filter-group">
-                    <label>Body Part:</label>
-                    <select id="bodyPartFilter">
-                        <option value="">All Body Parts</option>
-                    </select>
-                </div>
+               <div class="filter-group">
+    <label>OTR (On The Road):</label>
+    <select id="otrFilter">
+        <option value="">All</option>
+        <option value="yes">Yes</option>
+        <option value="no">No</option>
+    </select>
+</div>
                
                 <div class="filter-group">
                     <label>Date From:</label>
@@ -487,6 +489,7 @@
                    
                     <option value="trend">Monthly Trend</option>
                     <option value="processPath">Process Paths</option>
+                    <option value="otrAnalysis">OTR Analysis</option>
                 </select>
                 <div class="chart-container">
                     <canvas id="customChart1"></canvas>
@@ -552,21 +555,22 @@
                     <table id="dataTable">
                         <thead>
                             <tr>
-                                <th>Case Number</th>
-                                <th>Date</th>
-                                <th>Site</th>
-                                <th>Body Part</th>
-                                <th>Type</th>
-                                <th>Severity</th>
-                                <th>Recordable</th>
-                                <th>DAFW Days</th>
-                                <th>Root Cause</th>
-                                <th>Actions</th>
+                             <th>Case Number</th>
+<th>Date</th>
+<th>Site</th>
+<th>Body Part</th>
+<th>Type</th>
+<th>Severity</th>
+<th>Recordable</th>
+<th>OTR</th>
+<th>DAFW Days</th>
+<th>Root Cause</th>
+<th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="tableBody">
                             <tr>
-                                <td colspan="10" class="loading">
+                                <td colspan="11" class="loading">
                                     No data loaded. Please import a CSV file.<br>
                                     <small>Expected format: Injury & Illness tracking CSV with severity, body parts, recordability, and cause analysis.</small>
                                 </td>
@@ -657,7 +661,7 @@
             }
             
             // Filter listeners
-            const filters = ['severityFilter', 'bodyPartFilter', 'recordableFilter', 'siteFilter', 'dateFrom', 'dateTo'];
+            const filters = ['severityFilter', 'otrFilter', 'recordableFilter', 'siteFilter', 'dateFrom', 'dateTo'];
             filters.forEach(filterId => {
                 const element = document.getElementById(filterId);
                 if (element) {
@@ -674,7 +678,7 @@
                 
                 const tableBody = document.getElementById('tableBody');
                 if (tableBody) {
-                    tableBody.innerHTML = '<tr><td colspan="10" class="loading">Processing CSV file...</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="11" class="loading">Processing CSV file...</td></tr>';
                 }
                 
                 const reader = new FileReader();
@@ -771,11 +775,17 @@
                         row.case_number = `CASE-${index + 1}`;
                     }
                     
-                    // Extract body part
-                    row.bodyPart = row.initial_info_principal_body_part || row.initial_info_detailed_body_part || 'Unknown';
-                    
-                    // Extract root cause
-                    row.rootCause = row.rca_primary_cause || 'Under Investigation';
+              // Extract body part
+row.bodyPart = row.initial_info_principal_body_part || row.initial_info_detailed_body_part || 'Unknown';
+
+// Extract OTR status
+row.otr = row.otr || row.on_the_road || 'no';
+if (typeof row.otr === 'string') {
+    row.otr = row.otr.toLowerCase();
+}
+
+// Extract root cause
+row.rootCause = row.rca_primary_cause || 'Under Investigation';
                     
                 } catch (error) {
                     console.error(`Error processing row ${index}:`, error);
@@ -806,13 +816,7 @@
         
         // Populate filter dropdowns
         function populateFilters() {
-            // Body Part
-            const bodyParts = [...new Set(rawData.map(row => row.bodyPart).filter(Boolean))];
-            const bodyPartFilter = document.getElementById('bodyPartFilter');
-            bodyPartFilter.innerHTML = '<option value="">All Body Parts</option>';
-            bodyParts.forEach(part => {
-                bodyPartFilter.innerHTML += `<option value="${part}">${part}</option>`;
-            });
+    
             
             // Site
             const sites = [...new Set(rawData.map(row => row.site).filter(Boolean))];
@@ -831,13 +835,13 @@
             const severityFilter = document.getElementById('severityFilter').value;
             const recordableFilter = document.getElementById('recordableFilter').value;
 
-            const bodyPartFilter = document.getElementById('bodyPartFilter').value;
+            const otrFilter = document.getElementById('otrFilter').value;
             const dateFrom = document.getElementById('dateFrom').value;
             const dateTo = document.getElementById('dateTo').value;
             
             filteredData = rawData.filter(row => {
                 if (severityFilter && row.standardSeverity !== severityFilter) return false;
-                if (bodyPartFilter && row.bodyPart !== bodyPartFilter) return false;
+                if (otrFilter && row.otr !== otrFilter) return false
                 if (recordableFilter !== '' && row.recordable != recordableFilter) return false;
                 if (siteFilter && row.site !== siteFilter) return false;
                 
@@ -875,7 +879,7 @@
             const tbody = document.getElementById('tableBody');
             
             if (filteredData.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" class="loading">No data matches the current filters.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="11" class="loading">No data matches the current filters.</td></tr>';
                 return;
             }
             
@@ -888,6 +892,7 @@
                 const severity = row.standardSeverity || 'Unknown';
                 const recordable = row.recordable === 1 ? 'Yes' : 'No';
                 const dafwDays = row.total_dafw_days || 0;
+                const otr = row.otr === 'yes' ? 'Yes' : 'No';
                 const rootCause = (row.rootCause || 'N/A').substring(0, 20);
                 
                 return `
@@ -899,6 +904,7 @@
                         <td title="${row.type || ''}">${type}${type.length >= 15 ? '...' : ''}</td>
                         <td><span class="severity-badge severity-${severity.toLowerCase()}">${severity}</span></td>
                         <td><span class="severity-badge recordable-${recordable.toLowerCase()}">${recordable}</span></td>
+                        <td><span class="severity-badge ${otr === 'Yes' ? 'recordable-yes' : 'recordable-no'}">${otr}</span></td>
                         <td>${dafwDays}</td>
                         <td title="${row.rootCause || ''}">${rootCause}${rootCause.length >= 20 ? '...' : ''}</td>
                         <td>
@@ -953,7 +959,50 @@
             
             console.log('Charts initialized');
         }
-        
+        // Update OTR analysis chart
+function updateOTRAnalysisChart(chart) {
+    const otrCounts = {
+        'Yes': filteredData.filter(r => r.otr === 'yes').length,
+        'No': filteredData.filter(r => r.otr === 'no').length
+    };
+    
+    // Set chart type and options
+    chart.config.type = 'doughnut';
+    
+    chart.options = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: true,
+                position: 'bottom'
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const label = context.label || '';
+                        const value = context.parsed || 0;
+                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                        const percentage = ((value / total) * 100).toFixed(1);
+                        return `${label}: ${value} (${percentage}%)`;
+                    }
+                }
+            }
+        }
+    };
+    
+    // Set data
+    chart.data = {
+        labels: ['On The Road', 'Not On The Road'],
+        datasets: [{
+            data: [otrCounts.Yes, otrCounts.No],
+            backgroundColor: ['#FF5722', '#4CAF50'],
+            label: 'Cases'
+        }]
+    };
+    
+    chart.update();
+}
         // Update specific chart based on selection
         function updateChart(chartNumber) {
             const selectElement = document.getElementById(`chart${chartNumber}Select`);
