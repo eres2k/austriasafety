@@ -824,10 +824,11 @@
         function applyFilters() {
             if (rawData.length === 0) return;
             
-            const severityFilter = document.getElementById('severityFilter').value;
-            const bodyPartFilter = document.getElementById('bodyPartFilter').value;
-            const recordableFilter = document.getElementById('recordableFilter').value;
             const siteFilter = document.getElementById('siteFilter').value;
+            const severityFilter = document.getElementById('severityFilter').value;
+            const recordableFilter = document.getElementById('recordableFilter').value;
+
+            const bodyPartFilter = document.getElementById('bodyPartFilter').value;
             const dateFrom = document.getElementById('dateFrom').value;
             const dateTo = document.getElementById('dateTo').value;
             
