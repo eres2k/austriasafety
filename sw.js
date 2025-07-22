@@ -4,6 +4,7 @@ const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
+  '/icon-192.svg',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
 ];
