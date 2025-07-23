@@ -1,0 +1,2800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Safety Analytics Platform - Amazon Austria WHS</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --primary: #FF9900;
+            --primary-dark: #e88600;
+            --secondary: #232F3E;
+            --secondary-dark: #37475A;
+            --success: #4CAF50;
+            --warning: #FFC107;
+            --danger: #FF5722;
+            --critical: #B71C1C;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5f5;
+            --text-primary: #212121;
+            --text-secondary: #757575;
+            --shadow: rgba(0,0,0,0.1);
+            --shadow-hover: rgba(0,0,0,0.15);
+            --border-radius: 12px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --text-primary: #ffffff;
+            --text-secondary: #b0b0b0;
+            --shadow: rgba(255,255,255,0.05);
+            --shadow-hover: rgba(255,255,255,0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            transition: var(--transition);
+        }
+
+        /* Modern Header */
+        .header {
+            background: linear-gradient(135deg, var(--secondary) 0%, var(--secondary-dark) 100%);
+            color: white;
+            padding: 1.5rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 4px 20px var(--shadow);
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        /* Mode Toggle */
+        .mode-toggle {
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 30px;
+            padding: 0.5rem 1rem;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: var(--transition);
+        }
+
+        .mode-toggle:hover {
+            background: rgba(255,255,255,0.2);
+            transform: translateY(-2px);
+        }
+
+        /* Navigation Tabs */
+        .nav-tabs {
+            background: var(--bg-primary);
+            padding: 0.5rem;
+            display: flex;
+            gap: 0.5rem;
+            border-radius: var(--border-radius);
+            margin: 2rem auto;
+            max-width: 1400px;
+            overflow-x: auto;
+            scrollbar-width: thin;
+            box-shadow: 0 2px 10px var(--shadow);
+        }
+
+        .nav-tab {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+            white-space: nowrap;
+            font-weight: 500;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-tab::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 100%;
+            background: var(--primary);
+            transition: width 0.3s;
+            z-index: -1;
+        }
+
+        .nav-tab:hover {
+            color: var(--text-primary);
+            transform: translateY(-1px);
+        }
+
+        .nav-tab:hover::before {
+            width: 100%;
+        }
+
+        .nav-tab.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 10px rgba(255, 153, 0, 0.3);
+        }
+
+        /* Container */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px 40px;
+        }
+
+        /* Modern Cards */
+        .card {
+            background: var(--bg-primary);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            box-shadow: 0 2px 10px var(--shadow);
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--primary);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px var(--shadow-hover);
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        /* Metrics Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: var(--bg-primary);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 2px 10px var(--shadow);
+            transition: var(--transition);
+        }
+
+        .metric-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px var(--shadow-hover);
+        }
+
+        .metric-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 1rem;
+            transition: var(--transition);
+        }
+
+        .metric-card:hover .metric-icon {
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 0.5rem 0;
+            transition: var(--transition);
+        }
+
+        .metric-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .metric-trend {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            font-size: 0.9rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            background: rgba(76, 175, 80, 0.1);
+            color: var(--success);
+        }
+
+        .metric-trend.down {
+            background: rgba(255, 87, 34, 0.1);
+            color: var(--danger);
+        }
+
+        /* Control Panel */
+        .control-panel {
+            background: var(--bg-primary);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 10px var(--shadow);
+        }
+
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .control-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Modern Buttons */
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn:active::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 153, 0, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: var(--secondary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(35, 47, 62, 0.3);
+        }
+
+        /* File Upload Area */
+        .upload-area {
+            border: 2px dashed var(--primary);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            text-align: center;
+            transition: var(--transition);
+            background: rgba(255, 153, 0, 0.05);
+            margin-bottom: 1.5rem;
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary-dark);
+            background: rgba(255, 153, 0, 0.1);
+        }
+
+        .upload-area.dragging {
+            background: rgba(255, 153, 0, 0.2);
+            border-color: var(--primary);
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-label {
+            display: inline-block;
+            padding: 0.75rem 2rem;
+            background: var(--primary);
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-weight: 500;
+        }
+
+        .upload-label:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        /* Filter Section */
+        .filter-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .filter-label {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .filter-input {
+            padding: 0.75rem;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            transition: var(--transition);
+            font-size: 0.95rem;
+        }
+
+        .filter-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: var(--bg-primary);
+        }
+
+        /* Charts Container */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-card {
+            background: var(--bg-primary);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            box-shadow: 0 2px 10px var(--shadow);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .chart-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        /* Data Table */
+        .table-container {
+            background: var(--bg-primary);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            box-shadow: 0 2px 10px var(--shadow);
+            overflow: hidden;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            margin: -1.5rem;
+            padding: 1.5rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: var(--secondary);
+            color: white;
+            padding: 1rem;
+            text-align: left;
+            font-weight: 500;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        tr:hover {
+            background: var(--bg-secondary);
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .badge-success {
+            background: rgba(76, 175, 80, 0.2);
+            color: var(--success);
+        }
+
+        .badge-warning {
+            background: rgba(255, 193, 7, 0.2);
+            color: var(--warning);
+        }
+
+        .badge-danger {
+            background: rgba(255, 87, 34, 0.2);
+            color: var(--danger);
+        }
+
+        .badge-critical {
+            background: rgba(183, 28, 28, 0.2);
+            color: var(--critical);
+        }
+
+        /* Risk Matrix */
+        .risk-matrix {
+            display: grid;
+            grid-template-columns: 80px repeat(5, 1fr);
+            grid-template-rows: repeat(6, 80px);
+            gap: 4px;
+            max-width: 600px;
+            margin: 2rem auto;
+        }
+
+        .matrix-cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            color: white;
+            cursor: pointer;
+            transition: var(--transition);
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .matrix-cell::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255,255,255,0.3);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.4s, height 0.4s;
+        }
+
+        .matrix-cell:hover::before {
+            width: 100px;
+            height: 100px;
+        }
+
+        .matrix-cell:hover {
+            transform: scale(1.05);
+            z-index: 10;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .matrix-label {
+            background: var(--secondary);
+            color: white;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .risk-low { background: var(--success); }
+        .risk-medium { background: var(--warning); color: #333; }
+        .risk-high { background: var(--danger); }
+        .risk-critical { background: var(--critical); }
+
+        /* Status Messages */
+        .status-message {
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-10px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .status-success {
+            background: rgba(76, 175, 80, 0.1);
+            color: var(--success);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+
+        .status-error {
+            background: rgba(255, 87, 34, 0.1);
+            color: var(--danger);
+            border: 1px solid rgba(255, 87, 34, 0.3);
+        }
+
+        .status-info {
+            background: rgba(33, 150, 243, 0.1);
+            color: #2196F3;
+            border: 1px solid rgba(33, 150, 243, 0.3);
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--bg-secondary);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 2rem auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .nav-tabs {
+                flex-wrap: nowrap;
+                overflow-x: scroll;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .filter-section {
+                grid-template-columns: 1fr;
+            }
+
+            .table-wrapper {
+                font-size: 0.9rem;
+            }
+        }
+
+        /* Tab Content */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Hidden class */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Export Options */
+        .export-section {
+            background: var(--bg-primary);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            margin-top: 2rem;
+            box-shadow: 0 2px 10px var(--shadow);
+        }
+
+        .export-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            animation: fadeIn 0.3s;
+        }
+
+        .modal-content {
+            position: relative;
+            background: var(--bg-primary);
+            margin: 5% auto;
+            padding: 2rem;
+            width: 90%;
+            max-width: 600px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            animation: slideDown 0.3s;
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: var(--transition);
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+            transform: rotate(90deg);
+        }
+
+        /* Welcome Screen */
+        .welcome-screen {
+            text-align: center;
+            padding: 4rem 2rem;
+        }
+
+        .welcome-title {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .welcome-subtitle {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            margin-bottom: 3rem;
+        }
+
+        .welcome-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <h1>
+                <span>🛡️</span>
+                Safety Analytics Platform
+            </h1>
+            <div class="header-actions">
+                <button class="mode-toggle" onclick="toggleTheme()">
+                    <span id="themeIcon">🌙</span>
+                    <span id="themeText">Dark Mode</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <div class="container">
+        <nav class="nav-tabs">
+            <div class="nav-tab active" onclick="switchModule('overview')">
+                📊 Overview
+            </div>
+            <div class="nav-tab" onclick="switchModule('injury')">
+                🏥 Injury & Illness
+            </div>
+            <div class="nav-tab" onclick="switchModule('nearmiss')">
+                ⚠️ Near Miss
+            </div>
+            <div class="nav-tab" onclick="switchModule('combined')">
+                📈 Combined Analytics
+            </div>
+            <div class="nav-tab" onclick="switchModule('reports')">
+                📄 Reports
+            </div>
+        </nav>
+
+        <!-- Status Message Container -->
+        <div id="statusContainer"></div>
+
+        <!-- Overview Module -->
+        <div id="overview" class="tab-content active">
+            <div class="welcome-screen">
+                <h2 class="welcome-title">Welcome to Safety Analytics</h2>
+                <p class="welcome-subtitle">Your comprehensive platform for workplace safety data analysis</p>
+                <div class="welcome-actions">
+                    <button class="btn btn-primary" onclick="switchModule('injury')">
+                        <span>🏥</span> Analyze Injuries
+                    </button>
+                    <button class="btn btn-primary" onclick="switchModule('nearmiss')">
+                        <span>⚠️</span> Review Near Misses
+                    </button>
+                    <button class="btn btn-secondary" onclick="loadSampleData()">
+                        <span>🧪</span> Load Sample Data
+                    </button>
+                </div>
+            </div>
+
+            <!-- Combined Metrics Overview -->
+            <div class="metrics-grid" id="overviewMetrics" style="display: none;">
+                <div class="metric-card">
+                    <div class="metric-icon">📊</div>
+                    <div class="metric-value" id="totalIncidents">0</div>
+                    <div class="metric-label">Total Safety Events</div>
+                    <div class="metric-trend">↓ 12%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">🏥</div>
+                    <div class="metric-value" id="injuryCount">0</div>
+                    <div class="metric-label">Injuries & Illnesses</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">⚠️</div>
+                    <div class="metric-value" id="nearMissCount">0</div>
+                    <div class="metric-label">Near Misses</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">📈</div>
+                    <div class="metric-value" id="riskScore">0.0</div>
+                    <div class="metric-label">Overall Risk Score</div>
+                </div>
+            </div>
+
+            <!-- Quick Charts -->
+            <div class="charts-grid" id="overviewCharts" style="display: none;">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Safety Trend Overview</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="overviewTrendChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Site Comparison</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="overviewSiteChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Injury & Illness Module -->
+        <div id="injury" class="tab-content">
+            <div class="control-panel">
+                <div class="control-header">
+                    <h2 class="control-title">Injury & Illness Analysis</h2>
+                    <div>
+                        <button class="btn btn-secondary" onclick="exportInjuryData()">
+                            <span>📊</span> Export Data
+                        </button>
+                    </div>
+                </div>
+
+                <div class="upload-area" id="injuryUploadArea" ondrop="handleDrop(event, 'injury')" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+                    <p style="margin-bottom: 1rem;">📁 Drag and drop your injury CSV file here</p>
+                    <label for="injuryFile" class="upload-label">Choose File</label>
+                    <input type="file" id="injuryFile" class="file-input" accept=".csv" onchange="handleFileUpload(event, 'injury')">
+                    <p style="margin-top: 1rem; font-size: 0.9rem; color: var(--text-secondary);">
+                        Supports CSV files with injury/illness tracking data
+                    </p>
+                </div>
+
+                <div class="filter-section">
+                    <div class="filter-group">
+                        <label class="filter-label">Site</label>
+                        <select class="filter-input" id="injurySiteFilter" onchange="applyFilters('injury')">
+                            <option value="">All Sites</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Severity</label>
+                        <select class="filter-input" id="injurySeverityFilter" onchange="applyFilters('injury')">
+                            <option value="">All Severities</option>
+                            <option value="A">A - Critical</option>
+                            <option value="B">B - High</option>
+                            <option value="C">C - Medium</option>
+                            <option value="D">D - Low</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Recordable</label>
+                        <select class="filter-input" id="injuryRecordableFilter" onchange="applyFilters('injury')">
+                            <option value="">All Cases</option>
+                            <option value="1">Recordable Only</option>
+                            <option value="0">Non-Recordable Only</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Date From</label>
+                        <input type="date" class="filter-input" id="injuryDateFrom" onchange="applyFilters('injury')">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Date To</label>
+                        <input type="date" class="filter-input" id="injuryDateTo" onchange="applyFilters('injury')">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Injury Metrics -->
+            <div class="metrics-grid" id="injuryMetrics">
+                <div class="metric-card">
+                    <div class="metric-icon">🏥</div>
+                    <div class="metric-value" id="injuryTotal">0</div>
+                    <div class="metric-label">Total Incidents</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">📝</div>
+                    <div class="metric-value" id="injuryRecordable">0</div>
+                    <div class="metric-label">Recordable Cases</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">📅</div>
+                    <div class="metric-value" id="injuryLostTime">0</div>
+                    <div class="metric-label">Lost Time Cases</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">⏱️</div>
+                    <div class="metric-value" id="injuryDaysLost">0</div>
+                    <div class="metric-label">Days Away From Work</div>
+                </div>
+            </div>
+
+            <!-- Injury Charts -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Severity Distribution</h3>
+                        <select class="filter-input" style="width: auto;" onchange="updateInjuryChart(1, this.value)">
+                            <option value="severity">Severity</option>
+                            <option value="bodyPart">Body Parts</option>
+                            <option value="rootCause">Root Causes</option>
+                        </select>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="injuryChart1"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Monthly Trend</h3>
+                        <select class="filter-input" style="width: auto;" onchange="updateInjuryChart(2, this.value)">
+                            <option value="trend">Overall Trend</option>
+                            <option value="recordableTrend">Recordable Trend</option>
+                            <option value="lostTimeTrend">Lost Time Trend</option>
+                        </select>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="injuryChart2"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Injury Table -->
+            <div class="table-container">
+                <h3 style="margin-bottom: 1rem;">Recent Cases</h3>
+                <div class="table-wrapper">
+                    <table id="injuryTable">
+                        <thead>
+                            <tr>
+                                <th>Case Number</th>
+                                <th>Date</th>
+                                <th>Site</th>
+                                <th>Body Part</th>
+                                <th>Severity</th>
+                                <th>Recordable</th>
+                                <th>DAFW Days</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="injuryTableBody">
+                            <tr>
+                                <td colspan="8" style="text-align: center; padding: 3rem;">
+                                    No data loaded. Please upload a CSV file.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Near Miss Module -->
+        <div id="nearmiss" class="tab-content">
+            <div class="control-panel">
+                <div class="control-header">
+                    <h2 class="control-title">Near Miss Analysis</h2>
+                    <div>
+                        <button class="btn btn-secondary" onclick="exportNearMissData()">
+                            <span>📊</span> Export Data
+                        </button>
+                    </div>
+                </div>
+
+                <div class="upload-area" id="nearMissUploadArea" ondrop="handleDrop(event, 'nearmiss')" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+                    <p style="margin-bottom: 1rem;">📁 Drag and drop your near miss CSV file here</p>
+                    <label for="nearMissFile" class="upload-label">Choose File</label>
+                    <input type="file" id="nearMissFile" class="file-input" accept=".csv" onchange="handleFileUpload(event, 'nearmiss')">
+                    <p style="margin-top: 1rem; font-size: 0.9rem; color: var(--text-secondary);">
+                        Supports CSV files with near miss tracking data
+                    </p>
+                </div>
+
+                <div class="filter-section">
+                    <div class="filter-group">
+                        <label class="filter-label">Site</label>
+                        <select class="filter-input" id="nearMissSiteFilter" onchange="applyFilters('nearmiss')">
+                            <option value="">All Sites</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Potential Severity</label>
+                        <select class="filter-input" id="nearMissSeverityFilter" onchange="applyFilters('nearmiss')">
+                            <option value="">All Severities</option>
+                            <option value="A">A - Critical</option>
+                            <option value="B">B - High</option>
+                            <option value="C">C - Medium</option>
+                            <option value="D">D - Low</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Process Path</label>
+                        <select class="filter-input" id="nearMissProcessFilter" onchange="applyFilters('nearmiss')">
+                            <option value="">All Processes</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Date From</label>
+                        <input type="date" class="filter-input" id="nearMissDateFrom" onchange="applyFilters('nearmiss')">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Date To</label>
+                        <input type="date" class="filter-input" id="nearMissDateTo" onchange="applyFilters('nearmiss')">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Near Miss Metrics -->
+            <div class="metrics-grid" id="nearMissMetrics">
+                <div class="metric-card">
+                    <div class="metric-icon">⚠️</div>
+                    <div class="metric-value" id="nearMissTotal">0</div>
+                    <div class="metric-label">Total Near Misses</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">📊</div>
+                    <div class="metric-value" id="nearMissRisk">0.0</div>
+                    <div class="metric-label">Average Risk Score</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">🚨</div>
+                    <div class="metric-value" id="nearMissHigh">0</div>
+                    <div class="metric-label">High Severity (A & B)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">📍</div>
+                    <div class="metric-value" id="nearMissRepeat">0</div>
+                    <div class="metric-label">Repeat Locations</div>
+                </div>
+            </div>
+
+            <!-- Near Miss Charts -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Severity Analysis</h3>
+                        <select class="filter-input" style="width: auto;" onchange="updateNearMissChart(1, this.value)">
+                            <option value="severity">Severity</option>
+                            <option value="location">Locations</option>
+                            <option value="impact">Primary Impacts</option>
+                        </select>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="nearMissChart1"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Process Path Analysis</h3>
+                        <select class="filter-input" style="width: auto;" onchange="updateNearMissChart(2, this.value)">
+                            <option value="process">Process Paths</option>
+                            <option value="trend">Monthly Trend</option>
+                            <option value="site">Site Comparison</option>
+                        </select>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="nearMissChart2"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Near Miss Table -->
+            <div class="table-container">
+                <h3 style="margin-bottom: 1rem;">Recent Near Misses</h3>
+                <div class="table-wrapper">
+                    <table id="nearMissTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Date</th>
+                                <th>Site</th>
+                                <th>Location</th>
+                                <th>Process</th>
+                                <th>Severity</th>
+                                <th>Risk Score</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="nearMissTableBody">
+                            <tr>
+                                <td colspan="8" style="text-align: center; padding: 3rem;">
+                                    No data loaded. Please upload a CSV file.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Combined Analytics Module -->
+        <div id="combined" class="tab-content">
+            <div class="control-panel">
+                <div class="control-header">
+                    <h2 class="control-title">Combined Safety Analytics</h2>
+                    <div>
+                        <button class="btn btn-primary" onclick="generateCombinedReport()">
+                            <span>📄</span> Generate Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Risk Matrix -->
+            <div class="card">
+                <h3 style="margin-bottom: 1.5rem;">Combined Risk Assessment Matrix</h3>
+                <div class="risk-matrix" id="combinedRiskMatrix">
+                    <!-- Will be populated dynamically -->
+                </div>
+            </div>
+
+            <!-- Combined Charts -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Safety Performance Trend</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="combinedTrendChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Site Safety Comparison</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="combinedSiteChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Items -->
+            <div class="card" style="margin-top: 2rem;">
+                <h3 style="margin-bottom: 1.5rem;">Recommended Actions</h3>
+                <div id="actionItems">
+                    <p style="color: var(--text-secondary);">Load data to see recommended actions</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Module -->
+        <div id="reports" class="tab-content">
+            <div class="control-panel">
+                <div class="control-header">
+                    <h2 class="control-title">Report Generation</h2>
+                </div>
+            </div>
+
+            <div class="export-section">
+                <h3 style="margin-bottom: 1rem;">Available Reports</h3>
+                <div class="export-grid">
+                    <button class="btn btn-primary" onclick="generatePDFReport('injury')">
+                        <span>📄</span> Injury & Illness Report
+                    </button>
+                    <button class="btn btn-primary" onclick="generatePDFReport('nearmiss')">
+                        <span>📄</span> Near Miss Report
+                    </button>
+                    <button class="btn btn-primary" onclick="generatePDFReport('combined')">
+                        <span>📄</span> Combined Safety Report
+                    </button>
+                    <button class="btn btn-secondary" onclick="exportToExcel()">
+                        <span>📊</span> Export All Data to Excel
+                    </button>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 2rem;">
+                <h3 style="margin-bottom: 1rem;">Report History</h3>
+                <div id="reportHistory">
+                    <p style="color: var(--text-secondary);">No reports generated yet</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for details -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Details</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div id="modalBody">
+                <!-- Content will be populated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global State Management
+        const state = {
+            injury: {
+                rawData: [],
+                filteredData: [],
+                charts: {}
+            },
+            nearMiss: {
+                rawData: [],
+                filteredData: [],
+                charts: {}
+            },
+            currentModule: 'overview',
+            theme: 'light'
+        };
+
+        // Initialize Application
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Safety Analytics Platform initialized');
+            initializeCharts();
+            setupEventListeners();
+            createRiskMatrix();
+            
+            // Check for saved theme preference
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            if (savedTheme === 'dark') {
+                toggleTheme();
+            }
+        });
+
+        // Theme Toggle
+        function toggleTheme() {
+            const body = document.body;
+            const themeIcon = document.getElementById('themeIcon');
+            const themeText = document.getElementById('themeText');
+            
+            if (body.getAttribute('data-theme') === 'dark') {
+                body.removeAttribute('data-theme');
+                themeIcon.textContent = '🌙';
+                themeText.textContent = 'Dark Mode';
+                state.theme = 'light';
+            } else {
+                body.setAttribute('data-theme', 'dark');
+                themeIcon.textContent = '☀️';
+                themeText.textContent = 'Light Mode';
+                state.theme = 'dark';
+            }
+            
+            localStorage.setItem('theme', state.theme);
+            
+            // Update charts for new theme
+            updateAllCharts();
+        }
+
+        // Module Switching
+        function switchModule(module) {
+            // Update navigation
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Hide all content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Show selected content
+            document.getElementById(module).classList.add('active');
+            state.currentModule = module;
+            
+            // Update charts if needed
+            if (module === 'combined') {
+                updateCombinedAnalytics();
+            }
+        }
+
+        // File Handling
+        function handleFileUpload(event, type) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            showStatus(`Processing ${type} file...`, 'info');
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                parseCSV(e.target.result, type);
+            };
+            reader.onerror = function() {
+                showStatus('Error reading file', 'error');
+            };
+            reader.readAsText(file);
+        }
+
+        // Drag and Drop
+        function handleDrop(event, type) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            const uploadArea = event.target.closest('.upload-area');
+            uploadArea.classList.remove('dragging');
+            
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+                    // Create a fake event for the file input
+                    const input = type === 'injury' ? 
+                        document.getElementById('injuryFile') : 
+                        document.getElementById('nearMissFile');
+                    
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(file);
+                    input.files = dataTransfer.files;
+                    
+                    handleFileUpload({ target: input }, type);
+                } else {
+                    showStatus('Please upload a CSV file', 'error');
+                }
+            }
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.target.closest('.upload-area').classList.add('dragging');
+        }
+
+        function handleDragLeave(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.target.closest('.upload-area').classList.remove('dragging');
+        }
+
+        // CSV Parsing
+        function parseCSV(csvText, type) {
+            Papa.parse(csvText, {
+                header: true,
+                dynamicTyping: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    if (type === 'injury') {
+                        state.injury.rawData = results.data;
+                        processInjuryData();
+                        populateInjuryFilters();
+                        applyFilters('injury');
+                        showStatus(`Loaded ${results.data.length} injury records`, 'success');
+                    } else {
+                        state.nearMiss.rawData = results.data;
+                        processNearMissData();
+                        populateNearMissFilters();
+                        applyFilters('nearmiss');
+                        showStatus(`Loaded ${results.data.length} near miss records`, 'success');
+                    }
+                    
+                    updateOverview();
+                },
+                error: function(error) {
+                    showStatus('Failed to parse CSV: ' + error.message, 'error');
+                }
+            });
+        }
+
+        // Data Processing - Injury
+        function processInjuryData() {
+            state.injury.rawData.forEach((row, index) => {
+                // Parse dates
+                if (row.incident_date) {
+                    row.parsedDate = new Date(row.incident_date);
+                }
+                
+                // Standardize severity
+                row.severity = standardizeSeverity(row.severity || row.potential_severity);
+                
+                // Ensure numeric values
+                row.recordable = parseInt(row.recordable) || 0;
+                row.total_dafw_days = parseInt(row.total_dafw_days) || 0;
+                
+                // Generate ID if needed
+                if (!row.case_number) {
+                    row.case_number = `CASE-${index + 1}`;
+                }
+                
+                // Extract body part
+                row.bodyPart = row.initial_info_principal_body_part || 
+                              row.initial_info_detailed_body_part || 
+                              'Unknown';
+                
+                // Extract root cause
+                row.rootCause = row.rca_primary_cause || 'Under Investigation';
+            });
+        }
+
+        // Data Processing - Near Miss
+        function processNearMissData() {
+            state.nearMiss.rawData.forEach((row, index) => {
+                // Parse dates
+                if (row.nearmiss_date) {
+                    row.parsedDate = new Date(row.nearmiss_date);
+                }
+                
+                // Use potential_severity
+                row.severity = standardizeSeverity(row.potential_severity || row.severity);
+                
+                // Calculate risk score if not present
+                if (!row.risk || row.risk === '' || row.risk === 0) {
+                    row.risk = calculateRiskScore(row);
+                }
+                
+                // Generate ID if needed
+                if (!row.incident_id) {
+                    row.incident_id = `NM-${index + 1}`;
+                }
+            });
+        }
+
+        // Standardize severity
+        function standardizeSeverity(severity) {
+            if (!severity) return 'Unknown';
+            const severityStr = String(severity).toUpperCase().trim();
+            
+            if (['A', 'B', 'C', 'D'].includes(severityStr)) {
+                return severityStr;
+            }
+            
+            const lower = severityStr.toLowerCase();
+            if (lower.includes('critical') || lower.includes('severe')) return 'A';
+            if (lower.includes('high') || lower.includes('major')) return 'B';
+            if (lower.includes('medium') || lower.includes('moderate')) return 'C';
+            if (lower.includes('low') || lower.includes('minor')) return 'D';
+            
+            return 'Unknown';
+        }
+
+        // Calculate risk score
+        function calculateRiskScore(row) {
+            const severityMap = { 'A': 8, 'B': 5, 'C': 3, 'D': 1, 'Unknown': 2 };
+            const severity = severityMap[row.severity] || 2;
+            return (severity * 2.5).toFixed(1);
+        }
+
+        // Populate Filters
+        function populateInjuryFilters() {
+            const sites = [...new Set(state.injury.rawData.map(r => r.site).filter(Boolean))];
+            const siteFilter = document.getElementById('injurySiteFilter');
+            siteFilter.innerHTML = '<option value="">All Sites</option>';
+            sites.forEach(site => {
+                siteFilter.innerHTML += `<option value="${site}">${site}</option>`;
+            });
+        }
+
+        function populateNearMissFilters() {
+            // Sites
+            const sites = [...new Set(state.nearMiss.rawData.map(r => r.site).filter(Boolean))];
+            const siteFilter = document.getElementById('nearMissSiteFilter');
+            siteFilter.innerHTML = '<option value="">All Sites</option>';
+            sites.forEach(site => {
+                siteFilter.innerHTML += `<option value="${site}">${site}</option>`;
+            });
+            
+            // Process Paths
+            const processes = [...new Set(state.nearMiss.rawData.map(r => r.initial_info_process_path).filter(Boolean))];
+            const processFilter = document.getElementById('nearMissProcessFilter');
+            processFilter.innerHTML = '<option value="">All Processes</option>';
+            processes.forEach(process => {
+                processFilter.innerHTML += `<option value="${process}">${process}</option>`;
+            });
+        }
+
+        // Apply Filters
+        function applyFilters(type) {
+            if (type === 'injury') {
+                const siteFilter = document.getElementById('injurySiteFilter').value;
+                const severityFilter = document.getElementById('injurySeverityFilter').value;
+                const recordableFilter = document.getElementById('injuryRecordableFilter').value;
+                const dateFrom = document.getElementById('injuryDateFrom').value;
+                const dateTo = document.getElementById('injuryDateTo').value;
+                
+                state.injury.filteredData = state.injury.rawData.filter(row => {
+                    if (siteFilter && row.site !== siteFilter) return false;
+                    if (severityFilter && row.severity !== severityFilter) return false;
+                    if (recordableFilter !== '' && row.recordable != recordableFilter) return false;
+                    
+                    if (dateFrom || dateTo) {
+                        const rowDate = row.parsedDate;
+                        if (!rowDate || isNaN(rowDate)) return false;
+                        if (dateFrom && rowDate < new Date(dateFrom)) return false;
+                        if (dateTo && rowDate > new Date(dateTo)) return false;
+                    }
+                    
+                    return true;
+                });
+                
+                updateInjuryDashboard();
+                updateInjuryTable();
+                updateInjuryCharts();
+            } else {
+                const siteFilter = document.getElementById('nearMissSiteFilter').value;
+                const severityFilter = document.getElementById('nearMissSeverityFilter').value;
+                const processFilter = document.getElementById('nearMissProcessFilter').value;
+                const dateFrom = document.getElementById('nearMissDateFrom').value;
+                const dateTo = document.getElementById('nearMissDateTo').value;
+                
+                state.nearMiss.filteredData = state.nearMiss.rawData.filter(row => {
+                    if (siteFilter && row.site !== siteFilter) return false;
+                    if (severityFilter && row.severity !== severityFilter) return false;
+                    if (processFilter && row.initial_info_process_path !== processFilter) return false;
+                    
+                    if (dateFrom || dateTo) {
+                        const rowDate = row.parsedDate;
+                        if (!rowDate || isNaN(rowDate)) return false;
+                        if (dateFrom && rowDate < new Date(dateFrom)) return false;
+                        if (dateTo && rowDate > new Date(dateTo)) return false;
+                    }
+                    
+                    return true;
+                });
+                
+                updateNearMissDashboard();
+                updateNearMissTable();
+                updateNearMissCharts();
+            }
+            
+            updateOverview();
+        }
+
+        // Update Dashboards
+        function updateInjuryDashboard() {
+            const data = state.injury.filteredData;
+            
+            document.getElementById('injuryTotal').textContent = data.length;
+            document.getElementById('injuryRecordable').textContent = 
+                data.filter(r => r.recordable === 1).length;
+            document.getElementById('injuryLostTime').textContent = 
+                data.filter(r => r.total_dafw_days > 0).length;
+            document.getElementById('injuryDaysLost').textContent = 
+                data.reduce((sum, r) => sum + (r.total_dafw_days || 0), 0);
+        }
+
+        function updateNearMissDashboard() {
+            const data = state.nearMiss.filteredData;
+            
+            document.getElementById('nearMissTotal').textContent = data.length;
+            
+            const risks = data.map(r => parseFloat(r.risk)).filter(r => !isNaN(r));
+            const avgRisk = risks.length > 0 ? 
+                (risks.reduce((a, b) => a + b, 0) / risks.length).toFixed(1) : '0.0';
+            document.getElementById('nearMissRisk').textContent = avgRisk;
+            
+            document.getElementById('nearMissHigh').textContent = 
+                data.filter(r => r.severity === 'A' || r.severity === 'B').length;
+            
+            // Calculate repeat locations
+            const locationCounts = {};
+            data.forEach(row => {
+                const location = row.initial_info_location_event || 'Unknown';
+                locationCounts[location] = (locationCounts[location] || 0) + 1;
+            });
+            const repeatLocations = Object.values(locationCounts).filter(count => count >= 2).length;
+            document.getElementById('nearMissRepeat').textContent = repeatLocations;
+        }
+
+        // Update Tables
+        function updateInjuryTable() {
+            const tbody = document.getElementById('injuryTableBody');
+            const data = state.injury.filteredData.slice(0, 10);
+            
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 3rem;">No data matches the current filters.</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = data.map(row => `
+                <tr>
+                    <td>${row.case_number || 'N/A'}</td>
+                    <td>${row.incident_date || 'N/A'}</td>
+                    <td>${row.site || 'N/A'}</td>
+                    <td>${(row.bodyPart || 'N/A').substring(0, 20)}${row.bodyPart?.length > 20 ? '...' : ''}</td>
+                    <td><span class="badge badge-${getSeverityClass(row.severity)}">${row.severity}</span></td>
+                    <td><span class="badge badge-${row.recordable === 1 ? 'danger' : 'success'}">${row.recordable === 1 ? 'Yes' : 'No'}</span></td>
+                    <td>${row.total_dafw_days || 0}</td>
+                    <td>
+                        <button class="btn btn-secondary" style="padding: 0.5rem 1rem;" onclick="viewDetails('injury', '${row.case_number}')">View</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function updateNearMissTable() {
+            const tbody = document.getElementById('nearMissTableBody');
+            const data = state.nearMiss.filteredData.slice(0, 10);
+            
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 3rem;">No data matches the current filters.</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = data.map(row => `
+                <tr>
+                    <td>${row.incident_id || 'N/A'}</td>
+                    <td>${row.nearmiss_date || 'N/A'}</td>
+                    <td>${row.site || 'N/A'}</td>
+                    <td>${(row.initial_info_location_event || 'N/A').substring(0, 25)}${row.initial_info_location_event?.length > 25 ? '...' : ''}</td>
+                    <td>${(row.initial_info_process_path || 'N/A').substring(0, 20)}${row.initial_info_process_path?.length > 20 ? '...' : ''}</td>
+                    <td><span class="badge badge-${getSeverityClass(row.severity)}">${row.severity}</span></td>
+                    <td>${row.risk || 'N/A'}</td>
+                    <td>
+                        <button class="btn btn-secondary" style="padding: 0.5rem 1rem;" onclick="viewDetails('nearmiss', '${row.incident_id}')">View</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Get severity class for badges
+        function getSeverityClass(severity) {
+            switch(severity) {
+                case 'A': return 'critical';
+                case 'B': return 'danger';
+                case 'C': return 'warning';
+                case 'D': return 'success';
+                default: return 'secondary';
+            }
+        }
+
+        // Initialize Charts
+        function initializeCharts() {
+            // Injury Charts
+            const injuryChart1Ctx = document.getElementById('injuryChart1')?.getContext('2d');
+            if (injuryChart1Ctx) {
+                state.injury.charts.chart1 = new Chart(injuryChart1Ctx, {
+                    type: 'doughnut',
+                    data: { labels: [], datasets: [] },
+                    options: getChartOptions('doughnut')
+                });
+            }
+            
+            const injuryChart2Ctx = document.getElementById('injuryChart2')?.getContext('2d');
+            if (injuryChart2Ctx) {
+                state.injury.charts.chart2 = new Chart(injuryChart2Ctx, {
+                    type: 'line',
+                    data: { labels: [], datasets: [] },
+                    options: getChartOptions('line')
+                });
+            }
+            
+            // Near Miss Charts
+            const nearMissChart1Ctx = document.getElementById('nearMissChart1')?.getContext('2d');
+            if (nearMissChart1Ctx) {
+                state.nearMiss.charts.chart1 = new Chart(nearMissChart1Ctx, {
+                    type: 'doughnut',
+                    data: { labels: [], datasets: [] },
+                    options: getChartOptions('doughnut')
+                });
+            }
+            
+            const nearMissChart2Ctx = document.getElementById('nearMissChart2')?.getContext('2d');
+            if (nearMissChart2Ctx) {
+                state.nearMiss.charts.chart2 = new Chart(nearMissChart2Ctx, {
+                    type: 'bar',
+                    data: { labels: [], datasets: [] },
+                    options: getChartOptions('bar')
+                });
+            }
+            
+            // Overview Charts
+            const overviewTrendCtx = document.getElementById('overviewTrendChart')?.getContext('2d');
+            if (overviewTrendCtx) {
+                new Chart(overviewTrendCtx, {
+                    type: 'line',
+                    data: { labels: [], datasets: [] },
+                    options: getChartOptions('line')
+                });
+            }
+            
+            const overviewSiteCtx = document.getElementById('overviewSiteChart')?.getContext('2d');
+            if (overviewSiteCtx) {
+                new Chart(overviewSiteCtx, {
+                    type: 'bar',
+                    data: { labels: [], datasets: [] },
+                    options: getChartOptions('bar')
+                });
+            }
+        }
+
+        // Get chart options based on type
+        function getChartOptions(type) {
+            const isDark = state.theme === 'dark';
+            const textColor = isDark ? '#ffffff' : '#212121';
+            const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+            
+            const baseOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: type === 'doughnut' || type === 'pie',
+                        position: 'bottom',
+                        labels: {
+                            color: textColor,
+                            padding: 20,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: isDark ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                        titleColor: isDark ? '#ffffff' : '#212121',
+                        bodyColor: isDark ? '#ffffff' : '#212121',
+                        borderColor: isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)',
+                        borderWidth: 1,
+                        padding: 12,
+                        cornerRadius: 8
+                    }
+                }
+            };
+            
+            if (type === 'line' || type === 'bar') {
+                baseOptions.scales = {
+                    x: {
+                        ticks: {
+                            color: textColor
+                        },
+                        grid: {
+                            color: gridColor
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            color: textColor
+                        },
+                        grid: {
+                            color: gridColor
+                        },
+                        beginAtZero: true
+                    }
+                };
+            }
+            
+            return baseOptions;
+        }
+
+        // Update Charts
+        function updateInjuryCharts() {
+            updateInjuryChart(1, 'severity');
+            updateInjuryChart(2, 'trend');
+        }
+
+        function updateNearMissCharts() {
+            updateNearMissChart(1, 'severity');
+            updateNearMissChart(2, 'process');
+        }
+
+        function updateInjuryChart(chartNum, type) {
+            const chart = state.injury.charts[`chart${chartNum}`];
+            if (!chart) return;
+            
+            const data = state.injury.filteredData;
+            
+            switch(type) {
+                case 'severity':
+                    updateSeverityChart(chart, data);
+                    break;
+                case 'bodyPart':
+                    updateBodyPartChart(chart, data);
+                    break;
+                case 'rootCause':
+                    updateRootCauseChart(chart, data);
+                    break;
+                case 'trend':
+                    updateTrendChart(chart, data, 'injury');
+                    break;
+                case 'recordableTrend':
+                    updateRecordableTrendChart(chart, data);
+                    break;
+                case 'lostTimeTrend':
+                    updateLostTimeTrendChart(chart, data);
+                    break;
+            }
+        }
+
+        function updateNearMissChart(chartNum, type) {
+            const chart = state.nearMiss.charts[`chart${chartNum}`];
+            if (!chart) return;
+            
+            const data = state.nearMiss.filteredData;
+            
+            switch(type) {
+                case 'severity':
+                    updateSeverityChart(chart, data);
+                    break;
+                case 'location':
+                    updateLocationChart(chart, data);
+                    break;
+                case 'impact':
+                    updateImpactChart(chart, data);
+                    break;
+                case 'process':
+                    updateProcessChart(chart, data);
+                    break;
+                case 'trend':
+                    updateTrendChart(chart, data, 'nearmiss');
+                    break;
+                case 'site':
+                    updateSiteChart(chart, data);
+                    break;
+            }
+        }
+
+        // Chart Update Functions
+        function updateSeverityChart(chart, data) {
+            const severityCounts = {
+                'A': data.filter(r => r.severity === 'A').length,
+                'B': data.filter(r => r.severity === 'B').length,
+                'C': data.filter(r => r.severity === 'C').length,
+                'D': data.filter(r => r.severity === 'D').length
+            };
+            
+            const nonZero = Object.entries(severityCounts).filter(([_, count]) => count > 0);
+            
+            chart.data = {
+                labels: nonZero.map(([severity]) => `Severity ${severity}`),
+                datasets: [{
+                    data: nonZero.map(([, count]) => count),
+                    backgroundColor: [
+                        'rgba(183, 28, 28, 0.8)',
+                        'rgba(255, 87, 34, 0.8)',
+                        'rgba(255, 193, 7, 0.8)',
+                        'rgba(76, 175, 80, 0.8)'
+                    ]
+                }]
+            };
+            chart.update();
+        }
+
+        function updateBodyPartChart(chart, data) {
+            const bodyPartCounts = {};
+            data.forEach(row => {
+                const part = row.bodyPart || 'Unknown';
+                bodyPartCounts[part] = (bodyPartCounts[part] || 0) + 1;
+            });
+            
+            const topParts = Object.entries(bodyPartCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 6);
+            
+            chart.config.type = 'doughnut';
+            chart.data = {
+                labels: topParts.map(([part]) => part.substring(0, 20)),
+                datasets: [{
+                    data: topParts.map(([, count]) => count),
+                    backgroundColor: [
+                        'rgba(255, 153, 0, 0.8)',
+                        'rgba(35, 47, 62, 0.8)',
+                        'rgba(55, 71, 90, 0.8)',
+                        'rgba(255, 87, 34, 0.8)',
+                        'rgba(76, 175, 80, 0.8)',
+                        'rgba(33, 150, 243, 0.8)'
+                    ]
+                }]
+            };
+            chart.update();
+        }
+
+        function updateRootCauseChart(chart, data) {
+            const causeCounts = {};
+            data.forEach(row => {
+                const cause = row.rootCause || 'Unknown';
+                causeCounts[cause] = (causeCounts[cause] || 0) + 1;
+            });
+            
+            const topCauses = Object.entries(causeCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 6);
+            
+            chart.config.type = 'doughnut';
+            chart.data = {
+                labels: topCauses.map(([cause]) => cause.substring(0, 20)),
+                datasets: [{
+                    data: topCauses.map(([, count]) => count),
+                    backgroundColor: [
+                        'rgba(255, 153, 0, 0.8)',
+                        'rgba(35, 47, 62, 0.8)',
+                        'rgba(55, 71, 90, 0.8)',
+                        'rgba(255, 87, 34, 0.8)',
+                        'rgba(76, 175, 80, 0.8)',
+                        'rgba(33, 150, 243, 0.8)'
+                    ]
+                }]
+            };
+            chart.update();
+        }
+
+        function updateLocationChart(chart, data) {
+            const locationCounts = {};
+            data.forEach(row => {
+                const location = row.initial_info_location_event || 'Unknown';
+                locationCounts[location] = (locationCounts[location] || 0) + 1;
+            });
+            
+            const topLocations = Object.entries(locationCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 6);
+            
+            chart.config.type = 'doughnut';
+            chart.data = {
+                labels: topLocations.map(([location]) => location.substring(0, 25)),
+                datasets: [{
+                    data: topLocations.map(([, count]) => count),
+                    backgroundColor: [
+                        'rgba(255, 153, 0, 0.8)',
+                        'rgba(35, 47, 62, 0.8)',
+                        'rgba(55, 71, 90, 0.8)',
+                        'rgba(255, 87, 34, 0.8)',
+                        'rgba(76, 175, 80, 0.8)',
+                        'rgba(33, 150, 243, 0.8)'
+                    ]
+                }]
+            };
+            chart.update();
+        }
+
+        function updateImpactChart(chart, data) {
+            const impactCounts = {};
+            data.forEach(row => {
+                const impact = row.initial_info_primary_impact || 'Unknown';
+                impactCounts[impact] = (impactCounts[impact] || 0) + 1;
+            });
+            
+            const topImpacts = Object.entries(impactCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 6);
+            
+            chart.config.type = 'doughnut';
+            chart.data = {
+                labels: topImpacts.map(([impact]) => impact),
+                datasets: [{
+                    data: topImpacts.map(([, count]) => count),
+                    backgroundColor: [
+                        'rgba(255, 153, 0, 0.8)',
+                        'rgba(35, 47, 62, 0.8)',
+                        'rgba(55, 71, 90, 0.8)',
+                        'rgba(255, 87, 34, 0.8)',
+                        'rgba(76, 175, 80, 0.8)',
+                        'rgba(33, 150, 243, 0.8)'
+                    ]
+                }]
+            };
+            chart.update();
+        }
+
+        function updateProcessChart(chart, data) {
+            const processCounts = {};
+            data.forEach(row => {
+                const process = row.initial_info_process_path || 'Unknown';
+                processCounts[process] = (processCounts[process] || 0) + 1;
+            });
+            
+            const processes = Object.entries(processCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 8);
+            
+            chart.config.type = 'bar';
+            chart.data = {
+                labels: processes.map(([process]) => process),
+                datasets: [{
+                    label: 'Incidents',
+                    data: processes.map(([, count]) => count),
+                    backgroundColor: 'rgba(255, 153, 0, 0.8)',
+                    borderColor: 'rgba(255, 153, 0, 1)',
+                    borderWidth: 1
+                }]
+            };
+            chart.options = getChartOptions('bar');
+            chart.update();
+        }
+
+        function updateTrendChart(chart, data, type) {
+            const monthlyData = {};
+            data.forEach(row => {
+                if (row.parsedDate && !isNaN(row.parsedDate)) {
+                    const monthKey = `${row.parsedDate.getFullYear()}-${String(row.parsedDate.getMonth() + 1).padStart(2, '0')}`;
+                    monthlyData[monthKey] = (monthlyData[monthKey] || 0) + 1;
+                }
+            });
+            
+            const sortedMonths = Object.keys(monthlyData).sort();
+            const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            
+            chart.config.type = 'line';
+            chart.data = {
+                labels: sortedMonths.map(m => {
+                    const [year, month] = m.split('-');
+                    return `${monthNames[parseInt(month)-1]} ${year}`;
+                }),
+                datasets: [{
+                    label: type === 'injury' ? 'Injuries' : 'Near Misses',
+                    data: sortedMonths.map(m => monthlyData[m]),
+                    borderColor: 'rgba(255, 153, 0, 1)',
+                    backgroundColor: 'rgba(255, 153, 0, 0.1)',
+                    tension: 0.3
+                }]
+            };
+            chart.options = getChartOptions('line');
+            chart.update();
+        }
+
+        function updateRecordableTrendChart(chart, data) {
+            const monthlyData = {};
+            data.forEach(row => {
+                if (row.parsedDate && !isNaN(row.parsedDate) && row.recordable === 1) {
+                    const monthKey = `${row.parsedDate.getFullYear()}-${String(row.parsedDate.getMonth() + 1).padStart(2, '0')}`;
+                    monthlyData[monthKey] = (monthlyData[monthKey] || 0) + 1;
+                }
+            });
+            
+            const sortedMonths = Object.keys(monthlyData).sort();
+            const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            
+            chart.config.type = 'line';
+            chart.data = {
+                labels: sortedMonths.map(m => {
+                    const [year, month] = m.split('-');
+                    return `${monthNames[parseInt(month)-1]} ${year}`;
+                }),
+                datasets: [{
+                    label: 'Recordable Cases',
+                    data: sortedMonths.map(m => monthlyData[m] || 0),
+                    borderColor: 'rgba(255, 87, 34, 1)',
+                    backgroundColor: 'rgba(255, 87, 34, 0.1)',
+                    tension: 0.3
+                }]
+            };
+            chart.options = getChartOptions('line');
+            chart.update();
+        }
+
+        function updateLostTimeTrendChart(chart, data) {
+            const monthlyData = {};
+            data.forEach(row => {
+                if (row.parsedDate && !isNaN(row.parsedDate) && row.total_dafw_days > 0) {
+                    const monthKey = `${row.parsedDate.getFullYear()}-${String(row.parsedDate.getMonth() + 1).padStart(2, '0')}`;
+                    monthlyData[monthKey] = (monthlyData[monthKey] || 0) + 1;
+                }
+            });
+            
+            const sortedMonths = Object.keys(monthlyData).sort();
+            const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            
+            chart.config.type = 'line';
+            chart.data = {
+                labels: sortedMonths.map(m => {
+                    const [year, month] = m.split('-');
+                    return `${monthNames[parseInt(month)-1]} ${year}`;
+                }),
+                datasets: [{
+                    label: 'Lost Time Cases',
+                    data: sortedMonths.map(m => monthlyData[m] || 0),
+                    borderColor: 'rgba(183, 28, 28, 1)',
+                    backgroundColor: 'rgba(183, 28, 28, 0.1)',
+                    tension: 0.3
+                }]
+            };
+            chart.options = getChartOptions('line');
+            chart.update();
+        }
+
+        function updateSiteChart(chart, data) {
+            const siteCounts = {};
+            data.forEach(row => {
+                const site = row.site || 'Unknown';
+                siteCounts[site] = (siteCounts[site] || 0) + 1;
+            });
+            
+            const sites = Object.entries(siteCounts).sort((a, b) => b[1] - a[1]);
+            
+            chart.config.type = 'bar';
+            chart.data = {
+                labels: sites.map(([site]) => site),
+                datasets: [{
+                    label: 'Incidents',
+                    data: sites.map(([, count]) => count),
+                    backgroundColor: sites.map((_, i) => 
+                        i % 2 === 0 ? 'rgba(255, 153, 0, 0.8)' : 'rgba(35, 47, 62, 0.8)'
+                    )
+                }]
+            };
+            chart.options = getChartOptions('bar');
+            chart.update();
+        }
+
+        // Update Overview
+        function updateOverview() {
+            if (state.injury.rawData.length > 0 || state.nearMiss.rawData.length > 0) {
+                document.querySelector('.welcome-screen').style.display = 'none';
+                document.getElementById('overviewMetrics').style.display = 'grid';
+                document.getElementById('overviewCharts').style.display = 'grid';
+                
+                // Update metrics
+                const totalIncidents = state.injury.filteredData.length + state.nearMiss.filteredData.length;
+                document.getElementById('totalIncidents').textContent = totalIncidents;
+                document.getElementById('injuryCount').textContent = state.injury.filteredData.length;
+                document.getElementById('nearMissCount').textContent = state.nearMiss.filteredData.length;
+                
+                // Calculate overall risk score
+                const allRisks = [
+                    ...state.injury.filteredData.map(r => parseFloat(calculateRiskScore(r))),
+                    ...state.nearMiss.filteredData.map(r => parseFloat(r.risk))
+                ].filter(r => !isNaN(r));
+                
+                const avgRisk = allRisks.length > 0 ? 
+                    (allRisks.reduce((a, b) => a + b, 0) / allRisks.length).toFixed(1) : '0.0';
+                document.getElementById('riskScore').textContent = avgRisk;
+                
+                updateOverviewCharts();
+            }
+        }
+
+        function updateOverviewCharts() {
+            // Update trend chart
+            const trendChart = Chart.getChart("overviewTrendChart");
+            if (trendChart) {
+                const allData = [...state.injury.filteredData, ...state.nearMiss.filteredData];
+                const monthlyData = {};
+                
+                allData.forEach(row => {
+                    if (row.parsedDate && !isNaN(row.parsedDate)) {
+                        const monthKey = `${row.parsedDate.getFullYear()}-${String(row.parsedDate.getMonth() + 1).padStart(2, '0')}`;
+                        if (!monthlyData[monthKey]) {
+                            monthlyData[monthKey] = { injury: 0, nearMiss: 0 };
+                        }
+                        if (row.case_number) {
+                            monthlyData[monthKey].injury++;
+                        } else {
+                            monthlyData[monthKey].nearMiss++;
+                        }
+                    }
+                });
+                
+                const sortedMonths = Object.keys(monthlyData).sort();
+                const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                
+                trendChart.data = {
+                    labels: sortedMonths.map(m => {
+                        const [year, month] = m.split('-');
+                        return `${monthNames[parseInt(month)-1]} ${year}`;
+                    }),
+                    datasets: [
+                        {
+                            label: 'Injuries',
+                            data: sortedMonths.map(m => monthlyData[m].injury),
+                            borderColor: 'rgba(255, 87, 34, 1)',
+                            backgroundColor: 'rgba(255, 87, 34, 0.1)',
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Near Misses',
+                            data: sortedMonths.map(m => monthlyData[m].nearMiss),
+                            borderColor: 'rgba(255, 193, 7, 1)',
+                            backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                            tension: 0.3
+                        }
+                    ]
+                };
+                trendChart.update();
+            }
+            
+            // Update site chart
+            const siteChart = Chart.getChart("overviewSiteChart");
+            if (siteChart) {
+                const siteCounts = {};
+                
+                state.injury.filteredData.forEach(row => {
+                    const site = row.site || 'Unknown';
+                    if (!siteCounts[site]) siteCounts[site] = { injury: 0, nearMiss: 0 };
+                    siteCounts[site].injury++;
+                });
+                
+                state.nearMiss.filteredData.forEach(row => {
+                    const site = row.site || 'Unknown';
+                    if (!siteCounts[site]) siteCounts[site] = { injury: 0, nearMiss: 0 };
+                    siteCounts[site].nearMiss++;
+                });
+                
+                const sites = Object.keys(siteCounts).sort();
+                
+                siteChart.data = {
+                    labels: sites,
+                    datasets: [
+                        {
+                            label: 'Injuries',
+                            data: sites.map(site => siteCounts[site].injury),
+                            backgroundColor: 'rgba(255, 87, 34, 0.8)'
+                        },
+                        {
+                            label: 'Near Misses',
+                            data: sites.map(site => siteCounts[site].nearMiss),
+                            backgroundColor: 'rgba(255, 193, 7, 0.8)'
+                        }
+                    ]
+                };
+                siteChart.update();
+            }
+        }
+
+        // Update Combined Analytics
+        function updateCombinedAnalytics() {
+            if (state.injury.rawData.length === 0 && state.nearMiss.rawData.length === 0) {
+                return;
+            }
+            
+            updateCombinedRiskMatrix();
+            updateActionItems();
+        }
+
+        // Create Risk Matrix
+        function createRiskMatrix() {
+            const matrix = document.getElementById('combinedRiskMatrix');
+            if (!matrix) return;
+            
+            matrix.innerHTML = '';
+            
+            const severityLabels = ['', 'A', 'B', 'C', 'D'];
+            const likelihoodLabels = ['', 'Rare', 'Unlikely', 'Possible', 'Likely', 'Almost Certain'];
+            
+            for (let s = 0; s < 6; s++) {
+                for (let l = 0; l < 6; l++) {
+                    const cell = document.createElement('div');
+                    
+                    if (s === 0 && l === 0) {
+                        cell.className = 'matrix-label';
+                        cell.textContent = 'S/L';
+                    } else if (s === 0) {
+                        cell.className = 'matrix-label';
+                        cell.textContent = likelihoodLabels[l];
+                    } else if (l === 0) {
+                        cell.className = 'matrix-label';
+                        cell.textContent = severityLabels[s];
+                    } else {
+                        const risk = (5 - s) * l;
+                        let riskClass = 'risk-low';
+                        if (risk > 15) riskClass = 'risk-critical';
+                        else if (risk > 10) riskClass = 'risk-high';
+                        else if (risk > 5) riskClass = 'risk-medium';
+                        
+                        cell.className = `matrix-cell ${riskClass}`;
+                        cell.textContent = '0';
+                        cell.id = `matrix-${severityLabels[s]}-${likelihoodLabels[l]}`;
+                        cell.onclick = () => showMatrixDetails(severityLabels[s], likelihoodLabels[l]);
+                    }
+                    
+                    matrix.appendChild(cell);
+                }
+            }
+        }
+
+        function updateCombinedRiskMatrix() {
+            // Reset all cells
+            const severityLabels = ['A', 'B', 'C', 'D'];
+            const likelihoodLabels = ['Rare', 'Unlikely', 'Possible', 'Likely', 'Almost Certain'];
+            
+            severityLabels.forEach(severity => {
+                likelihoodLabels.forEach(likelihood => {
+                    const cell = document.getElementById(`matrix-${severity}-${likelihood}`);
+                    if (cell) cell.textContent = '0';
+                });
+            });
+            
+            // Count incidents
+            const allData = [...state.injury.filteredData, ...state.nearMiss.filteredData];
+            
+            allData.forEach(incident => {
+                const severity = incident.severity;
+                const likelihood = 'Possible'; // Default if not specified
+                
+                if (['A', 'B', 'C', 'D'].includes(severity)) {
+                    const cell = document.getElementById(`matrix-${severity}-${likelihood}`);
+                    if (cell) {
+                        cell.textContent = (parseInt(cell.textContent) + 1).toString();
+                    }
+                }
+            });
+        }
+
+        function showMatrixDetails(severity, likelihood) {
+            const allData = [...state.injury.filteredData, ...state.nearMiss.filteredData];
+            const incidents = allData.filter(r => r.severity === severity);
+            
+            if (incidents.length === 0) {
+                showStatus(`No incidents found with Severity ${severity}`, 'info');
+                return;
+            }
+            
+            // Show in modal
+            const modal = document.getElementById('detailModal');
+            const title = document.getElementById('modalTitle');
+            const body = document.getElementById('modalBody');
+            
+            title.textContent = `Incidents: Severity ${severity}, ${likelihood}`;
+            body.innerHTML = `
+                <p>Total incidents: ${incidents.length}</p>
+                <ul style="list-style: none; padding: 0;">
+                    ${incidents.slice(0, 5).map(incident => `
+                        <li style="padding: 0.5rem 0; border-bottom: 1px solid var(--bg-secondary);">
+                            <strong>${incident.case_number || incident.incident_id}</strong><br>
+                            Date: ${incident.incident_date || incident.nearmiss_date || 'N/A'}<br>
+                            Site: ${incident.site || 'N/A'}
+                        </li>
+                    `).join('')}
+                </ul>
+                ${incidents.length > 5 ? `<p>... and ${incidents.length - 5} more incidents</p>` : ''}
+            `;
+            
+            modal.style.display = 'block';
+        }
+
+        // Update Action Items
+        function updateActionItems() {
+            const actionContainer = document.getElementById('actionItems');
+            const allData = [...state.injury.filteredData, ...state.nearMiss.filteredData];
+            
+            if (allData.length === 0) {
+                actionContainer.innerHTML = '<p style="color: var(--text-secondary);">No data available for analysis</p>';
+                return;
+            }
+            
+            const actions = {
+                immediate: [],
+                shortTerm: [],
+                longTerm: []
+            };
+            
+            // High severity incidents
+            const highSeverity = allData.filter(r => r.severity === 'A' || r.severity === 'B');
+            if (highSeverity.length > 5) {
+                actions.immediate.push(`Address ${highSeverity.length} high-severity incidents immediately`);
+            }
+            
+            // Recordable cases
+            const recordable = state.injury.filteredData.filter(r => r.recordable === 1);
+            if (recordable.length > 3) {
+                actions.immediate.push(`Review ${recordable.length} recordable cases for compliance`);
+            }
+            
+            // Site-specific issues
+            const siteCounts = {};
+            allData.forEach(r => {
+                if (r.site) {
+                    siteCounts[r.site] = (siteCounts[r.site] || 0) + 1;
+                }
+            });
+            
+            Object.entries(siteCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 2)
+                .forEach(([site, count]) => {
+                    if (count > 5) {
+                        actions.shortTerm.push(`Conduct safety audit at ${site} (${count} incidents)`);
+                    }
+                });
+            
+            // Long-term improvements
+            actions.longTerm.push('Implement enhanced safety monitoring system');
+            actions.longTerm.push('Develop predictive analytics for incident prevention');
+            
+            actionContainer.innerHTML = `
+                <div style="margin-bottom: 2rem;">
+                    <h4 style="color: var(--danger); margin-bottom: 1rem;">Immediate Actions Required</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        ${actions.immediate.map(action => `
+                            <li style="padding: 0.5rem 0;">
+                                <span style="color: var(--danger);">●</span> ${action}
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+                <div style="margin-bottom: 2rem;">
+                    <h4 style="color: var(--warning); margin-bottom: 1rem;">Short-term Actions (30 days)</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        ${actions.shortTerm.map(action => `
+                            <li style="padding: 0.5rem 0;">
+                                <span style="color: var(--warning);">●</span> ${action}
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+                <div>
+                    <h4 style="color: var(--primary); margin-bottom: 1rem;">Long-term Improvements</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        ${actions.longTerm.map(action => `
+                            <li style="padding: 0.5rem 0;">
+                                <span style="color: var(--primary);">●</span> ${action}
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+
+        // View Details
+        function viewDetails(type, id) {
+            const data = type === 'injury' ? 
+                state.injury.filteredData.find(r => r.case_number === id) :
+                state.nearMiss.filteredData.find(r => r.incident_id === id);
+            
+            if (!data) return;
+            
+            const modal = document.getElementById('detailModal');
+            const title = document.getElementById('modalTitle');
+            const body = document.getElementById('modalBody');
+            
+            title.textContent = type === 'injury' ? 'Injury Details' : 'Near Miss Details';
+            
+            if (type === 'injury') {
+                body.innerHTML = `
+                    <div style="display: grid; gap: 1rem;">
+                        <div><strong>Case Number:</strong> ${data.case_number}</div>
+                        <div><strong>Date:</strong> ${data.incident_date || 'N/A'}</div>
+                        <div><strong>Site:</strong> ${data.site || 'N/A'}</div>
+                        <div><strong>Body Part:</strong> ${data.bodyPart || 'N/A'}</div>
+                        <div><strong>Type:</strong> ${data.type || 'N/A'}</div>
+                        <div><strong>Severity:</strong> <span class="badge badge-${getSeverityClass(data.severity)}">${data.severity}</span></div>
+                        <div><strong>Recordable:</strong> <span class="badge badge-${data.recordable === 1 ? 'danger' : 'success'}">${data.recordable === 1 ? 'Yes' : 'No'}</span></div>
+                        <div><strong>DAFW Days:</strong> ${data.total_dafw_days || 0}</div>
+                        <div><strong>Root Cause:</strong> ${data.rootCause || 'Under Investigation'}</div>
+                        <div><strong>Description:</strong> ${data.initial_info_incident_description || 'No description available'}</div>
+                    </div>
+                `;
+            } else {
+                body.innerHTML = `
+                    <div style="display: grid; gap: 1rem;">
+                        <div><strong>ID:</strong> ${data.incident_id}</div>
+                        <div><strong>Date:</strong> ${data.nearmiss_date || 'N/A'}</div>
+                        <div><strong>Site:</strong> ${data.site || 'N/A'}</div>
+                        <div><strong>Location:</strong> ${data.initial_info_location_event || 'N/A'}</div>
+                        <div><strong>Process Path:</strong> ${data.initial_info_process_path || 'N/A'}</div>
+                        <div><strong>Primary Impact:</strong> ${data.initial_info_primary_impact || 'N/A'}</div>
+                        <div><strong>Severity:</strong> <span class="badge badge-${getSeverityClass(data.severity)}">${data.severity}</span></div>
+                        <div><strong>Risk Score:</strong> ${data.risk || 'N/A'}</div>
+                        <div><strong>Description:</strong> ${data.initial_info_incident_description || 'No description available'}</div>
+                    </div>
+                `;
+            }
+            
+            modal.style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').style.display = 'none';
+        }
+
+        // Export Functions
+        function exportInjuryData() {
+            exportToExcel('injury');
+        }
+
+        function exportNearMissData() {
+            exportToExcel('nearmiss');
+        }
+
+        function exportToExcel(type = 'all') {
+            let dataToExport = [];
+            let filename = '';
+            
+            if (type === 'injury') {
+                dataToExport = state.injury.filteredData;
+                filename = 'injury_analysis';
+            } else if (type === 'nearmiss') {
+                dataToExport = state.nearMiss.filteredData;
+                filename = 'nearmiss_analysis';
+            } else {
+                // Export all data
+                const wb = XLSX.utils.book_new();
+                
+                if (state.injury.filteredData.length > 0) {
+                    const ws1 = XLSX.utils.json_to_sheet(state.injury.filteredData);
+                    XLSX.utils.book_append_sheet(wb, ws1, "Injury Data");
+                }
+                
+                if (state.nearMiss.filteredData.length > 0) {
+                    const ws2 = XLSX.utils.json_to_sheet(state.nearMiss.filteredData);
+                    XLSX.utils.book_append_sheet(wb, ws2, "Near Miss Data");
+                }
+                
+                XLSX.writeFile(wb, `safety_analysis_${new Date().toISOString().split('T')[0]}.xlsx`);
+                showStatus('Data exported successfully!', 'success');
+                return;
+            }
+            
+            if (dataToExport.length === 0) {
+                showStatus('No data to export', 'error');
+                return;
+            }
+            
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(dataToExport);
+            XLSX.utils.book_append_sheet(wb, ws, "Data");
+            
+            XLSX.writeFile(wb, `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`);
+            showStatus('Data exported successfully!', 'success');
+        }
+
+        // Generate PDF Report
+        function generatePDFReport(type) {
+            showStatus('Generating PDF report...', 'info');
+            
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                // Add header
+                doc.setFillColor(255, 153, 0);
+                doc.rect(0, 0, 210, 25, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(22);
+                doc.text('Safety Analytics Report', 105, 15, { align: 'center' });
+                
+                // Add content based on type
+                let yPos = 40;
+                doc.setTextColor(0, 0, 0);
+                doc.setFontSize(12);
+                
+                if (type === 'injury' || type === 'combined') {
+                    doc.text('Injury & Illness Summary', 20, yPos);
+                    yPos += 10;
+                    doc.text(`Total Incidents: ${state.injury.filteredData.length}`, 20, yPos);
+                    yPos += 7;
+                    doc.text(`Recordable Cases: ${state.injury.filteredData.filter(r => r.recordable === 1).length}`, 20, yPos);
+                    yPos += 7;
+                    doc.text(`Days Lost: ${state.injury.filteredData.reduce((sum, r) => sum + (r.total_dafw_days || 0), 0)}`, 20, yPos);
+                    yPos += 15;
+                }
+                
+                if (type === 'nearmiss' || type === 'combined') {
+                    doc.text('Near Miss Summary', 20, yPos);
+                    yPos += 10;
+                    doc.text(`Total Near Misses: ${state.nearMiss.filteredData.length}`, 20, yPos);
+                    yPos += 7;
+                    doc.text(`High Severity: ${state.nearMiss.filteredData.filter(r => r.severity === 'A' || r.severity === 'B').length}`, 20, yPos);
+                    yPos += 15;
+                }
+                
+                // Add footer
+                doc.setFontSize(10);
+                doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 280);
+                
+                // Save PDF
+                doc.save(`safety_report_${type}_${new Date().toISOString().split('T')[0]}.pdf`);
+                showStatus('PDF report generated successfully!', 'success');
+                
+                // Update report history
+                updateReportHistory(type);
+            } catch (error) {
+                showStatus('Error generating PDF: ' + error.message, 'error');
+            }
+        }
+
+        function generateCombinedReport() {
+            generatePDFReport('combined');
+        }
+
+        function updateReportHistory(type) {
+            const history = document.getElementById('reportHistory');
+            const now = new Date();
+            const reportEntry = `
+                <div style="padding: 1rem 0; border-bottom: 1px solid var(--bg-secondary);">
+                    <strong>${type.charAt(0).toUpperCase() + type.slice(1)} Report</strong><br>
+                    <span style="color: var(--text-secondary); font-size: 0.9rem;">
+                        Generated at ${now.toLocaleTimeString()} on ${now.toLocaleDateString()}
+                    </span>
+                </div>
+            `;
+            
+            if (history.innerHTML.includes('No reports generated yet')) {
+                history.innerHTML = reportEntry;
+            } else {
+                history.innerHTML = reportEntry + history.innerHTML;
+            }
+        }
+
+        // Load Sample Data
+        function loadSampleData() {
+            showStatus('Loading sample data...', 'info');
+            
+            // Sample injury data
+            const sampleInjuryData = [
+                {
+                    case_number: 'INJ-VIE-202401-001',
+                    incident_date: '2024-01-15',
+                    site: 'Vienna DC1',
+                    initial_info_principal_body_part: 'Back - Lower',
+                    type: 'Strain/Sprain',
+                    severity: 'B',
+                    recordable: 1,
+                    total_dafw_days: 5,
+                    rca_primary_cause: 'Human Error'
+                },
+                {
+                    case_number: 'INJ-VIE-202401-002',
+                    incident_date: '2024-01-20',
+                    site: 'Vienna DC1',
+                    initial_info_principal_body_part: 'Hand',
+                    type: 'Cut/Laceration',
+                    severity: 'C',
+                    recordable: 0,
+                    total_dafw_days: 0,
+                    rca_primary_cause: 'Equipment'
+                },
+                {
+                    case_number: 'INJ-GRZ-202402-003',
+                    incident_date: '2024-02-01',
+                    site: 'Graz FC',
+                    initial_info_principal_body_part: 'Ankle',
+                    type: 'Slip/Trip/Fall',
+                    severity: 'A',
+                    recordable: 1,
+                    total_dafw_days: 30,
+                    rca_primary_cause: 'Environment'
+                }
+            ];
+            
+            // Sample near miss data
+            const sampleNearMissData = [
+                {
+                    incident_id: 'NM-VIE-202401-001',
+                    nearmiss_date: '2024-01-15',
+                    site: 'Vienna DC1',
+                    initial_info_location_event: 'Warehouse Aisle 3',
+                    initial_info_process_path: 'Inbound/Receiving',
+                    initial_info_primary_impact: 'Associate Safety',
+                    potential_severity: 'B',
+                    risk: 7.5
+                },
+                {
+                    incident_id: 'NM-VIE-202401-002',
+                    nearmiss_date: '2024-01-20',
+                    site: 'Vienna DC1',
+                    initial_info_location_event: 'Storage Rack B4',
+                    initial_info_process_path: 'Stow',
+                    initial_info_primary_impact: 'Product Damage',
+                    potential_severity: 'C',
+                    risk: 4.2
+                },
+                {
+                    incident_id: 'NM-GRZ-202401-003',
+                    nearmiss_date: '2024-02-01',
+                    site: 'Graz FC',
+                    initial_info_location_event: 'Main Entrance',
+                    initial_info_process_path: 'General Facility',
+                    initial_info_primary_impact: 'Associate Safety',
+                    potential_severity: 'D',
+                    risk: 2.1
+                }
+            ];
+            
+            // Process data
+            state.injury.rawData = sampleInjuryData;
+            state.nearMiss.rawData = sampleNearMissData;
+            
+            processInjuryData();
+            processNearMissData();
+            
+            populateInjuryFilters();
+            populateNearMissFilters();
+            
+            applyFilters('injury');
+            applyFilters('nearmiss');
+            
+            showStatus('Sample data loaded successfully!', 'success');
+            updateOverview();
+        }
+
+        // Status Messages
+        function showStatus(message, type = 'info') {
+            const container = document.getElementById('statusContainer');
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `status-message status-${type}`;
+            
+            let icon = '💡';
+            if (type === 'success') icon = '✅';
+            else if (type === 'error') icon = '❌';
+            else if (type === 'warning') icon = '⚠️';
+            
+            statusDiv.innerHTML = `<span>${icon}</span> ${message}`;
+            container.appendChild(statusDiv);
+            
+            setTimeout(() => {
+                statusDiv.style.opacity = '0';
+                setTimeout(() => statusDiv.remove(), 300);
+            }, 5000);
+        }
+
+        // Event Listeners
+        function setupEventListeners() {
+            // Close modal when clicking outside
+            window.onclick = function(event) {
+                const modal = document.getElementById('detailModal');
+                if (event.target === modal) {
+                    modal.style.display = 'none';
+                }
+            };
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closeModal();
+                }
+            });
+        }
+
+        // Update all charts (for theme changes)
+        function updateAllCharts() {
+            // Update existing charts with new theme colors
+            Chart.helpers.each(Chart.instances, (chart) => {
+                chart.options = getChartOptions(chart.config.type);
+                chart.update();
+            });
+        }
+    </script>
+</body>
+</html>
