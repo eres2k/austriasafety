@@ -50,6 +50,7 @@
             display: inline-block;
             margin-top: 10px;
             transition: all 0.3s;
+            font-size: 14px;
         }
         
         .austin-link:hover {
@@ -446,7 +447,6 @@
     <div class="header">
         <h1>Injury & Illness Analysis Tool</h1>
         <p>Amazon Austria WHS - Data Analytics Platform</p>
-        <a href="https://safety.amazon.com/austin-case-study" class="austin-link" target="_blank">📚 View Austin Case Study</a>
     </div>
     
     <div class="container">
@@ -723,6 +723,7 @@
         let charts = {};
         let currentTimelinePage = 1;
         const itemsPerPage = 10;
+        const DEFAULT_AUSTIN_URL = 'https://safety.amazon.com/austin-case-study';
         
         // Initialize the application
         document.addEventListener('DOMContentLoaded', function() {
@@ -837,87 +838,131 @@
         }
         
         // Process and enhance data
+        function processData() {
+            rawData.forEach((row, index) => {
+                try {
+                    // Parse dates
+                    if (row.incident_date) {
+                        row.parsedDate = new Date(row.incident_date);
+                    }
+                    
+                    // Standardize severity
+                    row.standardSeverity = standardizeSeverity(row.severity || row.potential_severity);
+                    
+                    // Ensure recordable is numeric
+                    row.recordable = parseInt(row.recordable) || 0;
+                    
+                    // Ensure DAFW days is numeric
+                    row.total_dafw_days = parseInt(row.total_dafw_days) || 0;
+                    
+                    // Generate case ID if not present
+                    if (!row.case_number) {
+                        row.case_number = `CASE-${index + 1}`;
+                    }
+                    
+                    // Extract body part
+                    row.bodyPart = row.initial_info_principal_body_part || row.initial_info_detailed_body_part || 'Unknown';
 
-function processData() {
-    rawData.forEach((row, index) => {
-        try {
-            // Parse dates
-            if (row.incident_date) {
-                row.parsedDate = new Date(row.incident_date);
-            }
-            
-            // Standardize severity
-            row.standardSeverity = standardizeSeverity(row.severity || row.potential_severity);
-            
-            // Ensure recordable is numeric
-            row.recordable = parseInt(row.recordable) || 0;
-            
-            // Ensure DAFW days is numeric
-            row.total_dafw_days = parseInt(row.total_dafw_days) || 0;
-            
-            // Generate case ID if not present
-            if (!row.case_number) {
-                row.case_number = `CASE-${index + 1}`;
-            }
-            
-            // Extract body part
-            row.bodyPart = row.initial_info_principal_body_part || row.initial_info_detailed_body_part || 'Unknown';
+                    // Extract OTR status from initial_info_incident_on_the_road column
+                    // Handle boolean values first (from Papa Parse with dynamicTyping)
+                    if (row.initial_info_incident_on_the_road === true) {
+                        row.otr = 'yes';
+                    } else if (row.initial_info_incident_on_the_road === false) {
+                        row.otr = 'no';
+                    } else {
+                        // Handle string values and other cases
+                        row.otr = row.initial_info_incident_on_the_road || 'no';
+                        if (typeof row.otr === 'string') {
+                            row.otr = row.otr.toLowerCase();
+                        }
+                        // Normalize various string OTR values to yes/no
+                        if (row.otr === '1' || row.otr === 'true' || row.otr === 'yes' || row.otr === 'y') {
+                            row.otr = 'yes';
+                        } else {
+                            row.otr = 'no';
+                        }
+                    }
 
-            // Extract OTR status from initial_info_incident_on_the_road column
-            // Handle boolean values first (from Papa Parse with dynamicTyping)
-            if (row.initial_info_incident_on_the_road === true) {
-                row.otr = 'yes';
-            } else if (row.initial_info_incident_on_the_road === false) {
-                row.otr = 'no';
-            } else {
-                // Handle string values and other cases
-                row.otr = row.initial_info_incident_on_the_road || 'no';
-                if (typeof row.otr === 'string') {
-                    row.otr = row.otr.toLowerCase();
+                    // Extract root cause
+                    row.rootCause = row.rca_primary_cause || 'Under Investigation';
+                    
+                    // Standardize likelihood values
+                    row.standardized_likelihood = standardizeLikelihood(row.initial_risk_assessment_likeliness);
+                    
+                    // Add likelihood for risk matrix (if not present, assign random for demo)
+                    if (!row.initial_risk_assessment_likeliness) {
+                        const likelihoods = ['Rare', 'Unlikely', 'Possible', 'Likely', 'Almost Certain'];
+                        row.initial_risk_assessment_likeliness = likelihoods[Math.floor(Math.random() * likelihoods.length)];
+                        row.standardized_likelihood = row.initial_risk_assessment_likeliness;
+                    }
+                    
+                    // Extract Austin URL from CSV if present, otherwise use default
+                    // Check for various possible column names
+                    row.austin_url = row.austin_url || 
+                                    row.austin_case_study_url || 
+                                    row.austin_link || 
+                                    row.case_study_url ||
+                                    DEFAULT_AUSTIN_URL;
+                    
+                } catch (error) {
+                    console.error(`Error processing row ${index}:`, error);
                 }
-                // Normalize various string OTR values to yes/no
-                if (row.otr === '1' || row.otr === 'true' || row.otr === 'yes' || row.otr === 'y') {
-                    row.otr = 'yes';
-                } else {
-                    row.otr = 'no';
-                }
-            }
-
-            // Extract root cause
-            row.rootCause = row.rca_primary_cause || 'Under Investigation';
-            
-            // Add likelihood for risk matrix (if not present, assign random for demo)
-            if (!row.initial_risk_assessment_likeliness) {
-                const likelihoods = ['Rare', 'Unlikely', 'Possible', 'Likely', 'Almost Certain'];
-                row.initial_risk_assessment_likeliness = likelihoods[Math.floor(Math.random() * likelihoods.length)];
-            }
-            
-        } catch (error) {
-            console.error(`Error processing row ${index}:`, error);
+            });
         }
-    });
-}
 
-// Standardize severity levels - This should be OUTSIDE processData function
-function standardizeSeverity(severity) {
-    if (!severity) return 'Unknown';
-    const severityStr = String(severity).toUpperCase().trim();
-    
-    // Handle A-D severity scale
-    if (severityStr === 'A') return 'A';
-    if (severityStr === 'B') return 'B';
-    if (severityStr === 'C') return 'C';
-    if (severityStr === 'D') return 'D';
-    
-    // Fallback for other formats
-    const lower = severityStr.toLowerCase();
-    if (lower.includes('critical') || lower.includes('severe')) return 'A';
-    if (lower.includes('high') || lower.includes('major')) return 'B';
-    if (lower.includes('medium') || lower.includes('moderate')) return 'C';
-    if (lower.includes('low') || lower.includes('minor')) return 'D';
-    
-    return 'Unknown';
-}
+        // Standardize severity levels
+        function standardizeSeverity(severity) {
+            if (!severity) return 'Unknown';
+            const severityStr = String(severity).toUpperCase().trim();
+            
+            // Handle A-D severity scale
+            if (severityStr === 'A') return 'A';
+            if (severityStr === 'B') return 'B';
+            if (severityStr === 'C') return 'C';
+            if (severityStr === 'D') return 'D';
+            
+            // Fallback for other formats
+            const lower = severityStr.toLowerCase();
+            if (lower.includes('critical') || lower.includes('severe')) return 'A';
+            if (lower.includes('high') || lower.includes('major')) return 'B';
+            if (lower.includes('medium') || lower.includes('moderate')) return 'C';
+            if (lower.includes('low') || lower.includes('minor')) return 'D';
+            
+            return 'Unknown';
+        }
+        
+        // Standardize likelihood values
+        function standardizeLikelihood(likelihood) {
+            if (!likelihood) return 'Possible';
+            
+            const likelihoodStr = String(likelihood).toLowerCase().trim();
+            
+            // Direct matches
+            if (likelihoodStr.includes('rare')) return 'Rare';
+            if (likelihoodStr.includes('unlikely')) return 'Unlikely';
+            if (likelihoodStr.includes('possible')) return 'Possible';
+            if (likelihoodStr.includes('likely') && !likelihoodStr.includes('unlikely')) {
+                if (likelihoodStr.includes('almost') || likelihoodStr.includes('certain')) {
+                    return 'Almost Certain';
+                }
+                return 'Likely';
+            }
+            if (likelihoodStr.includes('certain')) return 'Almost Certain';
+            
+            // Numeric values (1-5 scale)
+            const numValue = parseInt(likelihoodStr);
+            if (!isNaN(numValue)) {
+                switch(numValue) {
+                    case 1: return 'Rare';
+                    case 2: return 'Unlikely';
+                    case 3: return 'Possible';
+                    case 4: return 'Likely';
+                    case 5: return 'Almost Certain';
+                }
+            }
+            
+            return 'Possible'; // Default
+        }
         
         // Populate filter dropdowns
         function populateFilters() {
@@ -1005,6 +1050,7 @@ function standardizeSeverity(severity) {
                 const dafwDays = row.total_dafw_days || 0;
                 const otr = row.otr === 'yes' ? 'Yes' : 'No';
                 const rootCause = (row.rootCause || 'N/A').substring(0, 20);
+                const austinUrl = row.austin_url || DEFAULT_AUSTIN_URL;
                 
                 return `
                     <tr>
@@ -1020,6 +1066,7 @@ function standardizeSeverity(severity) {
                         <td title="${row.rootCause || ''}">${rootCause}${rootCause.length >= 20 ? '...' : ''}</td>
                         <td>
                             <button onclick="viewDetails('${caseNumber.replace(/'/g, "\\'")}')">View</button>
+                            <a href="${austinUrl}" target="_blank" title="Austin Case Study" style="text-decoration: none; margin-left: 5px;">📚</a>
                         </td>
                     </tr>
                 `;
@@ -1906,7 +1953,11 @@ function updateOTRAnalysisChart(chart) {
         // Create risk matrix
         function createRiskMatrix() {
             const matrix = document.getElementById('riskMatrixGrid');
-            const severityLabels = ['', 'A', 'B', 'C', 'D', ''];
+            if (!matrix) return;
+            
+            matrix.innerHTML = ''; // Clear existing matrix
+            
+            const severityLabels = ['', 'A', 'B', 'C', 'D'];
             const likelihoodLabels = ['', 'Rare', 'Unlikely', 'Possible', 'Likely', 'Almost Certain'];
             
             for (let s = 0; s < 6; s++) {
@@ -1922,9 +1973,6 @@ function updateOTRAnalysisChart(chart) {
                     } else if (l === 0) {
                         cell.className = 'matrix-label';
                         cell.textContent = severityLabels[s];
-                    } else if (s === 5 || l === 5) {
-                        // Skip the extra row/column
-                        continue;
                     } else {
                         const risk = calculateMatrixRisk(5-s, l);
                         cell.className = `matrix-cell risk-${getRiskLevel(risk)}`;
@@ -1942,30 +1990,56 @@ function updateOTRAnalysisChart(chart) {
         
         // Update risk matrix with actual data
         function updateRiskMatrix() {
-            if (filteredData.length === 0) return;
-            
-            // Reset all counts
-            const cells = document.querySelectorAll('.matrix-cell');
-            cells.forEach(cell => {
-                if (cell.dataset.severity && cell.dataset.likelihood) {
-                    cell.textContent = '0';
-                }
-            });
-            
-            // Count incidents for each cell
-            filteredData.forEach(row => {
-                const severity = row.standardSeverity;
-                const likelihood = row.initial_risk_assessment_likeliness;
-                
-                if (severity && likelihood) {
-                    const cellId = `matrix-${severity}-${likelihood}`;
-                    const cell = document.getElementById(cellId);
-                    if (cell) {
-                        const currentCount = parseInt(cell.textContent) || 0;
-                        cell.textContent = currentCount + 1;
+            if (filteredData.length === 0) {
+                // Reset all cells to 0
+                document.querySelectorAll('.matrix-cell').forEach(cell => {
+                    if (!cell.classList.contains('matrix-label')) {
+                        cell.textContent = '0';
+                        cell.style.fontWeight = 'normal';
+                        cell.style.fontSize = '14px';
                     }
+                });
+                return;
+            }
+            
+            // Count incidents by severity and likelihood
+            const matrixCounts = {};
+            
+            filteredData.forEach(incident => {
+                const severity = incident.standardSeverity;
+                const likelihood = incident.standardized_likelihood || 'Possible';
+                
+                // Only count valid severities (A-D)
+                if (['A', 'B', 'C', 'D'].includes(severity)) {
+                    const key = `${severity}-${likelihood}`;
+                    matrixCounts[key] = (matrixCounts[key] || 0) + 1;
                 }
             });
+            
+            // Reset all cells first
+            const severityLabels = ['A', 'B', 'C', 'D'];
+            const likelihoodLabels = ['Rare', 'Unlikely', 'Possible', 'Likely', 'Almost Certain'];
+            
+            severityLabels.forEach(severity => {
+                likelihoodLabels.forEach(likelihood => {
+                    const cell = document.getElementById(`matrix-${severity}-${likelihood}`);
+                    if (cell) {
+                        const count = matrixCounts[`${severity}-${likelihood}`] || 0;
+                        cell.textContent = count.toString();
+                        
+                        // Add visual indicator for cells with incidents
+                        if (count > 0) {
+                            cell.style.fontWeight = 'bold';
+                            cell.style.fontSize = '16px';
+                        } else {
+                            cell.style.fontWeight = 'normal';
+                            cell.style.fontSize = '14px';
+                        }
+                    }
+                });
+            });
+            
+            console.log('Risk matrix updated with counts:', matrixCounts);
         }
         
         // Calculate risk for matrix cell
@@ -1985,7 +2059,7 @@ function updateOTRAnalysisChart(chart) {
         function showMatrixIncidents(severity, likelihood) {
             const incidents = filteredData.filter(row => 
                 row.standardSeverity === severity && 
-                row.initial_risk_assessment_likeliness === likelihood
+                row.standardized_likelihood === likelihood
             );
             
             const modal = document.getElementById('matrixIncidentsModal');
@@ -1997,16 +2071,22 @@ function updateOTRAnalysisChart(chart) {
             if (incidents.length === 0) {
                 incidentsList.innerHTML = '<p>No incidents found for this combination.</p>';
             } else {
-                incidentsList.innerHTML = incidents.map(incident => `
-                    <div class="matrix-incident-item">
-                        <strong>${incident.case_number || 'N/A'}</strong> - ${incident.incident_date || 'N/A'}<br>
-                        <span>Site: ${incident.site || 'N/A'}</span><br>
-                        <span>Body Part: ${incident.bodyPart || 'N/A'}</span><br>
-                        <span>Type: ${incident.type || 'N/A'}</span><br>
-                        <span class="severity-badge severity-${incident.standardSeverity.toLowerCase()}">Severity ${incident.standardSeverity}</span>
-                        <span class="severity-badge recordable-${incident.recordable === 1 ? 'yes' : 'no'}">${incident.recordable === 1 ? 'Recordable' : 'Non-Recordable'}</span>
-                    </div>
-                `).join('');
+                incidentsList.innerHTML = incidents.map(incident => {
+                    const austinUrl = incident.austin_url || DEFAULT_AUSTIN_URL;
+                    return `
+                        <div class="matrix-incident-item">
+                            <strong>${incident.case_number || 'N/A'}</strong> - ${incident.incident_date || 'N/A'}<br>
+                            <span>Site: ${incident.site || 'N/A'}</span><br>
+                            <span>Body Part: ${incident.bodyPart || 'N/A'}</span><br>
+                            <span>Type: ${incident.type || 'N/A'}</span><br>
+                            <span class="severity-badge severity-${incident.standardSeverity.toLowerCase()}">Severity ${incident.standardSeverity}</span>
+                            <span class="severity-badge recordable-${incident.recordable === 1 ? 'yes' : 'no'}">${incident.recordable === 1 ? 'Recordable' : 'Non-Recordable'}</span><br>
+                            <a href="${austinUrl}" target="_blank" class="austin-link" style="margin-top: 5px; display: inline-block;">
+                                📚 View Austin Case Study
+                            </a>
+                        </div>
+                    `;
+                }).join('');
             }
             
             modal.style.display = 'block';
@@ -2068,21 +2148,25 @@ function updateOTRAnalysisChart(chart) {
             const pageIncidents = sortedIncidents.slice(startIndex, endIndex);
             
             // Update timeline content
-            timelineContent.innerHTML = pageIncidents.map(incident => `
-                <div class="timeline-item">
-                    <h4>${incident.case_number}</h4>
-                    <p><strong>Date:</strong> ${incident.incident_date || 'N/A'}</p>
-                    <p><strong>Site:</strong> ${incident.site || 'N/A'}</p>
-                    <p><strong>Body Part:</strong> ${incident.bodyPart || 'N/A'}</p>
-                    <p><strong>Type:</strong> ${incident.type || 'N/A'}</p>
-                    <p><strong>Severity:</strong> <span class="severity-badge severity-${(incident.standardSeverity || 'unknown').toLowerCase()}">${incident.standardSeverity || 'N/A'}</span></p>
-                    <p><strong>Recordable:</strong> <span class="severity-badge recordable-${incident.recordable === 1 ? 'yes' : 'no'}">${incident.recordable === 1 ? 'Yes' : 'No'}</span></p>
-                    <p><strong>OTR:</strong> <span class="severity-badge ${incident.otr === 'yes' ? 'recordable-yes' : 'recordable-no'}">${incident.otr === 'yes' ? 'Yes' : 'No'}</span></p>
-                    <p><strong>DAFW Days:</strong> ${incident.total_dafw_days || 0}</p>
-                    <p><strong>Description:</strong> ${incident.initial_info_incident_description || 'No description'}</p>
-                    <p><strong>Root Cause:</strong> ${incident.rootCause || 'Under investigation'}</p>
-                </div>
-            `).join('');
+            timelineContent.innerHTML = pageIncidents.map(incident => {
+                const austinUrl = incident.austin_url || DEFAULT_AUSTIN_URL;
+                return `
+                    <div class="timeline-item">
+                        <h4>${incident.case_number}</h4>
+                        <p><strong>Date:</strong> ${incident.incident_date || 'N/A'}</p>
+                        <p><strong>Site:</strong> ${incident.site || 'N/A'}</p>
+                        <p><strong>Body Part:</strong> ${incident.bodyPart || 'N/A'}</p>
+                        <p><strong>Type:</strong> ${incident.type || 'N/A'}</p>
+                        <p><strong>Severity:</strong> <span class="severity-badge severity-${(incident.standardSeverity || 'unknown').toLowerCase()}">${incident.standardSeverity || 'N/A'}</span></p>
+                        <p><strong>Recordable:</strong> <span class="severity-badge recordable-${incident.recordable === 1 ? 'yes' : 'no'}">${incident.recordable === 1 ? 'Yes' : 'No'}</span></p>
+                        <p><strong>OTR:</strong> <span class="severity-badge ${incident.otr === 'yes' ? 'recordable-yes' : 'recordable-no'}">${incident.otr === 'yes' ? 'Yes' : 'No'}</span></p>
+                        <p><strong>DAFW Days:</strong> ${incident.total_dafw_days || 0}</p>
+                        <p><strong>Description:</strong> ${incident.initial_info_incident_description || 'No description'}</p>
+                        <p><strong>Root Cause:</strong> ${incident.rootCause || 'Under investigation'}</p>
+                        <a href="${austinUrl}" target="_blank" class="austin-link">📚 View Austin Case Study</a>
+                    </div>
+                `;
+            }).join('');
             
             // Update pagination controls
             if (totalPages > 1) {
@@ -2892,6 +2976,7 @@ function getMonthlyTrendSummary() {
         function viewDetails(caseNumber) {
             const incident = filteredData.find(r => r.case_number === caseNumber);
             if (incident) {
+                const austinUrl = incident.austin_url || DEFAULT_AUSTIN_URL;
                 const details = `Injury & Illness Details:
                 
 Case Number: ${caseNumber}
@@ -2914,7 +2999,9 @@ Description: ${incident.initial_info_incident_description || 'No description ava
 Root Cause: ${incident.rootCause || 'Under investigation'}
 Contributing Factors: ${incident.rca_contributing_factor_category || 'N/A'}
 
-Status: ${incident.status || 'N/A'}`;
+Status: ${incident.status || 'N/A'}
+
+Austin Case Study: ${austinUrl}`;
                 
                 alert(details);
             }
@@ -2953,7 +3040,8 @@ Status: ${incident.status || 'N/A'}`;
                     initial_info_incident_on_the_road: 'no',
                     status: 'Closed',
                     created_at: '2024-01-15',
-                    initial_risk_assessment_likeliness: 'Likely'
+                    initial_risk_assessment_likeliness: 'Likely',
+                    austin_url: 'https://safety.amazon.com/austin-case-study'
                 },
                 {
                     case_number: 'INJ-VIE-202401-002',
@@ -2978,7 +3066,8 @@ Status: ${incident.status || 'N/A'}`;
                     initial_info_incident_on_the_road: 'no',
                     status: 'Closed',
                     created_at: '2024-01-20',
-                    initial_risk_assessment_likeliness: 'Possible'
+                    initial_risk_assessment_likeliness: 'Possible',
+                    austin_case_study_url: 'https://safety.amazon.com/austin-case-study/ppe'
                 },
                 {
                     case_number: 'INJ-GRZ-202402-003',
@@ -3003,7 +3092,8 @@ Status: ${incident.status || 'N/A'}`;
                     initial_info_incident_on_the_road: 'no',
                     status: 'Open',
                     created_at: '2024-02-01',
-                    initial_risk_assessment_likeliness: 'Unlikely'
+                    initial_risk_assessment_likeliness: 'Unlikely',
+                    austin_link: 'https://safety.amazon.com/austin-case-study/slips-trips-falls'
                 },
                 {
                     case_number: 'INJ-VIE-202402-004',
@@ -3078,7 +3168,8 @@ Status: ${incident.status || 'N/A'}`;
                     initial_info_incident_on_the_road: 'yes',
                     status: 'Open',
                     created_at: '2024-03-05',
-                    initial_risk_assessment_likeliness: 'Unlikely'
+                    initial_risk_assessment_likeliness: 'Unlikely',
+                    case_study_url: 'https://safety.amazon.com/austin-case-study/vehicle-safety'
                 },
                 {
                     case_number: 'INJ-VIE-202403-007',
