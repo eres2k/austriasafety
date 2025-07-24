@@ -4954,9 +4954,9 @@
             const title = document.getElementById('modalTitle');
             const body = document.getElementById('modalBody');
             
-            title.textContent = type === 'injury' ? 
-                `Injury Details: ${data.case_number}` : 
-                `Near Miss Details: ${data.incident_id}`;
+          title.textContent = `${type} Incidents: Severity ${severity}, ${likelihood}`;
+
+body.innerHTML = `
             
             const details = type === 'injury' ? `
                 <div style="display: grid; gap: 1rem;">
