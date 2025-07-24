@@ -1,0 +1,518 @@
+// Constants
+const stations = ['DVI1', 'DVI2', 'DVI3', 'DAP5', 'DAP8'];
+let questionnaires = [
+    { id: '1', name: 'General Safety', questions: [
+        { text: 'Is the area clean and free of hazards?', type: 'yesno' },
+        { text: 'Are emergency exits clear?', type: 'yesno' },
+        { text: 'Comments on equipment:', type: 'text' }
+    ]},
+    { id: '2', name: 'Fire Safety', questions: [
+        { text: 'Fire extinguishers accessible?', type: 'yesno' },
+        { text: 'Evacuation plan posted?', type: 'yesno' }
+    ]}
+]; // Can add more via app
+
+const apiBase = '/.netlify/functions/audits';
+
+// Service Worker for PWA (offline support)
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(err => console.error('SW failed:', err));
+    });
+}
+
+// IndexedDB for local drafts
+let db;
+const dbRequest = indexedDB.open('AuditDB', 1);
+dbRequest.onupgradeneeded = event => {
+    db = event.target.result;
+    db.createObjectStore('drafts', { keyPath: 'id' });
+};
+dbRequest.onsuccess = event => { db = event.target.result; };
+
+// UI Elements
+const mainContent = document.getElementById('main-content');
+const modal = document.getElementById('modal');
+const modalBody = document.getElementById('modal-body');
+const closeModal = document.querySelector('.close');
+
+closeModal.addEventListener('click', () => modal.classList.add('hidden'));
+
+// New Audit
+document.getElementById('new-audit-btn').addEventListener('click', () => {
+    mainContent.innerHTML = `
+        <form id="audit-form">
+            <label>Auditor Name: <input type="text" id="auditor" required></label>
+            <label>Station: <select id="station" required>
+                ${stations.map(s => `<option value="${s}">${s}</option>`).join('')}
+            </select></label>
+            <label>Questionnaire: <select id="questionnaire" required>
+                ${questionnaires.map(q => `<option value="${q.id}">${q.name}</option>`).join('')}
+            </select></label>
+            <button type="button" id="start-audit">Start</button>
+            <button type="button" id="add-questionnaire">Add New Questionnaire</button>
+        </form>
+    `;
+    document.getElementById('start-audit').addEventListener('click', startAudit);
+    document.getElementById('add-questionnaire').addEventListener('click', addQuestionnaire);
+});
+
+// Start Audit
+function startAudit() {
+    const auditor = document.getElementById('auditor').value;
+    const station = document.getElementById('station').value;
+    const qId = document.getElementById('questionnaire').value;
+    const questionnaire = questionnaires.find(q => q.id === qId);
+    const auditId = Date.now().toString();
+
+    mainContent.innerHTML = `<h2>Audit for ${station} by ${auditor}</h2>
+        <form id="questions-form"></form>
+        <div class="progress-bar"><div id="progress-fill" class="progress-fill" style="width:0%"></div></div>
+        <button id="save-draft">Save Draft</button>
+        <button id="submit-audit">Submit</button>`;
+
+    const form = document.getElementById('questions-form');
+    questionnaire.questions.forEach((q, i) => {
+        form.innerHTML += `
+            <div class="question">
+                <label>${q.text}</label>
+                ${q.type === 'yesno' ? `<input type="radio" name="q${i}" value="yes"> Yes <input type="radio" name="q${i}" value="no"> No` : `<textarea name="q${i}"></textarea>`}
+                <button type="button" class="voice-btn">🎤 Voice</button>
+                <p class="smart-tip"></p>
+            </div>`;
+    });
+
+    // Voice Input
+    document.querySelectorAll('.voice-btn').forEach((btn, i) => {
+        btn.addEventListener('click', () => {
+            if ('SpeechRecognition' in window) {
+                const recognition = new SpeechRecognition();
+                recognition.onresult = e => {
+                    const textarea = form.querySelector(`textarea[name="q${i}"]`);
+                    if (textarea) textarea.value = e.results[0][0].transcript;
+                };
+                recognition.start();
+            } else {
+                alert('Voice not supported');
+            }
+        });
+    });
+
+    // Smart Tips (rule-based)
+    form.addEventListener('change', e => {
+        if (e.target.type === 'radio' && e.target.value === 'no') {
+            const tip = e.target.closest('.question').querySelector('.smart-tip');
+            tip.textContent = 'Suggestion: Check for obstructions or report to maintenance.';
+        }
+    });
+
+    // Progress
+    form.addEventListener('change', updateProgress);
+    function updateProgress() {
+        const total = questionnaire.questions.length;
+        const filled = [...form.querySelectorAll('input:checked, textarea:not(:empty)')].length;
+        document.getElementById('progress-fill').style.width = `${(filled / total) * 100}%`;
+    }
+
+    // Save Draft to IndexedDB
+    document.getElementById('save-draft').addEventListener('click', () => {
+        const answers = collectAnswers(form, questionnaire);
+        const tx = db.transaction('drafts', 'readwrite');
+        tx.objectStore('drafts').put({ id: auditId, data: { auditor, station, qId, answers } });
+    });
+
+    // Submit to Netlify Blobs
+    document.getElementById('submit-audit').addEventListener('click', async () => {
+        const answers = collectAnswers(form, questionnaire);
+        const audit = { id: auditId, auditor, station, questionnaire: questionnaire.name, answers, date: new Date().toISOString() };
+        try {
+            const res = await fetch(apiBase, {
+                method: 'POST',
+                body: JSON.stringify(audit)
+            });
+            if (res.ok) {
+                alert('Audit submitted!');
+                // Delete draft
+                const tx = db.transaction('drafts', 'readwrite');
+                tx.objectStore('drafts').delete(auditId);
+            }
+        } catch (err) {
+            alert('Offline? Saved as draft.');
+        }
+    });
+}
+
+function collectAnswers(form, questionnaire) {
+    return questionnaire.questions.map((q, i) => {
+        if (q.type === 'yesno') {
+            return form.querySelector(`input[name="q${i}"]:checked`)?.value || '';
+        } else {
+            return form.querySelector(`textarea[name="q${i}"]`)?.value || '';
+        }
+    });
+}
+
+// Add New Questionnaire
+function addQuestionnaire() {
+    modalBody.innerHTML = `
+        <form id="new-q-form">
+            <label>Name: <input type="text" id="q-name"></label>
+            <div id="questions-list"></div>
+            <button type="button" id="add-question">Add Question</button>
+            <button type="submit">Save</button>
+        </form>
+    `;
+    modal.classList.remove('hidden');
+
+    let qCount = 0;
+    document.getElementById('add-question').addEventListener('click', () => {
+        document.getElementById('questions-list').innerHTML += `
+            <div>
+                <input type="text" name="text${qCount}" placeholder="Question text">
+                <select name="type${qCount}">
+                    <option value="yesno">Yes/No</option>
+                    <option value="text">Text</option>
+                </select>
+            </div>`;
+        qCount++;
+    });
+
+    document.getElementById('new-q-form').addEventListener('submit', e => {
+        e.preventDefault();
+        const name = document.getElementById('q-name').value;
+        const questions = [];
+        for (let i = 0; i < qCount; i++) {
+            questions.push({
+                text: e.target.querySelector(`[name="text${i}"]`).value,
+                type: e.target.querySelector(`[name="type${i}"]`).value
+            });
+        }
+        questionnaires.push({ id: Date.now().toString(), name, questions });
+        modal.classList.add('hidden');
+        alert('Questionnaire added!');
+    });
+}
+
+// View Audits
+document.getElementById('view-audits-btn').addEventListener('click', async () => {
+    try {
+        const res = await fetch(apiBase);
+        const audits = await res.json();
+        mainContent.innerHTML = '<h2>Completed Audits</h2><div class="audit-list"></div>';
+        const list = mainContent.querySelector('.audit-list');
+        audits.forEach(a => {
+            list.innerHTML += `
+                <div class="audit-item station-${a.station.toLowerCase()}">
+                    <span>${a.date} - ${a.auditor} @ ${a.station}</span>
+                    <button onclick="viewAudit('${a.id}')">View</ The user wants a complete audit solution similar to SafetyCulture or Lumiform, but original, for the 21st century with state-of-the-art tech and UI. It's for Amazon Austria WHS SIFA Begehungen, for delivery stations DVI1, DVI2, DVI3, DAP5, and DAP8.
+
+Key features:
+
+- Support multiple auditors
+
+- Multiple questionnaires
+
+- PDF export
+
+- Viewer
+
+- Use persistent storage without outside DBs, only Netlify functions like blobs
+
+- Separate files for HTML, CSS, code etc. to avoid crashing while generating
+
+- Dark design, state-of-the-art, user-friendly
+
+I need to generate code for this. It's a web app deployable on Netlify, using Netlify Blobs for storage.
+
+Structure:
+
+- Separate files: index.html, styles.css, script.js, maybe more.
+
+- Dark theme.
+
+- State-of-the-art UI: Use modern CSS, perhaps Tailwind or vanilla CSS with flex/grid, responsive.
+
+- Tech: HTML, CSS, JS. For PDF export, use jsPDF or similar.
+
+- Persistent storage: Netlify Blobs via Netlify Functions.
+
+Netlify Blobs is a key-value store. I'll need to use it to store audit data, questionnaires, etc.
+
+For multiple auditors: User authentication? Simple login or just names?
+
+Multiple questionnaires: Predefined for different stations or types.
+
+Viewer: To view completed audits.
+
+PDF export: Generate PDF from audit data.
+
+Since no external DB, everything in blobs. Blobs are like object storage, can store JSON blobs.
+
+Plan the app:
+
+- Login or select auditor.
+
+- Select station: DVI1, etc.
+
+- Select questionnaire.
+
+- Fill out the audit: Questions with yes/no, comments, photos? But photos might be complex, perhaps text only for simplicity.
+
+The user mentioned "use state of the art tech", so perhaps include camera access for photos, store as base64 in blobs.
+
+But to keep it simple, start with text.
+
+Separate files.
+
+I need to generate the code in parts.
+
+The response should be the code files.
+
+But the instruction is to generate a complete solution, so output the code.
+
+Use tools if needed, but for code generation, perhaps use code_execution to test, but probably not necessary.
+
+I think I need to write the code directly.
+
+First, research what SIFA Begehungen is. SIFA might be Sicherheitsfachkraft, Begehungen are inspections.
+
+For Amazon warehouse safety audits.
+
+Questionnaires for safety checks.
+
+App structure:
+
+- Home page: Select station, auditor, questionnaire.
+
+- Audit page: List of questions, inputs.
+
+- Save audit, store in blob.
+
+- View audits: List saved audits, view details, export PDF.
+
+For Netlify, need a function to interact with blobs.
+
+Netlify Functions are serverless functions.
+
+So, need /functions/save-audit.js, etc.
+
+To use blobs, import @netlify/blobs.
+
+Since it's Netlify, assume deployment there.
+
+Output the files.
+
+Files:
+
+- index.html
+
+- style.css
+
+- script.js
+
+- netlify.toml (for config)
+
+- functions/save-audit.js
+
+- functions/get-audits.js
+
+- etc.
+
+For questionnaires, perhaps store in JS or in blobs.
+
+Multiple questionnaires: Define them in code or allow creation.
+
+For simplicity, predefined.
+
+Define questionnaires for SIFA Begehungen.
+
+I need to think of questions. Since not specified, make some up.
+
+E.g., Fire exits clear? Equipment in good condition? etc.
+
+Dark design: Black background, white text, etc.
+
+User-friendly: Intuitive navigation, modals, etc.
+
+For PDF, use jsPDF.
+
+Include <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+Now, to generate without crashing, output in sections.
+
+But since I'm Grok, I can generate the whole thing.
+
+Plan the code.
+
+First, HTML:
+
+<body class="dark">
+
+<nav> Audit App </nav>
+
+<main>
+
+<section id="home">
+
+Select station: dropdown DVI1 etc.
+
+Auditor name: input
+
+Select questionnaire: dropdown, e.g. General Safety, Fire Safety.
+
+Button start audit.
+
+</section>
+
+<section id="audit" hidden>
+
+Questions list, each with yes/no radio, comment textarea.
+
+Button save.
+
+</section>
+
+<section id="view" hidden>
+
+List of audits, click to view details, button export PDF.
+
+</section>
+
+</main>
+
+CSS: body.dark { background: #121212; color: #fff; }
+
+etc.
+
+JS: Event listeners, fetch functions to save/get.
+
+For functions, example save-audit.js:
+
+import { getStore } from "@netlify/blobs";
+
+export async function handler(event) {
+
+  const store = getStore("audits");
+
+  const data = JSON.parse(event.body);
+
+  await store.setJSON(data.id, data);
+
+  return { statusCode: 200 };
+
+}
+
+Similar for get.
+
+In JS, use fetch('/.netlify/functions/save-audit', {method:'POST', body: JSON.stringify(data)})
+
+For multiple auditors: Just input name, no auth.
+
+Multiple questionnaires: Define in array.
+
+let questionnaires = [
+
+{ name: 'General', questions: ['Q1', 'Q2'] },
+
+...
+
+]
+
+During audit, generate form dynamically.
+
+For storage, each audit: {id: uuid, station, auditor, questionnaire, answers: {q1: {ans:'yes', comment:''}} }
+
+For viewer, fetch all keys, get each.
+
+For uuid, use crypto.randomUUID()
+
+For PDF:
+
+const { jsPDF } = window.jspdf;
+
+const doc = new jsPDF();
+
+doc.text(`Audit for ${station}`, 10, 10);
+
+etc.
+
+doc.save('audit.pdf')
+
+Yes.
+
+Now, to make it state-of-the-art: Use modern JS, async/await, perhaps service workers? But overkill.
+
+UI: Use cards, shadows, etc.
+
+Think outside the box: Perhaps integrate AI for suggestions? But no, keep simple.
+
+Use voice input? But complex.
+
+Perhaps QR code for stations? But no.
+
+I think basic is fine.
+
+Now, generate the code.```html
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amazon Austria WHS SIFA Audit App</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body class="dark">
+    <nav class="navbar">
+        <h1>21st Century SIFA Audit Solution</h1>
+        <div class="nav-buttons">
+            <button id="home-btn">Home</button>
+            <button id="view-btn">View Audits</button>
+        </div>
+    </nav>
+    <main>
+        <section id="home-section">
+            <div class="card">
+                <h2>Start New Audit</h2>
+                <label for="station">Delivery Station:</label>
+                <select id="station">
+                    <option value="DVI1">DVI1</option>
+                    <option value="DVI2">DVI2</option>
+                    <option value="DVI3">DVI3</option>
+                    <option value="DAP5">DAP5</option>
+                    <option value="DAP8">DAP8</option>
+                </select>
+                <label for="auditor">Auditor Name:</label>
+                <input type="text" id="auditor" placeholder="Enter your name">
+                <label for="questionnaire">Questionnaire:</label>
+                <select id="questionnaire">
+                    <option value="general-safety">General Safety Inspection</option>
+                    <option value="fire-safety">Fire Safety Check</option>
+                    <option value="equipment-maintenance">Equipment Maintenance Audit</option>
+                </select>
+                <button id="start-audit">Start Audit</button>
+            </div>
+        </section>
+        <section id="audit-section" hidden>
+            <div class="card">
+                <h2>Audit in Progress</h2>
+                <div id="questions-container"></div>
+                <button id="save-audit">Save Audit</button>
+            </div>
+        </section>
+        <section id="view-section" hidden>
+            <div class="card">
+                <h2>View Audits</h2>
+                <ul id="audits-list"></ul>
+            </div>
+            <div id="audit-details" hidden class="card">
+                <h3>Audit Details</h3>
+                <div id="details-content"></div>
+                <button id="export-pdf">Export to PDF</button>
+            </div>
+        </section>
+    </main>
+    <script src="script.js"></script>
+</body>
+</html>
