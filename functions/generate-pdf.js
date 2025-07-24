@@ -1,29 +1,20 @@
-const PDFDocument = require('pdfkit');
-const { Readable } = require('stream');
+import PDFDocument from 'pdfkit';
+import { get } from '@netlify/blobs';
 
-exports.handler = async (event) => {
-  const doc = new PDFDocument();
+export async function handler(event) {
+  const doc = new PDFDocument({ size: 'A4', margin: 50 });
   const buffers = [];
-
-  doc.text("Amazon WHS SIFA Audit Report");
-  doc.text("Generated at: " + new Date().toISOString());
-
   doc.on('data', buffers.push.bind(buffers));
   doc.on('end', () => {});
-
+  doc.fontSize(20).text('Amazon WHS SIFA Audit Report', { align: 'center' });
+  doc.moveDown();
   doc.end();
-
-  await new Promise((resolve) => doc.on('end', resolve));
-
+  await new Promise(resolve => doc.on('end', resolve));
   const pdfData = Buffer.concat(buffers);
-
   return {
     statusCode: 200,
-    headers: {
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': 'attachment; filename="audit.pdf"',
-    },
+    headers: { 'Content-Type': 'application/pdf' },
     body: pdfData.toString('base64'),
     isBase64Encoded: true
   };
-};
+}
