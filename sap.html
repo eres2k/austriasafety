@@ -4925,154 +4925,57 @@
         }
 
         function showMatrixDetails(severity, likelihood, matrixId) {
-            let data;
-            let type;
-            
-            if (matrixId.includes('injury')) {
-                data = state.injury.filteredData;
-                type = 'Injury';
-            } else if (matrixId.includes('nearMiss')) {
-                data = state.nearMiss.filteredData;
-                type = 'Near Miss';
-            } else {
-                data = [...state.injury.filteredData, ...state.nearMiss.filteredData];
-                type = 'Combined';
-            }
-            
-            const incidents = data.filter(r => 
-                r.severity === severity && 
-                r.standardized_likelihood === likelihood
-            );
-            
-            if (incidents.length === 0) {
-                showStatus(`No ${type.toLowerCase()} incidents found with Severity ${severity} and Likelihood ${likelihood}`, 'info');
-                return;
-            }
-            
-            // Show in modal
-            const modal = document.getElementById('detailModal');
-            const title = document.getElementById('modalTitle');
-            const body = document.getElementById('modalBody');
-            
-            title.textContent = type === 'injury' ? 
-                `Injury Details: ${data.case_number}` : 
-                `Near Miss Details: ${data.incident_id}`;
-            
-            const details = type === 'injury' ? `
-                <div style="display: grid; gap: 1rem;">
-                    <div>
-                        <strong>Date:</strong> ${data.incident_date || 'N/A'}
-                    </div>
-                    <div>
-                        <strong>Site:</strong> ${data.site || 'N/A'}
-                    </div>
-                    <div>
-                        <strong>Severity:</strong> 
-                        <span class="badge badge-${getSeverityClass(data.severity)}">${data.severity}</span>
-                    </div>
-                    <div>
-                        <strong>Recordable:</strong> 
-                        <span class="badge badge-${data.recordable === 1 ? 'danger' : 'success'}">
-                            ${data.recordable === 1 ? 'Yes' : 'No'}
-                        </span>
-                    </div>
-                    <div>
-                        <strong>OTR:</strong> 
-                        <span class="badge badge-${data.otr === 'yes' ? 'warning' : 'info'}">
-                            ${data.otr === 'yes' ? 'Yes' : 'No'}
-                        </span>
-                    </div>
-                    <div>
-                        <strong>Body Part:</strong> ${data.bodyPart || 'N/A'}
-                    </div>
-                    <div>
-                        <strong>Type:</strong> ${data.type || data.initial_info_impact_type_primary || 'N/A'}
-                    </div>
-                    <div>
-                        <strong>Root Cause:</strong> ${data.rootCause || 'N/A'}
-                    </div>
-                    <div>
-                        <strong>Process Path:</strong> ${data.processPath || 'N/A'}
-                    </div>
-                    <div>
-                        <strong>Contributing Factor:</strong> ${data.contributingFactor || 'N/A'}
-                    </div>
-                    <div>
-                        <strong>Days Away From Work:</strong> ${data.total_dafw_days || 0}
-                    </div>
-                    <div>
-                        <strong>Restricted Work Days:</strong> ${data.total_rwa_days || 0}
-                    </div>
-                    <div style="grid-column: 1 / -1;">
-                        <strong>Description:</strong>
-                        <p style="margin-top: 0.5rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
-                            ${data.description || 'No description available'}
-                        </p>
-                    </div>
-                    ${data.incident_url ? `
-                        <div style="grid-column: 1 / -1;">
-                            <a href="${data.incident_url}" target="_blank" class="btn btn-primary">
-                                View in EHS System
-                            </a>
-                        </div>
-                    ` : ''}
+    let data;
+    let type;
+    
+    if (matrixId.includes('injury')) {
+        data = state.injury.filteredData;
+        type = 'Injury';
+    } else if (matrixId.includes('nearMiss')) {
+        data = state.nearMiss.filteredData;
+        type = 'Near Miss';
+    } else {
+        data = [...state.injury.filteredData, ...state.nearMiss.filteredData];
+        type = 'Combined';
+    }
+    
+    const incidents = data.filter(r => 
+        r.severity === severity && 
+        r.standardized_likelihood === likelihood
+    );
+    
+    if (incidents.length === 0) {
+        showStatus(`No ${type.toLowerCase()} incidents found with Severity ${severity} and Likelihood ${likelihood}`, 'info');
+        return;
+    }
+    
+    // Show in modal
+    const modal = document.getElementById('detailModal');
+    const title = document.getElementById('modalTitle');
+    const body = document.getElementById('modalBody');
+    
+    title.textContent = `${type} Incidents: Severity ${severity}, ${likelihood}`;
+    
+    body.innerHTML = `
+        <p style="margin-bottom: 1rem;">Total incidents: ${incidents.length}</p>
+        <div style="max-height: 400px; overflow-y: auto;">
+            ${incidents.map(incident => `
+                <div style="padding: 1rem; border-bottom: 1px solid var(--bg-secondary);">
+                    <strong>${incident.case_number || incident.incident_id}</strong><br>
+                    <span style="color: var(--text-secondary);">
+                        Date: ${incident.incident_date || incident.nearmiss_date || 'N/A'}<br>
+                        Site: ${incident.site || 'N/A'}<br>
+                        ${incident.bodyPart ? `Body Part: ${incident.bodyPart}<br>` : ''}
+                        ${incident.location ? `Location: ${incident.location}<br>` : ''}
+                        ${incident.processPath ? `Process: ${incident.processPath}<br>` : ''}
+                    </span>
                 </div>
-            ` : `
-                <div style="display: grid; gap: 1rem;">
-                    <div>
-                        <strong>Date:</strong> ${data.nearmiss_date || 'N/A'}
-                    </div>
-                    <div>
-                        <strong>Site:</strong> ${data.site || 'N/A'}
-                    </div>
-                    <div>
-                        <strong>Severity:</strong> 
-                        <span class="badge badge-${getSeverityClass(data.severity)}">${data.severity}</span>
-                    </div>
-                    <div>
-                        <strong>Likelihood:</strong> 
-                        <span class="badge badge-info">${data.standardized_likelihood || 'N/A'}</span>
-                    </div>
-                    <div>
-                        <strong>Risk Score:</strong> 
-                        <span class="badge badge-${getRiskClass(data.risk)}">${data.risk || 'N/A'}</span>
-                    </div>
-                    <div>
-                        <strong>Location:</strong> ${data.location || 'N/A'}
-                    </div>
-                    <div>
-                        <strong>Process Path:</strong> ${data.processPath || 'N/A'}
-                    </div>
-                    <div>
-                        <strong>Primary Impact:</strong> ${data.primaryImpact || 'N/A'}
-                    </div>
-                    <div>
-                        <strong>Contributing Factor:</strong> ${data.contributingFactor || 'N/A'}
-                    </div>
-                    <div style="grid-column: 1 / -1;">
-                        <strong>Description:</strong>
-                        <p style="margin-top: 0.5rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
-                            ${data.description || 'No description available'}
-                        </p>
-                    </div>
-                    <div style="grid-column: 1 / -1;">
-                        <strong>Description Quality:</strong>
-                        <p>Length: ${data.descriptionLength || 0} characters</p>
-                        <p>Completeness: ${data.hasCompleteData ? '✅ Complete' : '❌ Incomplete'}</p>
-                    </div>
-                    ${data.incident_url ? `
-                        <div style="grid-column: 1 / -1;">
-                            <a href="${data.incident_url}" target="_blank" class="btn btn-primary">
-                                View in EHS System
-                            </a>
-                        </div>
-                    ` : ''}
-                </div>
-            `;
-            
-            body.innerHTML = details;
-            modal.style.display = 'block';
-        }
+            `).join('')}
+        </div>
+    `;
+    
+    modal.style.display = 'block';
+}
 
         function closeModal() {
             document.getElementById('detailModal').style.display = 'none';
