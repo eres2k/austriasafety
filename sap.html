@@ -4954,9 +4954,9 @@
             const title = document.getElementById('modalTitle');
             const body = document.getElementById('modalBody');
             
-          title.textContent = `${type} Incidents: Severity ${severity}, ${likelihood}`;
-
-body.innerHTML = `
+            title.textContent = type === 'injury' ? 
+                `Injury Details: ${data.case_number}` : 
+                `Near Miss Details: ${data.incident_id}`;
             
             const details = type === 'injury' ? `
                 <div style="display: grid; gap: 1rem;">
@@ -5522,7 +5522,7 @@ body.innerHTML = `
 
         console.log('Safety Analytics Platform initialized successfully!');
 
-        Content = `${type} Incidents: Severity ${severity}, ${likelihood}`;
+  Content = `${type} Incidents: Severity ${severity}, ${likelihood}`;
             body.innerHTML = `
                 <p style="margin-bottom: 1rem;">Total incidents: ${incidents.length}</p>
                 <div style="max-height: 400px; overflow-y: auto;">
