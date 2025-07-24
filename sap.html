@@ -4971,24 +4971,22 @@
                     </span>
                 </div>
             `).join('')}
-        </div>
-    `;
-    
-    modal.style.display = 'block';
+ </div>
+        `;
+        
+        modal.style.display = 'block';
+    }  // This closes showMatrixDetails function
 
-   }
+    function closeModal() {
+        document.getElementById('detailModal').style.display = 'none';
+    }
 
-        function closeModal() {
-            document.getElementById('detailModal').style.display = 'none';
-        }
-
-        // Export Functions
-        function generatePDFReport(reportType) {
-            showStatus('Generating professional PDF report...', 'info');
-            
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', 'a4');
-            
+    // Export Functions
+    function generatePDFReport(reportType) {
+        showStatus('Generating professional PDF report...', 'info');
+        
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
             // Professional styling
             const colors = {
                 primary: [35, 47, 62],        // Dark blue
