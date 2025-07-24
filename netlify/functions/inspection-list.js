@@ -1,7 +1,6 @@
-import { HandlerContext } from '@netlify/functions';
-import { getStore } from '@netlify/blobs';
+const { getStore } = require('@netlify/blobs');
 
-export const handler = async (event: any, context: HandlerContext) => {
+exports.handler = async function(event, context) {
   try {
     const inspectionStore = getStore('inspections', {
       siteId: process.env.NETLIFY_SITE_ID,
