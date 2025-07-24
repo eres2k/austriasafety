@@ -37,6 +37,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true }
   },
   {
+  path: '/inspections/:id/execute',
+  name: 'inspection-execute',
+  component: () => import('@/views/InspectionExecution.vue'),
+  meta: { requiresAuth: true }
+},
+  {
     path: '/reports',
     name: 'reports',
     component: () => import('@/views/Reports.vue'),
