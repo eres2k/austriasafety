@@ -138,8 +138,8 @@
         </div>
       </div>
 
-      <!-- Safety Trends -->
-      <div class="chart-card col-span-2">
+     <!-- Safety Trends -->
+<div class="chart-card lg:col-span-2">
         <div class="chart-header">
           <h3>Sicherheitstrends</h3>
           <div class="chart-legend">
@@ -173,7 +173,7 @@
       </div>
 
       <!-- Compliance Matrix -->
-      <div class="chart-card col-span-2">
+<div class="chart-card lg:col-span-2">
         <div class="chart-header">
           <h3>Compliance-Matrix</h3>
           <span class="chart-subtitle">Nach Standort und Kategorie</span>
@@ -606,10 +606,6 @@ onMounted(() => {
 .chart-card {
   @apply bg-surface-secondary rounded-lg p-6;
   @apply border border-surface-tertiary;
-}
-
-.chart-card.col-span-2 {
-  @apply lg:col-span-2;
 }
 
 .chart-header {
