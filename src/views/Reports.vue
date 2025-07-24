@@ -535,7 +535,7 @@ onMounted(() => {
 
 .metric-card.metric-primary {
   @apply border-accent-primary border-opacity-50;
-  @apply bg-gradient-to-br from-surface-secondary to-accent-primary to-opacity-10;
+  @apply bg-gradient-to-br from-surface-secondary to-accent-primary/10;
 }
 
 .metric-header {
