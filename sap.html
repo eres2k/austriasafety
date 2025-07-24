@@ -5521,9 +5521,8 @@
         }
 
         console.log('Safety Analytics Platform initialized successfully!');
-    </script>
-</body>
-</html>Content = `${type} Incidents: Severity ${severity}, ${likelihood}`;
+
+        Content = `${type} Incidents: Severity ${severity}, ${likelihood}`;
             body.innerHTML = `
                 <p style="margin-bottom: 1rem;">Total incidents: ${incidents.length}</p>
                 <div style="max-height: 400px; overflow-y: auto;">
