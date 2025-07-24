@@ -25,10 +25,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import {
-  TrendingUpIcon,
-  TrendingDownIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
   ExclamationTriangleIcon
-} from '@heroicons/vue/20/solid'
+} from '@heroicons/vue/24/solid'
 
 interface Props {
   title: string
@@ -51,7 +51,7 @@ const formattedValue = computed(() => {
 
 const trendIcon = computed(() => {
   if (!props.trend) return null
-  return props.trend.includes('+') ? TrendingUpIcon : TrendingDownIcon
+  return props.trend.includes('+') ? ArrowTrendingUpIcon : ArrowTrendingDownIcon
 })
 
 const changeClass = computed(() => {
