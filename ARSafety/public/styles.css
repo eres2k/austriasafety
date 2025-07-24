@@ -1,0 +1,147 @@
+:root {
+    --bg-primary: #0a0a0a;
+    --bg-secondary: #1a1a1a;
+    --text-primary: #e0e0e0;
+    --accent-primary: #00d4ff;
+    --success: #00ff88;
+    --danger: #ff3366;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+.loading-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.logo {
+    width: 120px;
+    height: 120px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+.loading-bar {
+    width: 200px;
+    height: 4px;
+    background: #333;
+    margin: 20px auto;
+    border-radius: 2px;
+}
+
+.loading-progress {
+    height: 100%;
+    background: var(--accent-primary);
+    animation: loading 2s forwards;
+}
+
+@keyframes loading {
+    to { width: 100%; }
+}
+
+.navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-secondary);
+    padding: 1rem;
+    z-index: 1000;
+    transform: translateY(-100%);
+    transition: transform 0.3s;
+}
+
+.navbar.active {
+    transform: translateY(0);
+}
+
+.main-content {
+    margin-top: 70px;
+    padding: 2rem;
+    min-height: calc(100vh - 70px);
+}
+
+.voice-button, .ar-button {
+    position: fixed;
+    bottom: 2rem;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    font-size: 24px;
+    transition: all 0.3s;
+}
+
+.voice-button {
+    right: 7rem;
+    background: var(--accent-primary);
+}
+
+.ar-button {
+    right: 2rem;
+    background: #9d4edd;
+}
+
+.ar-overlay {
+    position: fixed;
+    inset: 0;
+    background: black;
+    display: none;
+    z-index: 2000;
+}
+
+.ar-overlay.active {
+    display: block;
+}
+
+#arVideo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#arCanvas {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.ar-controls {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 1rem;
+}
+
+.ar-controls button {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid white;
+    font-size: 24px;
+    cursor: pointer;
+}
