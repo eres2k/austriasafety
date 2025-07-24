@@ -1,6 +1,6 @@
 <!-- src/components/inspections/InspectionCard.vue -->
 <template>
-  <div class="inspection-card" @click="$emit('click')">
+<div class="inspection-card group" @click="$emit('click')">
     <!-- Header -->
     <div class="card-header">
       <div class="location-badge">
@@ -209,7 +209,7 @@ function getInitials(name: string): string {
   @apply relative bg-surface-secondary rounded-lg p-4;
   @apply border border-surface-tertiary;
   @apply hover:border-accent-primary transition-all duration-200;
-  @apply cursor-pointer group;
+  @apply cursor-pointer;  /* Removed 'group' */
 }
 
 .card-header {
