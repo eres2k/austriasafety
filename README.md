@@ -1,28 +1,59 @@
-# WHS SIFA Audit Platform (Advanced)
+# Amazon Austria WHS SIFA Audit Platform
 
-A state-of-the-art, serverless audit tool for Amazon Austria WHS SIFA inspections, covering DVI1, DVI2, DVI3, DAP5, and DAP8.
+A modern, serverless digital audit platform for Workplace Health & Safety (WHS) SIFA site inspections at Amazon Austria delivery stations.
 
 ## Features
 
-- React + Tailwind CSS UI (dark mode & light toggle)
-- Modular React components: Sidebar, Audit Form, Dashboard, Template Builder
-- Drag & drop checklist designer (`react-beautiful-dnd`)
-- Voice-to-text inputs (Web Speech API)
-- Offline support with IndexedDB sync
-- PDF export via Netlify Functions + PDFKit
-- Audit history, versioning, and analytics
-- Deploy on Netlify (zero backend servers)
+- 🏢 Multi-location support (DVI1, DVI2, DVI3, DAP5, DAP8)
+- 👥 Multi-auditor collaboration
+- 📱 Mobile-first PWA with offline support
+- 🎙️ Voice input capabilities
+- 📷 Media capture and AI analysis
+- 📊 Real-time analytics dashboard
+- 🎮 Gamification elements
+- 📄 PDF report generation
+- 🔒 GDPR compliant
 
-## Setup
+## Tech Stack
 
-```bash
-npm install
-npm run build:css
-npm run dev
-```
+- **Frontend**: Vue 3 + TypeScript + Tailwind CSS
+- **Backend**: Netlify Functions (Serverless)
+- **Storage**: Netlify Blobs
+- **PWA**: Service Workers + IndexedDB
 
-Open http://localhost:8888
+## Quick Start
 
-## Deploy
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-org/amazon-whs-audit-platform.git
+   cd amazon-whs-audit-platform
+   ```
 
-Connect to Netlify and set build command to `npm run build && netlify deploy --prod` with publish directory `public`.
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Set up environment variables:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
+
+4. Run development server:
+   ```bash
+   npm run dev
+   ```
+
+5. Deploy to Netlify:
+   ```bash
+   netlify deploy --prod
+   ```
+
+## License
+
+This project is proprietary and confidential.
+
+## Support
+
+For support, contact the WHS team at whs-tech@amazon.at
