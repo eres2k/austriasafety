@@ -1,41 +1,24 @@
-import { Handler } from '@netlify/functions'
-import { getStore } from '@netlify/blobs'
-import crypto from 'crypto'
+import { Handler } from '@netlify/functions';
+import { getStore } from '@netlify/blobs';
+import { nanoid } from 'nanoid';
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' }
+    return { statusCode: 405, body: 'Method Not Allowed' };
   }
-
   try {
-    const inspectionStore = getStore('inspections')
-    const data = JSON.parse(event.body || '{}')
-    
-    const inspectionId = crypto.randomUUID()
-    const timestamp = new Date().toISOString()
-
-    const inspection = {
-      id: inspectionId,
-      ...data,
-      status: 'in-progress',
-      createdAt: timestamp,
-      updatedAt: timestamp
-    }
-
-    await inspectionStore.setJSON(inspectionId, inspection)
-
+    const payload = JSON.parse(event.body || '{}');
+    const inspectionStore = process.env.NETLIFY_SITE_ID && process.env.NETLIFY_AUTH_TOKEN
+      ? getStore('inspections', { siteID: process.env.NETLIFY_SITE_ID, token: process.env.NETLIFY_AUTH_TOKEN })
+      : getStore('inspections');
+    const id = nanoid();
+    await inspectionStore.put({ key: id, data: JSON.stringify({ id, ...payload }) });
     return {
       statusCode: 201,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        success: true,
-        data: inspection
-      })
-    }
-  } catch (error) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Internal server error' })
-    }
+      body: JSON.stringify({ id }),
+    };
+  } catch (err) {
+    console.error(err);
+    return { statusCode: 500, body: 'Internal Server Error' };
   }
-}
+};

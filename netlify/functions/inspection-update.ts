@@ -1,56 +1,19 @@
-import { Handler } from '@netlify/functions'
-import { getStore } from '@netlify/blobs'
+import { Handler } from '@netlify/functions';
+import { getStore } from '@netlify/blobs';
 
 export const handler: Handler = async (event) => {
-  if (event.httpMethod !== 'PATCH') {
-    return { statusCode: 405, body: 'Method Not Allowed' }
+  if (event.httpMethod !== 'PUT') {
+    return { statusCode: 405, body: 'Method Not Allowed' };
   }
-
   try {
-    const inspectionStore = getStore('inspections')
-    const { id, ...updates } = JSON.parse(event.body || '{}')
-    
-    if (!id) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'Inspection ID required' })
-      }
-    }
-
-    // Get existing inspection
-    const existingData = await inspectionStore.get(id)
-    
-    if (!existingData) {
-      return {
-        statusCode: 404,
-        body: JSON.stringify({ error: 'Inspection not found' })
-      }
-    }
-
-    const existingInspection = JSON.parse(existingData)
-    
-    // Merge updates
-    const updatedInspection = {
-      ...existingInspection,
-      ...updates,
-      updatedAt: new Date().toISOString()
-    }
-
-    // Save updated inspection
-    await inspectionStore.setJSON(id, updatedInspection)
-
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        success: true,
-        data: updatedInspection
-      })
-    }
-  } catch (error) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Internal server error' })
-    }
+    const { id, ...payload } = JSON.parse(event.body || '{}');
+    const inspectionStore = process.env.NETLIFY_SITE_ID && process.env.NETLIFY_AUTH_TOKEN
+      ? getStore('inspections', { siteID: process.env.NETLIFY_SITE_ID, token: process.env.NETLIFY_AUTH_TOKEN })
+      : getStore('inspections');
+    await inspectionStore.put({ key: id, data: JSON.stringify({ id, ...payload }) });
+    return { statusCode: 200, body: JSON.stringify({ id }) };
+  } catch (err) {
+    console.error(err);
+    return { statusCode: 500, body: 'Internal Server Error' };
   }
-}
+};

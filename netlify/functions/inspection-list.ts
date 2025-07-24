@@ -1,35 +1,22 @@
-import { Handler } from '@netlify/functions'
-import { getStore } from '@netlify/blobs'
+import { Handler } from '@netlify/functions';
+import { getStore } from '@netlify/blobs';
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'GET') {
-    return { statusCode: 405, body: 'Method Not Allowed' }
+    return { statusCode: 405, body: 'Method Not Allowed' };
   }
-
   try {
-    const inspectionStore = getStore('inspections')
-    const { blobs } = await inspectionStore.list()
-
-    const inspections = []
-    for (const blob of blobs) {
-      const data = await inspectionStore.get(blob.key)
-      if (data) {
-        inspections.push(JSON.parse(data))
-      }
-    }
-
+    const inspectionStore = process.env.NETLIFY_SITE_ID && process.env.NETLIFY_AUTH_TOKEN
+      ? getStore('inspections', { siteID: process.env.NETLIFY_SITE_ID, token: process.env.NETLIFY_AUTH_TOKEN })
+      : getStore('inspections');
+    const { blobs } = await inspectionStore.list();
+    const data = await Promise.all(blobs.map(blob => inspectionStore.get(blob.key)));
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        success: true,
-        data: inspections
-      })
-    }
-  } catch (error) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Internal server error' })
-    }
+      body: JSON.stringify(data),
+    };
+  } catch (err) {
+    console.error(err);
+    return { statusCode: 500, body: 'Internal Server Error' };
   }
-}
+};

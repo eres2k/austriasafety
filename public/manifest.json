@@ -1,24 +1,20 @@
 {
-  "name": "Amazon WHS SIFA Inspection Platform",
-  "short_name": "WHS Audit",
-  "description": "Digital audit platform for workplace health and safety inspections",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#121212",
-  "theme_color": "#FF9500",
-  "orientation": "portrait",
+  "short_name": "App",
+  "name": "Your App Name",
   "icons": [
     {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
+      "src": "icon-192.png",
       "type": "image/png",
-      "purpose": "any maskable"
+      "sizes": "192x192"
     },
     {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
+      "src": "icon-512.png",
       "type": "image/png",
-      "purpose": "any maskable"
+      "sizes": "512x512"
     }
-  ]
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff"
 }
