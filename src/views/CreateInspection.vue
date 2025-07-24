@@ -200,4 +200,349 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-imp
+import { useRouter } from 'vue-router'
+import {
+  CheckIcon,
+  BuildingOfficeIcon,
+  DocumentTextIcon,
+  ClockIcon,
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  PlayIcon,
+  ClipboardDocumentCheckIcon,
+  ShieldCheckIcon,
+  ExclamationTriangleIcon
+} from '@heroicons/vue/24/outline'
+
+import { useInspectionStore } from '@/stores/inspection'
+import { useQuestionnaireStore } from '@/stores/questionnaire'
+import { useAuthStore } from '@/stores/auth'
+import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import StatusBadge from '@/components/common/StatusBadge.vue'
+
+const router = useRouter()
+const inspectionStore = useInspectionStore()
+const questionnaireStore = useQuestionnaireStore()
+const authStore = useAuthStore()
+
+// State
+const currentStep = ref(0)
+const loadingTemplates = ref(false)
+
+const steps = [
+  { id: 'location', label: 'Standort' },
+  { id: 'template', label: 'Vorlage' },
+  { id: 'details', label: 'Details' }
+]
+
+const locations = [
+  { code: 'DVI1', name: 'Wien 1' },
+  { code: 'DVI2', name: 'Wien 2' },
+  { code: 'DVI3', name: 'Wien 3' },
+  { code: 'DAP5', name: 'Graz' },
+  { code: 'DAP8', name: 'Linz' }
+]
+
+const formData = ref({
+  location: '',
+  templateId: '',
+  name: '',
+  description: '',
+  assignedTo: [] as string[],
+  enableCollaboration: true,
+  enableVoiceInput: false
+})
+
+// Mock users - in production, load from API
+const availableUsers = ref([
+  { id: '1', name: 'Max Mustermann', color: '#3B82F6' },
+  { id: '2', name: 'Anna Schmidt', color: '#8B5CF6' },
+  { id: '3', name: 'Thomas Weber', color: '#10B981' }
+])
+
+// Computed
+const availableTemplates = computed(() => {
+  if (!formData.value.location) return []
+  
+  return questionnaireStore.questionnaires.filter(q => 
+    q.location === formData.value.location && q.active
+  )
+})
+
+const canProceed = computed(() => {
+  switch (currentStep.value) {
+    case 0:
+      return !!formData.value.location
+    case 1:
+      return !!formData.value.templateId
+    case 2:
+      return true // Details are optional
+    default:
+      return false
+  }
+})
+
+// Methods
+function selectLocation(code: string) {
+  formData.value.location = code
+  formData.value.templateId = '' // Reset template when location changes
+}
+
+function selectTemplate(id: string) {
+  formData.value.templateId = id
+  
+  // Auto-fill name if empty
+  if (!formData.value.name) {
+    const template = availableTemplates.value.find(t => t.id === id)
+    if (template) {
+      formData.value.name = `${template.name} - ${new Date().toLocaleDateString('de-AT')}`
+    }
+  }
+}
+
+function toggleAssignee(userId: string) {
+  const index = formData.value.assignedTo.indexOf(userId)
+  if (index > -1) {
+    formData.value.assignedTo.splice(index, 1)
+  } else {
+    formData.value.assignedTo.push(userId)
+  }
+}
+
+function getTemplateIcon(category: string) {
+  switch (category) {
+    case 'general-safety':
+      return ClipboardDocumentCheckIcon
+    case 'equipment-safety':
+      return ShieldCheckIcon
+    case 'emergency':
+      return ExclamationTriangleIcon
+    default:
+      return DocumentTextIcon
+  }
+}
+
+function estimateTime(template: any): number {
+  const totalQuestions = template.sections.reduce(
+    (sum: number, section: any) => sum + section.questions.length, 
+    0
+  )
+  return Math.round(totalQuestions * 1.5) // 1.5 minutes per question
+}
+
+function getInitials(name: string): string {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase()
+}
+
+function previousStep() {
+  if (currentStep.value > 0) {
+    currentStep.value--
+  }
+}
+
+function nextStep() {
+  if (currentStep.value < steps.length - 1 && canProceed.value) {
+    currentStep.value++
+  }
+}
+
+async function saveDraft() {
+  // Save as draft inspection
+  const inspection = await inspectionStore.createInspection({
+    ...formData.value,
+    status: 'draft',
+    responses: {},
+    progress: 0,
+    createdBy: authStore.user?.id
+  })
+  
+  router.push(`/inspections/${inspection.id}`)
+}
+
+async function startInspection() {
+  if (!canProceed.value) return
+  
+  // Create inspection and start execution
+  const inspection = await inspectionStore.createInspection({
+    ...formData.value,
+    status: 'in-progress',
+    responses: {},
+    progress: 0,
+    createdBy: authStore.user?.id
+  })
+  
+  router.push(`/inspections/${inspection.id}/execute`)
+}
+
+// Load templates when location changes
+watch(() => formData.value.location, async (newLocation) => {
+  if (newLocation) {
+    loadingTemplates.value = true
+    await questionnaireStore.loadQuestionnaires()
+    loadingTemplates.value = false
+  }
+})
+
+// Load initial data
+onMounted(async () => {
+  await questionnaireStore.loadQuestionnaires()
+})
+</script>
+
+<style scoped>
+.create-inspection {
+  @apply max-w-4xl mx-auto;
+}
+
+.progress-steps {
+  @apply flex items-center justify-center mb-8;
+  @apply bg-surface-secondary rounded-lg p-6;
+}
+
+.step {
+  @apply flex items-center gap-2 text-text-tertiary;
+  @apply relative px-4;
+}
+
+.step:not(:last-child)::after {
+  content: '';
+  @apply absolute right-0 top-1/2 -translate-y-1/2;
+  @apply w-16 h-0.5 bg-surface-tertiary;
+}
+
+.step.active {
+  @apply text-text-primary;
+}
+
+.step.completed {
+  @apply text-accent-success;
+}
+
+.step-indicator {
+  @apply w-8 h-8 rounded-full bg-surface-tertiary;
+  @apply flex items-center justify-center;
+  @apply text-sm font-medium;
+}
+
+.step.active .step-indicator {
+  @apply bg-accent-primary text-white;
+}
+
+.step.completed .step-indicator {
+  @apply bg-accent-success text-white;
+}
+
+.step-label {
+  @apply text-sm font-medium;
+}
+
+.step-content {
+  @apply bg-surface-secondary rounded-lg p-8 mb-6;
+  @apply min-h-[400px];
+}
+
+.step-title {
+  @apply text-2xl font-bold mb-2;
+}
+
+.step-description {
+  @apply text-text-secondary mb-8;
+}
+
+.location-grid {
+  @apply grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4;
+}
+
+.location-card {
+  @apply flex flex-col items-center justify-center p-6;
+  @apply bg-surface-tertiary rounded-lg;
+  @apply border-2 border-transparent;
+  @apply hover:bg-opacity-80 transition-all;
+}
+
+.location-card.selected {
+  @apply border-accent-primary bg-accent-primary bg-opacity-10;
+}
+
+.template-grid {
+  @apply grid grid-cols-1 md:grid-cols-2 gap-4;
+}
+
+.template-card {
+  @apply p-6 bg-surface-tertiary rounded-lg;
+  @apply border-2 border-transparent;
+  @apply hover:bg-opacity-80 transition-all cursor-pointer;
+}
+
+.template-card.selected {
+  @apply border-accent-primary bg-accent-primary bg-opacity-10;
+}
+
+.template-header {
+  @apply flex items-center justify-between mb-3;
+}
+
+.template-meta {
+  @apply flex items-center gap-4 mt-4;
+  @apply text-xs text-text-tertiary;
+}
+
+.meta-item {
+  @apply flex items-center gap-1;
+}
+
+.form-section {
+  @apply mb-6;
+}
+
+.form-label {
+  @apply block text-sm font-medium mb-2;
+}
+
+.form-input {
+  @apply w-full px-4 py-2 bg-surface-tertiary rounded-lg;
+  @apply border-2 border-transparent;
+  @apply focus:border-accent-primary outline-none;
+}
+
+.assignee-selector {
+  @apply flex flex-wrap gap-2;
+}
+
+.assignee-chip {
+  @apply flex items-center gap-2 px-3 py-2;
+  @apply bg-surface-tertiary rounded-full;
+  @apply border-2 border-transparent;
+  @apply hover:bg-opacity-80 transition-all;
+}
+
+.assignee-chip.selected {
+  @apply border-accent-primary bg-accent-primary bg-opacity-10;
+}
+
+.assignee-avatar {
+  @apply w-6 h-6 rounded-full;
+  @apply flex items-center justify-center;
+  @apply text-xs font-bold text-white;
+}
+
+.toggle-option {
+  @apply flex items-center gap-3 p-3;
+  @apply bg-surface-tertiary rounded-lg mb-2;
+  @apply cursor-pointer hover:bg-opacity-80;
+}
+
+.toggle-checkbox {
+  @apply w-4 h-4 rounded;
+  @apply bg-surface-primary border-surface-tertiary;
+  @apply text-accent-primary focus:ring-accent-primary;
+}
+
+.step-navigation {
+  @apply flex items-center;
+}
+
+.loading-state {
+  @apply flex justify-center py-12;
+}
+</style>
