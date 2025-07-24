@@ -4924,7 +4924,7 @@
             });
         }
 
-        function showMatrixDetails(severity, likelihood, matrixId) {
+function showMatrixDetails(severity, likelihood, matrixId) {
     let data;
     let type;
     
@@ -4948,6 +4948,37 @@
         showStatus(`No ${type.toLowerCase()} incidents found with Severity ${severity} and Likelihood ${likelihood}`, 'info');
         return;
     }
+    
+    // Show in modal
+    const modal = document.getElementById('detailModal');
+    const title = document.getElementById('modalTitle');
+    const body = document.getElementById('modalBody');
+    
+    title.textContent = `${type} Incidents: Severity ${severity}, ${likelihood}`;
+    
+    body.innerHTML = `
+        <p style="margin-bottom: 1rem;">Total incidents: ${incidents.length}</p>
+        <div style="max-height: 400px; overflow-y: auto;">
+            ${incidents.map(incident => `
+                <div style="padding: 1rem; border-bottom: 1px solid var(--bg-secondary);">
+                    <strong>${incident.case_number || incident.incident_id}</strong><br>
+                    <span style="color: var(--text-secondary);">
+                        Date: ${incident.incident_date || incident.nearmiss_date || 'N/A'}<br>
+                        Site: ${incident.site || 'N/A'}<br>
+                        ${incident.bodyPart ? `Body Part: ${incident.bodyPart}<br>` : ''}
+                        ${incident.location ? `Location: ${incident.location}<br>` : ''}
+                        ${incident.processPath ? `Process: ${incident.processPath}<br>` : ''}
+                    </span>
+                </div>
+            `).join('')}
+        </div>
+    `;
+    
+    modal.style.display = 'block';
+}
+
+function closeModal() {
+    document.getElementById('detailModal').style.display = 'none';
     
     // Show in modal
     const modal = document.getElementById('detailModal');
