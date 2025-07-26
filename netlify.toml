@@ -1,0 +1,17 @@
+[build]
+  # The directory to publish. We ship everything from the repository root
+  # because this is a static client‑side application.
+  publish = "./"
+
+[[redirects]]
+  # Serve index.html for all routes. This makes the SPA work when
+  # navigating directly to nested paths.
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[edge_functions]]
+  # Enable Netlify Identity and Functions for this site. When
+  # deploying this code you must enable Identity in the Netlify UI.
+  function = "identity"
+  path = "/.netlify/identity/*"
