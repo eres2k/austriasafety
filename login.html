@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Audit Platform – Login</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="login-container">
+      <div class="login-card">
+        <h2>Sign In</h2>
+        <form id="login-form">
+          <label for="login-username">Username</label>
+          <input type="text" id="login-username" required />
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" required />
+          <button type="submit" class="primary-btn">Login</button>
+        </form>
+        <p class="alternate-action">Don't have an account? <a href="#" id="show-register">Register</a></p>
+      </div>
+      <div class="login-card hidden" id="register-card">
+        <h2>Create Account</h2>
+        <form id="register-form">
+          <label for="register-username">Username</label>
+          <input type="text" id="register-username" required />
+          <label for="register-password">Password</label>
+          <input type="password" id="register-password" required />
+          <label for="register-role">Role</label>
+          <select id="register-role">
+            <option value="auditor">Auditor</option>
+            <option value="admin">Admin</option>
+            <option value="viewer">Viewer</option>
+          </select>
+          <button type="submit" class="primary-btn">Register</button>
+        </form>
+        <p class="alternate-action">Already have an account? <a href="#" id="show-login">Login</a></p>
+      </div>
+    </div>
+    <script src="user.js" defer></script>
+  </body>
+</html>

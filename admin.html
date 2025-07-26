@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Audit Platform – Template Builder</title>
+    <link rel="stylesheet" href="style.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+      integrity="sha512-pFhU9fC/6PvGwP7NG8fiPR8MpVmFR2nCwnhR9+GP5+5dzE2fAPae7n0X3j1eTm2U4zSA/Bk3ynWm8q9+X9R5fg=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"
+      integrity="sha512-G/eoexv5VoU7p3ty3nvkzLbxe8SxXnE8CFlkd0vY0CqE/7uj48QxL/5+T9R1uDHEQIzP7Fa2P4IuJP9+2n6MVw=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+      defer
+    ></script>
+  </head>
+  <body>
+    <div class="builder-container">
+      <header class="builder-header">
+        <h1>Template Builder</h1>
+        <button id="back-btn" class="secondary-btn">Back to App</button>
+      </header>
+      <section class="builder-controls">
+        <label for="builder-location">Location:</label>
+        <select id="builder-location"></select>
+        <label for="builder-inspection">Inspection Type:</label>
+        <select id="builder-inspection"></select>
+        <button id="new-inspection-type" class="secondary-btn">New Inspection Type</button>
+      </section>
+      <section class="questions-builder">
+        <h2>Questions</h2>
+        <ul id="builder-questions" class="builder-questions-list"></ul>
+        <button id="add-question" class="secondary-btn">Add Question</button>
+      </section>
+      <section class="builder-actions">
+        <button id="import-template" class="secondary-btn">Import JSON</button>
+        <input type="file" id="import-file" accept="application/json" class="hidden" />
+        <button id="export-template" class="secondary-btn">Export JSON</button>
+        <button id="save-template" class="primary-btn">Save Template</button>
+      </section>
+    </div>
+    <!-- Modal for editing/adding question -->
+    <div id="question-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3 id="modal-title">Add Question</h3>
+        <label for="modal-question-text">Question Text</label>
+        <input type="text" id="modal-question-text" />
+        <label for="modal-question-type">Type</label>
+        <select id="modal-question-type">
+          <option value="boolean">Yes/No</option>
+          <option value="text">Short Answer</option>
+          <option value="number">Number</option>
+          <option value="textarea">Paragraph</option>
+          <option value="file">File Upload</option>
+        </select>
+        <label><input type="checkbox" id="modal-question-required" /> Required</label>
+        <div class="modal-actions">
+          <button id="modal-save" class="primary-btn">Save</button>
+          <button id="modal-cancel" class="secondary-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+    <script src="builder.js" defer></script>
+  </body>
+</html>

@@ -9,6 +9,22 @@
  */
 
 (() => {
+  // Check user authentication and role
+  const currentUserRaw = localStorage.getItem('currentUser');
+  let currentUser = null;
+  try {
+    if (currentUserRaw) {
+      currentUser = JSON.parse(currentUserRaw);
+    }
+  } catch (err) {
+    currentUser = null;
+  }
+  if (!currentUser) {
+    // Not logged in, redirect to login page
+    window.location.href = 'login.html';
+    return;
+  }
+
   // Paths to template files. If you add new locations, update here.
   const TEMPLATE_PATHS = {
     DVI1: 'templates/DVI1.json',
@@ -22,6 +38,7 @@
   const locationSelect = document.getElementById('location-select');
   const inspectionSelect = document.getElementById('inspection-select');
   const newInspectionBtn = document.getElementById('new-inspection-btn');
+  const adminBtn = document.getElementById('admin-btn');
   const inspectionForm = document.getElementById('inspection-form');
   const formTitle = document.getElementById('form-title');
   const questionsContainer = document.getElementById('questions-container');
@@ -73,6 +90,10 @@
 
   // Initialize the page by loading templates for the default location
   async function init() {
+    // Show admin button if user is admin
+    if (currentUser.role === 'admin') {
+      adminBtn.classList.remove('hidden');
+    }
     await loadTemplates();
     // Initialize local storage structures if not present
     if (!localStorage.getItem('auditsPending')) {
@@ -594,4 +615,11 @@
 
   // Initialize on load
   document.addEventListener('DOMContentLoaded', init);
+
+  // Navigate to admin/template builder page
+  if (adminBtn) {
+    adminBtn.addEventListener('click', () => {
+      window.location.href = 'admin.html';
+    });
+  }
 })();
