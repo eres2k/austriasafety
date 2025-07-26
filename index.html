@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Amazon Austria WHS SIFA Audit Platform</title>
+    <!-- Main stylesheet -->
+    <link rel="stylesheet" href="style.css" />
+    <!-- Font Awesome for icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+      integrity="sha512-pFhU9fC/6PvGwP7NG8fiPR8MpVmFR2nCwnhR9+GP5+5dzE2fAPae7n0X3j1eTm2U4zSA/Bk3ynWm8q9+X9R5fg=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+    <!-- jsPDF for PDF generation -->
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+      integrity="sha512-Vv7cY+cPnD4+T0yfZCmcLlSvKH+FoT3b5GB+Pw7MUFcMVhEpTmR+9dTTlKx4AKyzX371F52eeC3uLEVYfrE2Lg=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+      defer
+    ></script>
+    <!-- Sortable.js for drag & drop reordering -->
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"
+      integrity="sha512-G/eoexv5VoU7p3ty3nvkzLbxe8SxXnE8CFlkd0vY0CqE/7uj48QxL/5+T9R1uDHEQIzP7Fa2P4IuJP9+2n6MVw=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+      defer
+    ></script>
+  </head>
+  <body>
+    <div id="app" class="app-container">
+      <!-- Sidebar -->
+      <aside id="sidebar" class="sidebar">
+        <div class="logo-section">
+          <h1>Audit Hub</h1>
+          <p class="subtitle">WHS SIFA Inspections</p>
+        </div>
+        <div class="controls">
+          <label for="location-select">Delivery Station:</label>
+          <select id="location-select" class="input-select">
+            <option value="DVI1">DVI1</option>
+            <option value="DVI2">DVI2</option>
+            <option value="DVI3">DVI3</option>
+            <option value="DAP5">DAP5</option>
+            <option value="DAP8">DAP8</option>
+          </select>
+          <label for="inspection-select">Inspection Type:</label>
+          <select id="inspection-select" class="input-select">
+            <!-- Populated dynamically based on location -->
+          </select>
+          <button id="new-inspection-btn" class="primary-btn">Start New Inspection</button>
+        </div>
+        <div class="drafts-section">
+          <h2>Pending Inspections</h2>
+          <ul id="drafts-list"></ul>
+        </div>
+        <div class="completed-section">
+          <h2>Completed Inspections</h2>
+          <ul id="completed-list"></ul>
+        </div>
+      </aside>
+      <!-- Main content -->
+      <main id="main" class="main-content">
+        <div id="no-inspection" class="no-inspection">
+          <p>Select a location and inspection type to begin.</p>
+        </div>
+        <form id="inspection-form" class="inspection-form hidden">
+          <div class="form-header">
+            <h2 id="form-title">Inspection Form</h2>
+            <div class="form-actions">
+              <button type="button" id="viewer-toggle" class="secondary-btn">Viewer Mode</button>
+              <button type="button" id="save-draft" class="secondary-btn">Save Draft</button>
+              <button type="button" id="export-pdf" class="secondary-btn">Export PDF</button>
+              <button type="button" id="submit-inspection" class="primary-btn">Submit &amp; Sync</button>
+            </div>
+          </div>
+          <div class="auditor-info">
+            <label>Auditor Name(s):
+              <input type="text" id="auditor-names" placeholder="Enter names" required />
+            </label>
+            <label>Inspection Date:
+              <input type="date" id="inspection-date" required />
+            </label>
+          </div>
+          <div id="questions-container" class="questions-container"></div>
+          <div class="form-footer">
+            <p class="status" id="status-message"></p>
+          </div>
+        </form>
+      </main>
+    </div>
+    <!-- Application script -->
+    <script src="script.js" defer></script>
+  </body>
+</html>
