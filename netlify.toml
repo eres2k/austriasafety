@@ -2,6 +2,46 @@
   # The directory to publish. We ship everything from the repository root
   # because this is a static client‑side application.
   publish = "./"
+  # Functions directory
+  functions = "netlify/functions"
+
+[functions]
+  # Configure the blob function
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# Headers for security and PWA
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Content-Security-Policy = "default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://identity.netlify.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://identity.netlify.com"
+
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+    Cache-Control = "public, max-age=3600"
+
+[[headers]]
+  for = "/service-worker.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+# Redirects for SPA and API
+[[redirects]]
+  from = "/.netlify/blobs/*"
+  to = "/.netlify/functions/blob"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
 
 [[redirects]]
   # Serve index.html for all routes. This makes the SPA work when
@@ -10,8 +50,16 @@
   to = "/index.html"
   status = 200
 
-[[edge_functions]]
-  # Enable Netlify Identity and Functions for this site. When
-  # deploying this code you must enable Identity in the Netlify UI.
-  function = "identity"
-  path = "/.netlify/identity/*"
+# Enable Netlify Identity
+[build.environment]
+  NETLIFY_USE_YARN = "false"
+
+# Context specific settings
+[context.production]
+  environment = { NODE_ENV = "production" }
+
+[context.deploy-preview]
+  environment = { NODE_ENV = "development" }
+
+[context.branch-deploy]
+  environment = { NODE_ENV = "development" }
