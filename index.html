@@ -1195,14 +1195,20 @@
                         <h3 class="section-title">Quick Actions</h3>
                     </div>
                     <div class="flex flex-col gap-sm">
-                        <button class="btn btn-secondary btn-full">
+                        <button id="export-reports-btn" class="btn btn-secondary btn-full">
                             <i class="fas fa-download"></i> Export Reports
                         </button>
-                        <button class="btn btn-secondary btn-full">
+                        <button id="sync-data-btn" class="btn btn-secondary btn-full">
                             <i class="fas fa-sync-alt"></i> Sync Data
                         </button>
-                        <button class="btn btn-secondary btn-full">
+                        <button id="settings-btn" class="btn btn-secondary btn-full">
                             <i class="fas fa-cog"></i> Settings
+                        </button>
+                        <button id="import-questions-btn" class="btn btn-secondary btn-full">
+                            <i class="fas fa-file-import"></i> Import Questions
+                        </button>
+                        <button id="export-questions-btn" class="btn btn-secondary btn-full">
+                            <i class="fas fa-file-export"></i> Export Questions
                         </button>
                     </div>
                 </div>
@@ -1213,43 +1219,10 @@
                         <h3 class="section-title">
                             <i class="fas fa-clock"></i> Pending
                         </h3>
-                        <span class="section-badge">5</span>
+                        <!-- badge removed for dynamic count -->
                     </div>
                     <ul id="pending-list" class="list">
-                        <li class="list-item slide-up">
-                            <div class="list-item-header">
-                                <div class="list-item-title">DVI1 - General Safety</div>
-                                <div class="list-item-meta">2h ago</div>
-                            </div>
-                            <div class="list-item-content">
-                                Fire extinguisher check pending...
-                            </div>
-                            <div class="list-item-actions">
-                                <button class="btn btn-secondary">
-                                    <i class="fas fa-edit"></i> Edit
-                                </button>
-                                <button class="btn btn-success">
-                                    <i class="fas fa-check"></i> Complete
-                                </button>
-                            </div>
-                        </li>
-                        <li class="list-item slide-up">
-                            <div class="list-item-header">
-                                <div class="list-item-title">DAP5 - Fire Safety</div>
-                                <div class="list-item-meta">1d ago</div>
-                            </div>
-                            <div class="list-item-content">
-                                Emergency exit verification required...
-                            </div>
-                            <div class="list-item-actions">
-                                <button class="btn btn-secondary">
-                                    <i class="fas fa-edit"></i> Edit
-                                </button>
-                                <button class="btn btn-warning">
-                                    <i class="fas fa-exclamation-triangle"></i> Priority
-                                </button>
-                            </div>
-                        </li>
+                        <!-- Pending inspections will be populated here dynamically -->
                     </ul>
                 </div>
 
@@ -1259,27 +1232,10 @@
                         <h3 class="section-title">
                             <i class="fas fa-check-circle"></i> Completed
                         </h3>
-                        <span class="section-badge">23</span>
+                        <!-- badge removed for dynamic count -->
                     </div>
                     <ul id="completed-list" class="list">
-                        <li class="list-item">
-                            <div class="list-item-header">
-                                <div class="list-item-title">DVI2 - Equipment Check</div>
-                                <div class="status-indicator status-completed">
-                                    <i class="fas fa-check"></i> Completed
-                                </div>
-                            </div>
-                            <div class="list-item-meta">Today, 14:30</div>
-                        </li>
-                        <li class="list-item">
-                            <div class="list-item-header">
-                                <div class="list-item-title">DVI3 - General Safety</div>
-                                <div class="status-indicator status-completed">
-                                    <i class="fas fa-check"></i> Completed
-                                </div>
-                            </div>
-                            <div class="list-item-meta">Yesterday, 09:15</div>
-                        </li>
+                        <!-- Completed inspections will be populated here dynamically -->
                     </ul>
                 </div>
             </div>
@@ -1343,19 +1299,19 @@
                 <div class="content-header">
                     <h2 id="inspection-title" class="content-title">
                         <i class="fas fa-shield-check"></i>
-                        Fire Safety Inspection - DVI1 Vienna
+                        Inspection - No Location Selected
                     </h2>
                     <div class="content-actions">
-                        <button id="preview-mode-btn" type="button" class="btn btn-secondary">
+                        <button id="preview-mode-btn" class="btn btn-secondary">
                             <i class="fas fa-eye"></i> Preview Mode
                         </button>
-                        <button id="save-draft-btn" type="button" class="btn btn-secondary">
+                        <button id="save-draft-btn" class="btn btn-secondary">
                             <i class="fas fa-save"></i> Save Draft
                         </button>
-                        <button id="export-pdf-btn" type="button" class="btn btn-warning">
+                        <button id="export-pdf-btn" class="btn btn-warning">
                             <i class="fas fa-file-pdf"></i> Export PDF
                         </button>
-                        <button id="submit-inspection-btn" type="button" class="btn btn-success">
+                        <button id="submit-inspection-btn" class="btn btn-success">
                             <i class="fas fa-check-circle"></i> Submit Inspection
                         </button>
                     </div>
@@ -1371,11 +1327,11 @@
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg);">
                             <div class="form-group">
                                 <label class="form-label">Auditor Name(s) *</label>
-                                <input type="text" id="auditor-names" class="form-control" placeholder="John Doe, Jane Smith" value="Sarah Wilson">
+                                <input id="auditor-names" type="text" class="form-control" placeholder="John Doe, Jane Smith" value="">
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Inspection Date *</label>
-                                <input type="date" id="inspection-date" class="form-control" value="2024-12-17">
+                                <input id="inspection-date" type="date" class="form-control" value="">
                             </div>
                         </div>
                     </div>
@@ -1384,126 +1340,38 @@
                     <div class="form-section">
                         <div class="flex items-center justify-between">
                             <span class="form-label">Progress</span>
-                            <span id="progress-status" style="color: var(--text-secondary); font-size: 0.875rem;">3 of 8 completed</span>
+                            <span id="progress-status" style="color: var(--text-secondary); font-size: 0.875rem;">0 of 0 completed</span>
                         </div>
                         <div class="progress-bar">
-                            <div id="progress-fill" class="progress-fill" style="width: 37.5%;"></div>
+                            <div id="progress-fill" class="progress-fill" style="width: 0%;"></div>
                         </div>
                     </div>
 
                     <!-- Questions Section -->
-                    <div class="form-section">
+                    <div id="questions-section" class="form-section">
                         <h3 class="form-section-title">
                             <i class="fas fa-clipboard-question"></i>
                             Safety Checklist
                         </h3>
 
-                        <!-- Question 1: Boolean -->
-                        <div class="question-card">
-                            <div class="question-header">
-                                <div class="question-text">
-                                    Are all fire alarms functional and tested within the last 30 days?
-                                    <span class="question-required">*</span>
-                                </div>
-                                <button type="button" class="voice-btn" title="Voice Input">
-                                    <i class="fas fa-microphone"></i>
-                                </button>
+                        <!-- Hidden file upload area used by dynamic questions -->
+                        <div id="file-upload-area" class="file-upload" style="display: none;">
+                            <div class="file-upload-icon">
+                                <i class="fas fa-cloud-upload-alt"></i>
                             </div>
-                            <div class="boolean-options">
-                                <div class="option-card">
-                                    <input type="radio" name="fire-alarms" id="fire-alarms-yes" value="yes" checked>
-                                    <label for="fire-alarms-yes" class="option-label">
-                                        <i class="fas fa-check"></i>
-                                        Yes
-                                    </label>
-                                </div>
-                                <div class="option-card">
-                                    <input type="radio" name="fire-alarms" id="fire-alarms-no" value="no">
-                                    <label for="fire-alarms-no" class="option-label">
-                                        <i class="fas fa-times"></i>
-                                        No
-                                    </label>
-                                </div>
+                            <div class="file-upload-text">
+                                Click to upload or drag and drop
+                            </div>
+                            <div class="file-upload-hint">
+                                PNG, JPG, HEIC up to 10MB
                             </div>
                         </div>
-
-                        <!-- Question 2: Text Area -->
-                        <div class="question-card">
-                            <div class="question-header">
-                                <div class="question-text">
-                                    Describe any safety concerns or violations observed during inspection
-                                </div>
-                                <button type="button" class="voice-btn" title="Voice Input">
-                                    <i class="fas fa-microphone"></i>
-                                </button>
-                            </div>
-                            <textarea id="observations" class="text-input" placeholder="Describe any observations, issues, or recommendations...">Fire extinguisher in loading dock area has an expired inspection tag dated March 2024. Needs immediate attention and re-certification.</textarea>
-                        </div>
-
-                        <!-- Question 3: Boolean with Status -->
-                        <div class="question-card">
-                            <div class="question-header">
-                                <div class="question-text">
-                                    Are emergency evacuation routes clearly marked and unobstructed?
-                                    <span class="question-required">*</span>
-                                </div>
-                                <button type="button" class="voice-btn listening" title="Voice Input Active">
-                                    <i class="fas fa-stop"></i>
-                                </button>
-                            </div>
-                            <div class="boolean-options">
-                                <div class="option-card">
-                                    <input type="radio" name="evacuation-routes" id="evacuation-yes" value="yes">
-                                    <label for="evacuation-yes" class="option-label">
-                                        <i class="fas fa-check"></i>
-                                        Yes
-                                    </label>
-                                </div>
-                                <div class="option-card">
-                                    <input type="radio" name="evacuation-routes" id="evacuation-no" value="no" checked>
-                                    <label for="evacuation-no" class="option-label">
-                                        <i class="fas fa-times"></i>
-                                        No
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Question 4: File Upload -->
-                        <div class="question-card">
-                            <div class="question-header">
-                                <div class="question-text">
-                                    Upload photo evidence of any safety issues found
-                                </div>
-                            </div>
-                            <div id="file-upload-area" class="file-upload">
-                                <div class="file-upload-icon">
-                                    <i class="fas fa-cloud-upload-alt"></i>
-                                </div>
-                                <div class="file-upload-text">
-                                    Click to upload or drag and drop
-                                </div>
-                                <div class="file-upload-hint">
-                                    PNG, JPG, HEIC up to 10MB
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Question 5: Number Input -->
-                        <div class="question-card">
-                            <div class="question-header">
-                                <div class="question-text">
-                                    How many fire extinguishers were inspected?
-                                    <span class="question-required">*</span>
-                                </div>
-                                <button type="button" class="voice-btn" title="Voice Input">
-                                    <i class="fas fa-microphone"></i>
-                                </button>
-                            </div>
-                            <input type="number" id="extinguisher-count" class="form-control" placeholder="Enter number" value="12" min="0">
-                        </div>
+                        <!-- Questions will be dynamically inserted here -->
                     </div>
 
+                    <!-- Hidden placeholders for backward compatibility -->
+                    <input type="hidden" id="extinguisher-count">
+                    <textarea id="observations" style="display:none;"></textarea>
                     <!-- Form Actions -->
                     <div class="flex justify-between items-center" style="margin-top: var(--space-2xl);">
                         <div class="flex items-center gap-md">
@@ -1599,9 +1467,9 @@
     <button class="fab" title="Quick Actions">
         <i class="fas fa-plus"></i>
     </button>
-    <!-- Netlify Identity Widget -->
+
+    <!-- Netlify Identity and App Scripts -->
     <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-    <!-- Main App Script -->
     <script src="app.js"></script>
 </body>
 </html>

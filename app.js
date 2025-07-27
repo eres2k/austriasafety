@@ -37,6 +37,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const progressFillEl = document.getElementById('progress-fill');
   const inspectionTitleEl = document.getElementById('inspection-title');
 
+  // Quick actions buttons
+  const importQuestionsBtn = document.getElementById('import-questions-btn');
+  const exportQuestionsBtn = document.getElementById('export-questions-btn');
+  const exportReportsBtn = document.getElementById('export-reports-btn');
+  const syncDataBtn = document.getElementById('sync-data-btn');
+  const settingsBtn = document.getElementById('settings-btn');
+
   // Track current inspection identifier. When editing an existing
   // inspection the id is set; for new inspections it is null until
   // saved.
@@ -47,10 +54,58 @@ document.addEventListener('DOMContentLoaded', () => {
   // uploaded individually.
   let uploadedFiles = [];
 
+  // Define the default question set. Each question has an id (used
+  // internally and for storing answers), a type, a prompt and an
+  // optional required flag. Supported types are 'boolean', 'text',
+  // 'number' and 'file'. File questions currently share a common
+  // upload area.
+  const defaultQuestions = [
+    {
+      id: 'fire-alarms',
+      type: 'boolean',
+      question: 'Are all fire alarms functional and tested within the last 30 days?',
+      required: true
+    },
+    {
+      id: 'observations',
+      type: 'text',
+      question: 'Describe any safety concerns or violations observed during inspection',
+      required: false
+    },
+    {
+      id: 'evacuation-routes',
+      type: 'boolean',
+      question: 'Are emergency evacuation routes clearly marked and unobstructed?',
+      required: true
+    },
+    {
+      id: 'evidence',
+      type: 'file',
+      question: 'Upload photo evidence of any safety issues found',
+      required: false
+    },
+    {
+      id: 'extinguishers',
+      type: 'number',
+      question: 'How many fire extinguishers were inspected?',
+      required: true
+    }
+  ];
+
+  // The current question list in use. Initially set to the default
+  // questions but may be replaced by a user specific set loaded
+  // from Netlify Blobs or via import. This array drives dynamic
+  // rendering and progress calculations.
+  let questions = [...defaultQuestions];
+
   // Initialize the user menu immediately based on the current
   // authentication state. If Netlify Identity is unavailable or
   // there is no logged in user this will show the login prompt.
   updateUserMenu(window.netlifyIdentity && window.netlifyIdentity.currentUser() || null);
+  // Load questions on startup. When not logged in this will render
+  // the default question set; when logged in the user-specific
+  // question set will be loaded in the init event.
+  loadQuestions();
 
   /**
    * Update the header user menu. When a user is signed in the menu
@@ -101,6 +156,206 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
+  /**
+   * Load the question set for the current user from Netlify Blobs. If
+   * no record exists the default question set is used. The loaded
+   * questions are stored in the global `questions` variable and the
+   * UI is re-rendered accordingly. When the user is not logged in
+   * the default questions remain.
+   */
+  async function loadQuestions() {
+    // Use default questions when Identity is unavailable or no user is
+    // logged in.
+    if (!window.netlifyIdentity) {
+      questions = [...defaultQuestions];
+      renderQuestions();
+      return;
+    }
+    const user = window.netlifyIdentity.currentUser();
+    if (!user) {
+      questions = [...defaultQuestions];
+      renderQuestions();
+      return;
+    }
+    try {
+      const token = await user.jwt();
+      const path = `questions/${user.id}/questions.json`;
+      const res = await fetch(`/.netlify/blobs/${path}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          questions = data;
+        } else {
+          questions = [...defaultQuestions];
+        }
+      } else {
+        // If the file does not exist fall back to default questions
+        questions = [...defaultQuestions];
+      }
+    } catch (err) {
+      console.warn('Failed to load questions, using defaults', err);
+      questions = [...defaultQuestions];
+    }
+    renderQuestions();
+  }
+
+  /**
+   * Persist the current question set to Netlify Blobs for the
+   * authenticated user. If the user is not logged in this
+   * operation is a no-op and the questions remain only in memory.
+   */
+  async function saveQuestions() {
+    if (!window.netlifyIdentity) return;
+    const user = window.netlifyIdentity.currentUser();
+    if (!user) return;
+    try {
+      const token = await user.jwt();
+      const path = `questions/${user.id}/questions.json`;
+      await fetch(`/.netlify/blobs/${path}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(questions)
+      });
+    } catch (err) {
+      console.error('Failed to save questions', err);
+    }
+  }
+
+  /**
+   * Render the questions into the form. This function clears any
+   * existing question cards and rebuilds them based on the
+   * contents of the `questions` array. Event listeners for voice
+   * buttons and input changes are attached. After rendering the
+   * progress indicator is updated to reflect the new question
+   * count.
+   */
+  function renderQuestions() {
+    const section = document.getElementById('questions-section');
+    if (!section) return;
+    // Remove all existing question cards
+    section.querySelectorAll('.question-card').forEach(card => card.remove());
+    // For each question build appropriate markup
+    questions.forEach(q => {
+      const card = document.createElement('div');
+      card.className = 'question-card';
+      const header = document.createElement('div');
+      header.className = 'question-header';
+      const textEl = document.createElement('div');
+      textEl.className = 'question-text';
+      // Compose question text and append required indicator
+      textEl.textContent = q.question;
+      if (q.required) {
+        const reqSpan = document.createElement('span');
+        reqSpan.className = 'question-required';
+        reqSpan.textContent = '*';
+        textEl.appendChild(reqSpan);
+      }
+      header.appendChild(textEl);
+      // Voice button (only for text and number questions). For boolean
+      // questions voice input may not make sense but we include it
+      // anyway for parity.
+      if (q.type !== 'file') {
+        const voiceBtn = document.createElement('button');
+        voiceBtn.type = 'button';
+        voiceBtn.className = 'voice-btn';
+        voiceBtn.title = 'Voice Input';
+        const micIcon = document.createElement('i');
+        micIcon.className = 'fas fa-microphone';
+        voiceBtn.appendChild(micIcon);
+        header.appendChild(voiceBtn);
+      }
+      card.appendChild(header);
+      // Create input control based on type
+      let control;
+      if (q.type === 'boolean') {
+        const options = document.createElement('div');
+        options.className = 'boolean-options';
+        ['yes', 'no'].forEach(val => {
+          const optionCard = document.createElement('div');
+          optionCard.className = 'option-card';
+          const input = document.createElement('input');
+          input.type = 'radio';
+          input.name = q.id;
+          input.id = `${q.id}-${val}`;
+          input.value = val;
+          const label = document.createElement('label');
+          label.className = 'option-label';
+          label.setAttribute('for', `${q.id}-${val}`);
+          const icon = document.createElement('i');
+          icon.className = val === 'yes' ? 'fas fa-check' : 'fas fa-times';
+          label.appendChild(icon);
+          label.appendChild(document.createTextNode(val === 'yes' ? ' Yes' : ' No'));
+          optionCard.appendChild(input);
+          optionCard.appendChild(label);
+          options.appendChild(optionCard);
+        });
+        control = options;
+      } else if (q.type === 'text') {
+        const textarea = document.createElement('textarea');
+        textarea.id = q.id;
+        textarea.className = 'text-input';
+        textarea.placeholder = 'Enter your answer...';
+        control = textarea;
+      } else if (q.type === 'number') {
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.id = q.id;
+        input.className = 'form-control';
+        input.placeholder = 'Enter number';
+        input.min = '0';
+        control = input;
+      } else if (q.type === 'file') {
+        // For file questions we reuse the global upload area. If
+        // multiple file questions exist they share attachments.
+        const wrapper = document.createElement('div');
+        wrapper.appendChild(fileArea);
+        control = wrapper;
+      } else {
+        // Unknown type, fallback to text
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.id = q.id;
+        input.className = 'form-control';
+        control = input;
+      }
+      card.appendChild(control);
+      // Append the card to the questions section
+      section.appendChild(card);
+    });
+    // After rendering attach voice button handlers. We need to
+    // delegate because voice buttons may be newly created.
+    section.querySelectorAll('.voice-btn').forEach(btn => {
+      btn.addEventListener('click', () => toggleVoice(btn));
+    });
+    // Attach change handlers to new inputs for progress updates
+    // Boolean radio inputs
+    questions.forEach(q => {
+      if (q.type === 'boolean') {
+        const radios = section.querySelectorAll(`input[name="${q.id}"]`);
+        radios.forEach(r => {
+          r.addEventListener('change', updateProgress);
+        });
+      } else if (q.type === 'text' || q.type === 'number') {
+        const el = section.querySelector(`#${q.id}`);
+        if (el) {
+          el.addEventListener('input', () => {
+            updateProgress();
+          });
+          el.addEventListener('change', () => {
+            updateProgress();
+          });
+        }
+      }
+    });
+    // Update progress bar and title after rendering
+    updateProgress();
+  }
+
   // Register Netlify Identity event listeners. On init, login and logout
   // update the user menu. After login the inspection data is loaded.
   if (window.netlifyIdentity) {
@@ -108,6 +363,11 @@ document.addEventListener('DOMContentLoaded', () => {
       updateUserMenu(user);
       if (user) {
         loadInspections();
+        loadQuestions();
+      } else {
+        // When not logged in fallback to default question set
+        questions = [...defaultQuestions];
+        renderQuestions();
       }
     });
     window.netlifyIdentity.on('login', user => {
@@ -116,10 +376,14 @@ document.addEventListener('DOMContentLoaded', () => {
         window.netlifyIdentity.close();
       }
       loadInspections();
+      loadQuestions();
     });
     window.netlifyIdentity.on('logout', () => {
       updateUserMenu(null);
       currentInspectionId = null;
+      // Reset to default question set on logout
+      questions = [...defaultQuestions];
+      renderQuestions();
     });
   }
 
@@ -151,17 +415,22 @@ document.addEventListener('DOMContentLoaded', () => {
     typeSelect.selectedIndex = 0;
     auditorNamesInput.value = '';
     inspectionDateInput.value = '';
-    // Reset radio buttons to unchecked states
-    const radioNames = ['fire-alarms', 'evacuation-routes'];
-    radioNames.forEach(name => {
-      const radios = document.querySelectorAll(`input[name="${name}"]`);
-      radios.forEach(radio => {
-        radio.checked = false;
-      });
+    // Reset dynamic question fields
+    questions.forEach(q => {
+      if (q.type === 'boolean') {
+        const radios = document.querySelectorAll(`input[name="${q.id}"]`);
+        radios.forEach(r => (r.checked = false));
+      } else if (q.type === 'text' || q.type === 'number') {
+        const el = document.getElementById(q.id);
+        if (el) el.value = '';
+      } else if (q.type === 'file') {
+        // Clear attachments
+        uploadedFiles = [];
+      } else {
+        const el = document.getElementById(q.id);
+        if (el) el.value = '';
+      }
     });
-    observationsTextarea.value = '';
-    extinguisherCountInput.value = '';
-    uploadedFiles = [];
     updateFileListDisplay();
     updateProgress();
     updateFormTitle();
@@ -190,27 +459,27 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeIdx >= 0) typeSelect.selectedIndex = typeIdx;
     auditorNamesInput.value = data.auditors || '';
     inspectionDateInput.value = data.date || '';
-    // Fire alarms and evacuation routes
-    const fire = document.querySelector(
-      `input[name="fire-alarms"][value="${data.answers?.fireAlarms || ''}"]`
-    );
-    if (fire) fire.checked = true;
-    const evac = document.querySelector(
-      `input[name="evacuation-routes"][value="${data.answers?.evacuationRoutes || ''}"]`
-    );
-    if (evac) evac.checked = true;
-    observationsTextarea.value = data.answers?.observations || '';
-    extinguisherCountInput.value = data.answers?.extinguisherCount || '';
-    // Currently file uploads are not pulled from server; the UI lists
-    // file names from the data but does not download the files. The
-    // user would need to re-upload attachments when editing.
-    uploadedFiles = [];
-    if (Array.isArray(data.answers?.files)) {
-      // Build dummy File-like objects with only name property for
-      // display. When editing the user must reattach actual files
-      // before saving.
-      uploadedFiles = data.answers.files.map(name => ({ name }));
-    }
+    // Populate dynamic question answers
+    questions.forEach(q => {
+      const value = data.answers && data.answers[q.id];
+      if (q.type === 'boolean') {
+        const radio = document.querySelector(`input[name="${q.id}"][value="${value}"]`);
+        if (radio) radio.checked = true;
+      } else if (q.type === 'text' || q.type === 'number') {
+        const el = document.getElementById(q.id);
+        if (el) el.value = value || '';
+      } else if (q.type === 'file') {
+        // Attachments: create dummy objects for display. When editing
+        // the user must reattach actual files to upload them again.
+        uploadedFiles = [];
+        if (Array.isArray(value)) {
+          uploadedFiles = value.map(name => ({ name }));
+        }
+      } else {
+        const el = document.getElementById(q.id);
+        if (el) el.value = value || '';
+      }
+    });
     updateFileListDisplay();
     updateProgress();
     updateFormTitle();
@@ -228,9 +497,21 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   function collectFormData(status) {
     const id = currentInspectionId || `${Date.now()}`;
-    // Determine selected values for radio inputs
-    const fireAlarms = (document.querySelector('input[name="fire-alarms"]:checked') || {}).value || '';
-    const evacuation = (document.querySelector('input[name="evacuation-routes"]:checked') || {}).value || '';
+    const answers = {};
+    questions.forEach(q => {
+      if (q.type === 'boolean') {
+        const selected = document.querySelector(`input[name="${q.id}"]:checked`);
+        answers[q.id] = selected ? selected.value : '';
+      } else if (q.type === 'text' || q.type === 'number') {
+        const el = document.getElementById(q.id);
+        answers[q.id] = el ? el.value : '';
+      } else if (q.type === 'file') {
+        answers[q.id] = uploadedFiles.map(f => f.name);
+      } else {
+        const el = document.getElementById(q.id);
+        answers[q.id] = el ? el.value : '';
+      }
+    });
     return {
       id,
       location: locationSelect.value,
@@ -239,13 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
       date: inspectionDateInput.value,
       status,
       created_at: new Date().toISOString(),
-      answers: {
-        fireAlarms,
-        observations: observationsTextarea.value,
-        evacuationRoutes: evacuation,
-        extinguisherCount: extinguisherCountInput.value,
-        files: uploadedFiles.map(f => f.name)
-      }
+      answers
     };
   }
 
@@ -279,24 +554,32 @@ document.addEventListener('DOMContentLoaded', () => {
    * your form.
    */
   function updateProgress() {
-    // Each of these checks contributes one step to progress when
-    // satisfied.
+    // Compute progress based on required base fields and the current
+    // question set. Always include location, type, auditor names and
+    // inspection date in the calculation.
     const checks = [];
-    // Location and type selections
     checks.push(!!locationSelect.value);
     checks.push(!!typeSelect.value);
-    // Auditor names and date
     checks.push(auditorNamesInput.value.trim().length > 0);
     checks.push(!!inspectionDateInput.value);
-    // Radio questions
-    checks.push(!!document.querySelector('input[name="fire-alarms"]:checked'));
-    checks.push(!!document.querySelector('input[name="evacuation-routes"]:checked'));
-    // Observations (text area)
-    checks.push(observationsTextarea.value.trim().length > 0);
-    // Numeric entry for extinguishers
-    checks.push(!!extinguisherCountInput.value);
-    // File upload presence
-    checks.push(uploadedFiles.length > 0);
+    // Evaluate each question
+    questions.forEach(q => {
+      if (q.type === 'boolean') {
+        checks.push(!!document.querySelector(`input[name="${q.id}"]:checked`));
+      } else if (q.type === 'text') {
+        const el = document.getElementById(q.id);
+        checks.push(el && el.value.trim().length > 0);
+      } else if (q.type === 'number') {
+        const el = document.getElementById(q.id);
+        checks.push(el && el.value !== '');
+      } else if (q.type === 'file') {
+        checks.push(uploadedFiles.length > 0);
+      } else {
+        // Unknown type counts only when input has value
+        const el = document.getElementById(q.id);
+        checks.push(el && el.value.trim().length > 0);
+      }
+    });
     const completed = checks.filter(Boolean).length;
     const total = checks.length;
     const percent = total === 0 ? 0 : (completed / total) * 100;
@@ -797,6 +1080,160 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   exportPdfBtn.addEventListener('click', () => {
     alert('PDF export is not yet implemented.');
+  });
+
+  /* ------------------------------------------------------------------ */
+  /*                 Question Import/Export and Other Actions          */
+  /* ------------------------------------------------------------------ */
+  // Import questions from a JSON file. The JSON must be an array of
+  // question objects. Only types boolean, text and number are
+  // supported. File questions are ignored.
+  importQuestionsBtn.addEventListener('click', () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json';
+    input.onchange = async () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const imported = JSON.parse(text);
+        if (!Array.isArray(imported)) {
+          alert('Invalid format: expected an array of questions');
+          return;
+        }
+        // Validate each question
+        const validTypes = ['boolean', 'text', 'number'];
+        const cleaned = [];
+        for (const q of imported) {
+          if (!q.id || !q.type || !q.question) {
+            continue;
+          }
+          if (!validTypes.includes(q.type)) {
+            continue;
+          }
+          cleaned.push({
+            id: String(q.id),
+            type: q.type,
+            question: String(q.question),
+            required: !!q.required
+          });
+        }
+        if (cleaned.length === 0) {
+          alert('No valid questions found in the file.');
+          return;
+        }
+        if (!window.confirm('Importing will overwrite your current question set. Proceed?')) {
+          return;
+        }
+        questions = cleaned;
+        renderQuestions();
+        await saveQuestions();
+        alert('Questions imported successfully.');
+      } catch (err) {
+        console.error(err);
+        alert('Failed to import questions. Make sure the file contains valid JSON.');
+      }
+    };
+    input.click();
+  });
+
+  // Export the current question set as a JSON file. The file is
+  // downloaded to the user’s device. No authentication required.
+  exportQuestionsBtn.addEventListener('click', () => {
+    try {
+      const blob = new Blob([JSON.stringify(questions, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'questions.json';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to export questions.');
+    }
+  });
+
+  // Export all inspections belonging to the current user as a JSON
+  // file. This can be used to generate a backup or to inspect
+  // results offline. When not logged in the user is prompted to
+  // authenticate.
+  exportReportsBtn.addEventListener('click', async () => {
+    if (!window.netlifyIdentity) {
+      alert('This feature is only available when deployed on Netlify.');
+      return;
+    }
+    const user = window.netlifyIdentity.currentUser();
+    if (!user) {
+      window.netlifyIdentity.open();
+      return;
+    }
+    try {
+      const token = await user.jwt();
+      const prefix = `inspections/${user.id}/`;
+      const listRes = await fetch(`/.netlify/blobs/${prefix}?list=true`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!listRes.ok) {
+        alert('Failed to list inspections for export.');
+        return;
+      }
+      const listData = await listRes.json();
+      const blobs = listData.blobs || [];
+      const recordPaths = blobs
+        .map(b => b.path || b)
+        .filter(p => typeof p === 'string' && p.endsWith('record.json'));
+      const records = [];
+      for (const recordPath of recordPaths) {
+        const recRes = await fetch(`/.netlify/blobs/${recordPath}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (recRes.ok) {
+          try {
+            const rec = await recRes.json();
+            records.push(rec);
+          } catch (e) {
+            // Skip invalid records
+          }
+        }
+      }
+      const blob = new Blob([JSON.stringify(records, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'inspections.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert('An error occurred while exporting inspections.');
+    }
+  });
+
+  // Sync data by reloading the inspections list from Netlify. If the
+  // user is not authenticated they will be prompted to log in.
+  syncDataBtn.addEventListener('click', () => {
+    if (!window.netlifyIdentity) {
+      alert('This feature is only available when deployed on Netlify.');
+      return;
+    }
+    const user = window.netlifyIdentity.currentUser();
+    if (!user) {
+      window.netlifyIdentity.open();
+      return;
+    }
+    loadInspections().then(() => alert('Data synced successfully.'));
+  });
+
+  // Settings button placeholder
+  settingsBtn.addEventListener('click', () => {
+    alert('Settings are not yet implemented.');
   });
 
   // Kick off initial progress calculation and title update
