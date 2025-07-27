@@ -30,12 +30,72 @@ document.addEventListener('DOMContentLoaded', () => {
   const typeSelect = document.getElementById('inspection-type-select');
   const auditorNamesInput = document.getElementById('auditor-names');
   const inspectionDateInput = document.getElementById('inspection-date');
-  const observationsTextarea = document.getElementById('observations');
-  const extinguisherCountInput = document.getElementById('extinguisher-count');
-  const fileArea = document.getElementById('file-upload-area');
+  // Observations and extinguisher inputs have been removed.
+  const observationsTextarea = null;
+  const extinguisherCountInput = null;
+  const fileArea = null;
   const progressStatusEl = document.getElementById('progress-status');
   const progressFillEl = document.getElementById('progress-fill');
   const inspectionTitleEl = document.getElementById('inspection-title');
+
+  // Navigation items
+  const navDashboard = document.getElementById('nav-dashboard');
+  const navInspections = document.getElementById('nav-inspections');
+  const navReports = document.getElementById('nav-reports');
+  const navAnalytics = document.getElementById('nav-analytics');
+
+  /**
+   * Show only the section with the given name and update nav states.
+   * @param {string} section
+   */
+  function setActiveSection(section) {
+    document.querySelectorAll('[data-section]').forEach(el => {
+      if (el.dataset.section === section) {
+        el.style.display = '';
+      } else {
+        el.style.display = 'none';
+      }
+    });
+    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+    const navMap = {
+      dashboard: navDashboard,
+      inspections: navInspections,
+      reports: navReports,
+      analytics: navAnalytics
+    };
+    if (navMap[section]) {
+      navMap[section].classList.add('active');
+    }
+    if (section === 'inspections') {
+      updateFormTitle();
+      updateProgress();
+    } else if (section === 'reports') {
+      renderReports();
+    } else if (section === 'analytics') {
+      renderAnalytics();
+    }
+  }
+
+  // Bind nav clicks
+  navDashboard?.addEventListener('click', e => {
+    e.preventDefault();
+    setActiveSection('dashboard');
+  });
+  navInspections?.addEventListener('click', e => {
+    e.preventDefault();
+    setActiveSection('inspections');
+  });
+  navReports?.addEventListener('click', e => {
+    e.preventDefault();
+    setActiveSection('reports');
+  });
+  navAnalytics?.addEventListener('click', e => {
+    e.preventDefault();
+    setActiveSection('analytics');
+  });
+
+  // Set default section
+  setActiveSection('dashboard');
 
   // Quick actions buttons
   const importQuestionsBtn = document.getElementById('import-questions-btn');
@@ -49,47 +109,73 @@ document.addEventListener('DOMContentLoaded', () => {
   // saved.
   let currentInspectionId = null;
 
-  // Keep selected/dragged files in memory until saved. Each entry is a
-  // File object. When saving the inspection these files will be
-  // uploaded individually.
-  let uploadedFiles = [];
+  // For per-question attachments. Each question id maps to an array of File objects or file name strings.
+  let questionFiles = {};
+  // Cache loaded inspections for reports and analytics. Populated by loadInspections().
+  let inspectionsData = [];
 
-  // Define the default question set. Each question has an id (used
-  // internally and for storing answers), a type, a prompt and an
-  // optional required flag. Supported types are 'boolean', 'text',
-  // 'number' and 'file'. File questions currently share a common
-  // upload area.
+  // Define the default question set extracted from the provided audit report.
+  // Each question belongs to a category and is a simple yes/no (boolean) type.
   const defaultQuestions = [
-    {
-      id: 'fire-alarms',
-      type: 'boolean',
-      question: 'Are all fire alarms functional and tested within the last 30 days?',
-      required: true
-    },
-    {
-      id: 'observations',
-      type: 'text',
-      question: 'Describe any safety concerns or violations observed during inspection',
-      required: false
-    },
-    {
-      id: 'evacuation-routes',
-      type: 'boolean',
-      question: 'Are emergency evacuation routes clearly marked and unobstructed?',
-      required: true
-    },
-    {
-      id: 'evidence',
-      type: 'file',
-      question: 'Upload photo evidence of any safety issues found',
-      required: false
-    },
-    {
-      id: 'extinguishers',
-      type: 'number',
-      question: 'How many fire extinguishers were inspected?',
-      required: true
-    }
+    // Allgemeine Sicherheit (General Safety)
+    { id: 'general-visible-signs', type: 'boolean', category: 'General Safety', question: 'Sind Sicherheitshinweise und Fluchtwegpläne deutlich sichtbar?', required: false },
+    { id: 'general-exits-clear', type: 'boolean', category: 'General Safety', question: 'Sind alle Notausgänge frei und gut gekennzeichnet?', required: false },
+    { id: 'general-first-aid', type: 'boolean', category: 'General Safety', question: 'Ist die Erste-Hilfe-Ausstattung vollständig und erreichbar?', required: false },
+    { id: 'general-emergency-equipment', type: 'boolean', category: 'General Safety', question: 'Ist die Notfallausrüstung (Augenspülung, Feuerlöscher) zugänglich?', required: false },
+    { id: 'general-psa', type: 'boolean', category: 'General Safety', question: 'Tragen alle Mitarbeiter die korrekte PSA?', required: false },
+    { id: 'general-badges', type: 'boolean', category: 'General Safety', question: 'Sind alle Mitarbeiter-Badges sichtbar?', required: false },
+    { id: 'general-hair-clothing', type: 'boolean', category: 'General Safety', question: 'Entsprechen Frisur/Kleidung den Sicherheitsvorschriften? (max. Schulterhöhe)', required: false },
+    { id: 'general-instructions', type: 'boolean', category: 'General Safety', question: 'Sind aktuelle Arbeitsanweisungen verfügbar?', required: false },
+    // Arbeitsplatz und Umgebung (Workplace and Environment)
+    { id: 'workplace-clean', type: 'boolean', category: 'Workplace & Environment', question: 'Ist die Lagerhalle sauber und aufgeräumt?', required: false },
+    { id: 'workplace-floors', type: 'boolean', category: 'Workplace & Environment', question: 'Sind die Böden rutschfest und eben?', required: false },
+    { id: 'workplace-space', type: 'boolean', category: 'Workplace & Environment', question: 'Ist ausreichend Bewegungsfreiheit vorhanden? (min. 1,5 m² pro Person)', required: false },
+    { id: 'workplace-lighting', type: 'boolean', category: 'Workplace & Environment', question: 'Entspricht die Beleuchtung den Anforderungen? (min. 200 Lux)', required: false },
+    { id: 'workplace-temperature', type: 'boolean', category: 'Workplace & Environment', question: 'Ist die Raumtemperatur angemessen? (18-25°C)', required: false },
+    { id: 'workplace-ventilation', type: 'boolean', category: 'Workplace & Environment', question: 'Ist die Lüftung ausreichend?', required: false },
+    { id: 'workplace-noise', type: 'boolean', category: 'Workplace & Environment', question: 'Liegt der Lärmpegel im zulässigen Bereich? (< 85 dB(A))', required: false },
+    { id: 'workplace-ergonomics', type: 'boolean', category: 'Workplace & Environment', question: 'Sind die Arbeitsplätze ergonomisch gestaltet?', required: false },
+    // Lagerung und Transport (Storage & Transport)
+    { id: 'storage-5s', type: 'boolean', category: 'Storage & Transport', question: 'Werden die 5S-Markierungen respektiert?', required: false },
+    { id: 'storage-organization', type: 'boolean', category: 'Storage & Transport', question: 'Sind die Lagerbereiche sicher organisiert?', required: false },
+    { id: 'storage-overhead', type: 'boolean', category: 'Storage & Transport', question: 'Werden Lagerungen über Kopf vermieden?', required: false },
+    { id: 'storage-shelves', type: 'boolean', category: 'Storage & Transport', question: 'Sind Regale ordnungsgemäß befestigt?', required: false },
+    { id: 'storage-stack-height', type: 'boolean', category: 'Storage & Transport', question: 'Sind die maximalen Stapelhöhen eingehalten?', required: false },
+    { id: 'storage-pedestrian-paths', type: 'boolean', category: 'Storage & Transport', question: 'Sind Fußgängerwege klar gekennzeichnet? (min. 1,2 m breit)', required: false },
+    { id: 'storage-paths-clear', type: 'boolean', category: 'Storage & Transport', question: 'Sind alle Transportwege frei von Hindernissen?', required: false },
+    { id: 'storage-danger-zones', type: 'boolean', category: 'Storage & Transport', question: 'Sind Gefahrenbereiche deutlich markiert?', required: false },
+    { id: 'storage-vehicles-condition', type: 'boolean', category: 'Storage & Transport', question: 'Sind alle Flurförderzeuge in gutem Zustand?', required: false },
+    { id: 'storage-maintenance-logs', type: 'boolean', category: 'Storage & Transport', question: 'Sind die Wartungsprotokolle aktuell? (jährliche Prüfung)', required: false },
+    { id: 'storage-loading-aids', type: 'boolean', category: 'Storage & Transport', question: 'Sind Ladehilfsmittel unbeschädigt?', required: false },
+    // Gefahrstoffe (Hazardous Materials)
+    { id: 'hazard-storage', type: 'boolean', category: 'Hazardous Materials', question: 'Sind Gefahrstoffe korrekt gelagert?', required: false },
+    { id: 'hazard-labeling', type: 'boolean', category: 'Hazardous Materials', question: 'Sind alle Gefahrstoffe ordnungsgemäß gekennzeichnet?', required: false },
+    { id: 'hazard-safety-data', type: 'boolean', category: 'Hazardous Materials', question: 'Sind Sicherheitsdatenblätter verfügbar?', required: false },
+    { id: 'hazard-area-secured', type: 'boolean', category: 'Hazardous Materials', question: 'Sind Gefahrstoffbereiche abgesperrt?', required: false },
+    // Ergonomie und Arbeitsverhalten (Ergonomics & Work Behaviour)
+    { id: 'ergo-posture', type: 'boolean', category: 'Ergonomics & Behaviour', question: 'Vermeiden Mitarbeiter ungünstige Körperhaltungen?', required: false },
+    { id: 'ergo-cart-control', type: 'boolean', category: 'Ergonomics & Behaviour', question: 'Werden Transportwagen kontrolliert bewegt?', required: false },
+    { id: 'ergo-handrails', type: 'boolean', category: 'Ergonomics & Behaviour', question: 'Werden Handläufe verwendet (wo vorhanden)?', required: false },
+    { id: 'ergo-lifting-aids', type: 'boolean', category: 'Ergonomics & Behaviour', question: 'Werden Hebehilfen bei schweren Lasten eingesetzt? (ab 25 kg Männer, 15 kg Frauen)', required: false },
+    { id: 'ergo-breaks', type: 'boolean', category: 'Ergonomics & Behaviour', question: 'Werden Pausenzeiten eingehalten?', required: false },
+    { id: 'ergo-work-rhythm', type: 'boolean', category: 'Ergonomics & Behaviour', question: 'Ist der Arbeitsrhythmus angemessen?', required: false },
+    // Notfallvorsorge (Emergency Preparedness)
+    { id: 'emergency-first-aiders', type: 'boolean', category: 'Emergency Preparedness', question: 'Sind genügend Ersthelfer verfügbar? (1 pro 19 Mitarbeiter)', required: false },
+    { id: 'emergency-fire-wardens', type: 'boolean', category: 'Emergency Preparedness', question: 'Sind Brandschutzwarte ernannt und geschult?', required: false },
+    { id: 'emergency-plans', type: 'boolean', category: 'Emergency Preparedness', question: 'Sind die Notfallpläne aktuell und bekannt?', required: false },
+    { id: 'emergency-drills', type: 'boolean', category: 'Emergency Preparedness', question: 'Werden regelmäßig Notfallübungen durchgeführt?', required: false },
+    { id: 'emergency-assembly-points', type: 'boolean', category: 'Emergency Preparedness', question: 'Sind Sammelplätze bekannt und gekennzeichnet?', required: false },
+    { id: 'emergency-alarm-system', type: 'boolean', category: 'Emergency Preparedness', question: 'Funktioniert das Alarmsystem ordnungsgemäß?', required: false },
+    // Wartung und Instandhaltung (Maintenance & Inspection)
+    { id: 'maintenance-gate-intervals', type: 'boolean', category: 'Maintenance', question: 'Werden Wartungsintervalle bei Toren eingehalten?', required: false },
+    { id: 'maintenance-extinguisher', type: 'boolean', category: 'Maintenance', question: 'Sind Feuerlöscher-Prüffristen aktuell? (alle 2 Jahre)', required: false },
+    { id: 'maintenance-electrical', type: 'boolean', category: 'Maintenance', question: 'Sind elektrische Anlagen ordnungsgemäß geprüft?', required: false },
+    { id: 'maintenance-ventilation', type: 'boolean', category: 'Maintenance', question: 'Erfolgt regelmäßige Wartung der Lüftungsanlagen?', required: false },
+    { id: 'maintenance-protocols', type: 'boolean', category: 'Maintenance', question: 'Sind alle Wartungsprotokolle verfügbar?', required: false },
+    // Höhenarbeiten (Working at Heights)
+    { id: 'height-fall-protection', type: 'boolean', category: 'Working at Heights', question: 'Sind Absturzsicherungen vorhanden?', required: false },
+    { id: 'height-special-gear', type: 'boolean', category: 'Working at Heights', question: 'Ist spezielle Schutzausrüstung verfügbar?', required: false },
+    { id: 'height-permits', type: 'boolean', category: 'Working at Heights', question: 'Sind Arbeiten in der Höhe genehmigt?', required: false }
   ];
 
   // The current question list in use. Initially set to the default
@@ -239,8 +325,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!section) return;
     // Remove all existing question cards
     section.querySelectorAll('.question-card').forEach(card => card.remove());
+    // Track the current category to insert headings when category changes
+    let currentCategory = null;
     // For each question build appropriate markup
     questions.forEach(q => {
+      // Insert a category heading if this question starts a new category
+      if (q.category && q.category !== currentCategory) {
+        currentCategory = q.category;
+        const heading = document.createElement('div');
+        heading.className = 'category-heading';
+        heading.textContent = currentCategory;
+        section.appendChild(heading);
+      }
       const card = document.createElement('div');
       card.className = 'question-card';
       const header = document.createElement('div');
@@ -310,10 +406,9 @@ document.addEventListener('DOMContentLoaded', () => {
         input.min = '0';
         control = input;
       } else if (q.type === 'file') {
-        // For file questions we reuse the global upload area. If
-        // multiple file questions exist they share attachments.
+        // For file type questions we do not render a specific control.
+        // Attachments can still be uploaded via the per-question upload area below.
         const wrapper = document.createElement('div');
-        wrapper.appendChild(fileArea);
         control = wrapper;
       } else {
         // Unknown type, fallback to text
@@ -324,6 +419,19 @@ document.addEventListener('DOMContentLoaded', () => {
         control = input;
       }
       card.appendChild(control);
+      // Ensure a files array exists for this question
+      if (!questionFiles[q.id]) {
+        questionFiles[q.id] = [];
+      }
+      // Add comment input
+      const comment = document.createElement('textarea');
+      comment.id = `comment-${q.id}`;
+      comment.className = 'text-input comment-input';
+      comment.placeholder = 'Add a comment (optional)';
+      card.appendChild(comment);
+      // Add per-question file upload area
+      const attachArea = createFileUploadElement(q.id);
+      card.appendChild(attachArea);
       // Append the card to the questions section
       section.appendChild(card);
     });
@@ -354,6 +462,103 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     // Update progress bar and title after rendering
     updateProgress();
+  }
+
+  /**
+   * Create a file upload area for a specific question. Allows the user
+   * to click or drag files to upload images. Selected files are stored
+   * in the questionFiles map. A list of file names is displayed below
+   * the upload area.
+   *
+   * @param {string} qid The question ID.
+   * @returns {HTMLElement} The file upload wrapper element.
+   */
+  function createFileUploadElement(qid) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'file-upload';
+    // Hidden file input
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = 'image/png,image/jpeg,image/heic';
+    input.style.display = 'none';
+    wrapper.appendChild(input);
+    // Icon
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'file-upload-icon';
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-cloud-upload-alt';
+    iconDiv.appendChild(icon);
+    wrapper.appendChild(iconDiv);
+    // Text
+    const textDiv = document.createElement('div');
+    textDiv.className = 'file-upload-text';
+    textDiv.textContent = 'Click to upload or drag and drop';
+    wrapper.appendChild(textDiv);
+    // Hint
+    const hintDiv = document.createElement('div');
+    hintDiv.className = 'file-upload-hint';
+    hintDiv.textContent = 'PNG, JPG, HEIC up to 10MB';
+    wrapper.appendChild(hintDiv);
+    // List display
+    const listDiv = document.createElement('div');
+    listDiv.className = 'file-list';
+    wrapper.appendChild(listDiv);
+    // Ensure array exists
+    if (!questionFiles[qid]) {
+      questionFiles[qid] = [];
+    }
+    // Refresh list
+    function refreshList() {
+      listDiv.innerHTML = '';
+      const files = questionFiles[qid] || [];
+      files.forEach(f => {
+        const item = document.createElement('div');
+        item.textContent = f.name || f;
+        item.style.fontSize = '0.8rem';
+        item.style.marginTop = '4px';
+        listDiv.appendChild(item);
+      });
+    }
+    // Input change
+    input.addEventListener('change', e => {
+      const files = Array.from(e.target.files || []);
+      files.forEach(file => {
+        if (!questionFiles[qid].some(existing => existing.name === file.name)) {
+          questionFiles[qid].push(file);
+        }
+      });
+      refreshList();
+      updateProgress();
+    });
+    // Click to open file picker
+    wrapper.addEventListener('click', () => {
+      input.click();
+    });
+    // Drag & drop
+    wrapper.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      wrapper.classList.add('drag-over');
+    });
+    wrapper.addEventListener('dragleave', () => {
+      wrapper.classList.remove('drag-over');
+    });
+    wrapper.addEventListener('drop', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      wrapper.classList.remove('drag-over');
+      const files = Array.from(e.dataTransfer.files || []);
+      files.forEach(file => {
+        if (!questionFiles[qid].some(existing => existing.name === file.name)) {
+          questionFiles[qid].push(file);
+        }
+      });
+      refreshList();
+      updateProgress();
+    });
+    refreshList();
+    return wrapper;
   }
 
   // Register Netlify Identity event listeners. On init, login and logout
@@ -415,7 +620,7 @@ document.addEventListener('DOMContentLoaded', () => {
     typeSelect.selectedIndex = 0;
     auditorNamesInput.value = '';
     inspectionDateInput.value = '';
-    // Reset dynamic question fields
+    // Reset dynamic question fields and attachments
     questions.forEach(q => {
       if (q.type === 'boolean') {
         const radios = document.querySelectorAll(`input[name="${q.id}"]`);
@@ -423,15 +628,16 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (q.type === 'text' || q.type === 'number') {
         const el = document.getElementById(q.id);
         if (el) el.value = '';
-      } else if (q.type === 'file') {
-        // Clear attachments
-        uploadedFiles = [];
       } else {
         const el = document.getElementById(q.id);
         if (el) el.value = '';
       }
+      // Clear comment
+      const commentEl = document.getElementById(`comment-${q.id}`);
+      if (commentEl) commentEl.value = '';
+      // Clear attachments for this question
+      questionFiles[q.id] = [];
     });
-    updateFileListDisplay();
     updateProgress();
     updateFormTitle();
   }
@@ -459,28 +665,34 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeIdx >= 0) typeSelect.selectedIndex = typeIdx;
     auditorNamesInput.value = data.auditors || '';
     inspectionDateInput.value = data.date || '';
-    // Populate dynamic question answers
+    // Populate dynamic question answers. Reset questionFiles first.
+    questionFiles = {};
     questions.forEach(q => {
-      const value = data.answers && data.answers[q.id];
+      const ans = data.answers && data.answers[q.id];
+      const fileNames = ans && ans.files ? ans.files : [];
+      questionFiles[q.id] = Array.isArray(fileNames) ? fileNames.slice() : [];
+    });
+    // Re-render questions to update UI with comments and attachments
+    renderQuestions();
+    // Set values and comments
+    questions.forEach(q => {
+      const ans = data.answers && data.answers[q.id];
+      const val = ans && ans.value;
       if (q.type === 'boolean') {
-        const radio = document.querySelector(`input[name="${q.id}"][value="${value}"]`);
+        const radio = document.querySelector(`input[name="${q.id}"][value="${val}"]`);
         if (radio) radio.checked = true;
       } else if (q.type === 'text' || q.type === 'number') {
         const el = document.getElementById(q.id);
-        if (el) el.value = value || '';
-      } else if (q.type === 'file') {
-        // Attachments: create dummy objects for display. When editing
-        // the user must reattach actual files to upload them again.
-        uploadedFiles = [];
-        if (Array.isArray(value)) {
-          uploadedFiles = value.map(name => ({ name }));
-        }
+        if (el) el.value = val || '';
       } else {
         const el = document.getElementById(q.id);
-        if (el) el.value = value || '';
+        if (el) el.value = val || '';
+      }
+      const commentEl = document.getElementById(`comment-${q.id}`);
+      if (commentEl) {
+        commentEl.value = (ans && ans.comment) || '';
       }
     });
-    updateFileListDisplay();
     updateProgress();
     updateFormTitle();
   }
@@ -499,18 +711,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const id = currentInspectionId || `${Date.now()}`;
     const answers = {};
     questions.forEach(q => {
+      let value = '';
       if (q.type === 'boolean') {
         const selected = document.querySelector(`input[name="${q.id}"]:checked`);
-        answers[q.id] = selected ? selected.value : '';
+        value = selected ? selected.value : '';
       } else if (q.type === 'text' || q.type === 'number') {
         const el = document.getElementById(q.id);
-        answers[q.id] = el ? el.value : '';
-      } else if (q.type === 'file') {
-        answers[q.id] = uploadedFiles.map(f => f.name);
+        value = el ? el.value : '';
       } else {
         const el = document.getElementById(q.id);
-        answers[q.id] = el ? el.value : '';
+        value = el ? el.value : '';
       }
+      const commentEl = document.getElementById(`comment-${q.id}`);
+      const comment = commentEl ? commentEl.value : '';
+      const files = (questionFiles[q.id] || []).map(f => (f.name ? f.name : f));
+      answers[q.id] = { value, comment, files };
     });
     return {
       id,
@@ -572,10 +787,8 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (q.type === 'number') {
         const el = document.getElementById(q.id);
         checks.push(el && el.value !== '');
-      } else if (q.type === 'file') {
-        checks.push(uploadedFiles.length > 0);
       } else {
-        // Unknown type counts only when input has value
+        // For all other types check if value is non-empty
         const el = document.getElementById(q.id);
         checks.push(el && el.value.trim().length > 0);
       }
@@ -615,31 +828,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const token = await user.jwt();
     const basePath = `inspections/${user.id}/${data.id}`;
     try {
-      // Upload files individually. Use await in sequence to avoid
-      // overwhelming the remote API. Each file is stored under a
-      // unique path. When editing an existing record the user must
-      // reattach files; previously uploaded attachments are not
-      // preserved automatically.
-      for (const file of uploadedFiles) {
-        // Files with only a name (dummy objects created when
-        // editing existing records) do not have a Blob body to
-        // upload and therefore are skipped. These will simply
-        // remain referenced in the JSON until the user re-uploads
-        // them.
-        if (!file || !file instanceof File) continue;
-        const filePath = `${basePath}/files/${encodeURIComponent(file.name)}`;
-        await fetch(`/.netlify/blobs/${filePath}`, {
-          method: 'PUT',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': file.type || 'application/octet-stream'
-          },
-          body: file
-        });
+      // Upload files for each question. Files are stored under
+      // inspections/{user}/{inspectionId}/files/{questionId}/{fileName}
+      for (const qid of Object.keys(questionFiles)) {
+        const files = questionFiles[qid] || [];
+        for (const file of files) {
+          if (!file || !(file instanceof File)) continue;
+          const filePath = `${basePath}/files/${encodeURIComponent(qid)}/${encodeURIComponent(file.name)}`;
+          await fetch(`/.netlify/blobs/${filePath}`, {
+            method: 'PUT',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': file.type || 'application/octet-stream'
+            },
+            body: file
+          });
+        }
       }
-      // Store the JSON record. Use record.json as filename to
-      // differentiate from attachments. Overwrite existing record
-      // when currentInspectionId is defined.
+      // Store the JSON record. Use record.json as filename to differentiate from attachments.
       await fetch(`/.netlify/blobs/${basePath}/record.json`, {
         method: 'PUT',
         headers: {
@@ -674,6 +880,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!user) return;
     pendingList.innerHTML = '';
     completedList.innerHTML = '';
+    // Reset the inspections cache used for reports and analytics
+    inspectionsData = [];
     try {
       const token = await user.jwt();
       const prefix = `inspections/${user.id}/`;
@@ -701,8 +909,10 @@ document.addEventListener('DOMContentLoaded', () => {
             headers: { Authorization: `Bearer ${token}` }
           });
           if (!recRes.ok) continue;
-          const record = await recRes.json();
-          appendInspectionToList(record);
+      const record = await recRes.json();
+      // Add to local cache for reports/analytics
+      inspectionsData.push(record);
+      appendInspectionToList(record);
         } catch (ex) {
           console.error('Failed to fetch record', recordPath, ex);
         }
@@ -774,7 +984,29 @@ document.addEventListener('DOMContentLoaded', () => {
         ${inspection.status === 'completed' ? statusIndicator : `<div class="list-item-meta">${meta}</div>`}
       </div>
       <div class="list-item-content">
-        ${inspection.answers && inspection.answers.observations ? inspection.answers.observations.substring(0, 80) + (inspection.answers.observations.length > 80 ? '...' : '') : 'No description provided.'}
+        ${(() => {
+          const answers = inspection.answers || {};
+          let summary = '';
+          for (const key in answers) {
+            const ans = answers[key];
+            if (ans && typeof ans === 'object') {
+              if (ans.comment && ans.comment.trim()) {
+                summary = ans.comment.trim();
+                break;
+              } else if (ans.value && typeof ans.value === 'string' && ans.value.trim()) {
+                summary = ans.value.trim();
+                break;
+              }
+            } else if (typeof ans === 'string' && ans.trim()) {
+              summary = ans.trim();
+              break;
+            }
+          }
+          if (!summary) {
+            return 'No description provided.';
+          }
+          return summary.length > 80 ? summary.substring(0, 80) + '...' : summary;
+        })()}
       </div>
       ${inspection.status === 'completed' ? `<div class="list-item-meta">${meta}</div>` : ''}
       ${actionsHtml}
@@ -865,93 +1097,169 @@ document.addEventListener('DOMContentLoaded', () => {
     return 'just now';
   }
 
-  /* ------------------------------------------------------------------ */
-  /*                        File Upload Interactions                   */
-  /* ------------------------------------------------------------------ */
-  // Create a hidden file input which is triggered when the file
-  // upload area is clicked. Accept multiple image files.
-  const hiddenFileInput = document.createElement('input');
-  hiddenFileInput.type = 'file';
-  hiddenFileInput.accept = 'image/*';
-  hiddenFileInput.multiple = true;
-  hiddenFileInput.style.display = 'none';
-  fileArea.appendChild(hiddenFileInput);
-
-  // Handle click on the upload area by forwarding it to the
-  // hidden input.
-  fileArea.addEventListener('click', () => {
-    hiddenFileInput.click();
-  });
-
-  // Apply visual feedback on dragenter/dragover and reset on dragleave/drop
-  fileArea.addEventListener('dragover', event => {
-    event.preventDefault();
-    fileArea.classList.add('dragover');
-  });
-  fileArea.addEventListener('dragleave', () => {
-    fileArea.classList.remove('dragover');
-  });
-  fileArea.addEventListener('drop', event => {
-    event.preventDefault();
-    fileArea.classList.remove('dragover');
-    const files = Array.from(event.dataTransfer.files);
-    handleFiles(files);
-  });
-
-  // Listen for changes on the hidden file input
-  hiddenFileInput.addEventListener('change', () => {
-    const files = Array.from(hiddenFileInput.files);
-    handleFiles(files);
-    hiddenFileInput.value = '';
-  });
-
   /**
-   * Add new files to the in-memory file list and update the
-   * display. Ignores files that exceed the maximum allowed size
-   * (10MB) and notifies the user. Duplicate file names are also
-   * prevented.
-   *
-   * @param {File[]} files A list of File objects selected/dropped.
+   * Render the list of completed inspections on the Reports page.
+   * Inspections are pulled from the global inspectionsData array.
    */
-  function handleFiles(files) {
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    files.forEach(file => {
-      if (file.size > maxSize) {
-        alert(`File ${file.name} exceeds the 10MB limit and was skipped.`);
-        return;
+  function renderReports() {
+    const container = document.getElementById('reports-container');
+    if (!container) return;
+    container.innerHTML = '';
+    const completed = inspectionsData.filter(ins => ins.status === 'completed');
+    if (completed.length === 0) {
+      const msg = document.createElement('p');
+      msg.style.color = 'var(--text-secondary)';
+      msg.textContent = 'No completed inspections available.';
+      container.appendChild(msg);
+      return;
+    }
+    completed.forEach(ins => {
+      const item = document.createElement('div');
+      item.className = 'list-item slide-up';
+      const meta = timeAgo(ins.created_at);
+      // Generate a summary from the first non-empty comment or value
+      let summary = '';
+      const answers = ins.answers || {};
+      for (const key in answers) {
+        const ans = answers[key];
+        if (ans && typeof ans === 'object') {
+          if (ans.comment && ans.comment.trim()) {
+            summary = ans.comment.trim();
+            break;
+          } else if (ans.value && typeof ans.value === 'string' && ans.value.trim()) {
+            summary = ans.value.trim();
+            break;
+          }
+        } else if (typeof ans === 'string' && ans.trim()) {
+          summary = ans.trim();
+          break;
+        }
       }
-      // Prevent duplicates based on file name
-      if (uploadedFiles.find(f => f.name === file.name)) {
-        alert(`File ${file.name} has already been added.`);
-        return;
+      if (!summary) {
+        summary = 'No description provided.';
       }
-      uploadedFiles.push(file);
+      if (summary.length > 80) summary = summary.substring(0, 80) + '...';
+      item.innerHTML = `
+        <div class="list-item-header">
+          <div class="list-item-title">${ins.location} - ${ins.type}</div>
+          <div class="list-item-meta">${meta}</div>
+        </div>
+        <div class="list-item-content">${summary}</div>
+      `;
+      container.appendChild(item);
     });
-    updateFileListDisplay();
-    updateProgress();
   }
 
   /**
-   * Render the list of selected file names under the upload area. If
-   * no files are attached the display is cleared. This function
-   * creates a container lazily the first time it is needed.
+   * Render a simple analytics bar chart summarising the number of
+   * "No" answers per category across all completed inspections. Uses
+   * Chart.js for visualisation.
    */
-  function updateFileListDisplay() {
-    let listContainer = fileArea.querySelector('.uploaded-file-list');
-    if (!listContainer) {
-      listContainer = document.createElement('div');
-      listContainer.className = 'uploaded-file-list';
-      listContainer.style.marginTop = '0.5rem';
-      listContainer.style.fontSize = '0.75rem';
-      listContainer.style.color = 'var(--text-secondary)';
-      fileArea.appendChild(listContainer);
+  function renderAnalytics() {
+    const canvas = document.getElementById('analytics-chart');
+    if (!canvas) return;
+    // Clear any previous message siblings
+    const parent = canvas.parentElement;
+    // Remove any text messages previously added
+    Array.from(parent.querySelectorAll('.analytics-message')).forEach(el => el.remove());
+    if (typeof Chart === 'undefined') {
+      const msg = document.createElement('p');
+      msg.className = 'analytics-message';
+      msg.style.color = 'var(--text-secondary)';
+      msg.textContent = 'Chart.js library is not available.';
+      parent.appendChild(msg);
+      return;
     }
-    if (uploadedFiles.length === 0) {
-      listContainer.innerHTML = '';
-    } else {
-      listContainer.innerHTML = uploadedFiles.map(f => `<div>${f.name}</div>`).join('');
+    const completed = inspectionsData.filter(ins => ins.status === 'completed');
+    if (completed.length === 0) {
+      canvas.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.className = 'analytics-message';
+      msg.style.color = 'var(--text-secondary)';
+      msg.textContent = 'No data available for analytics.';
+      parent.appendChild(msg);
+      return;
     }
+    canvas.style.display = '';
+    // Compute the number of "no" answers per category
+    const counts = {};
+    completed.forEach(ins => {
+      const answers = ins.answers || {};
+      questions.forEach(q => {
+        const ans = answers[q.id];
+        const category = q.category || 'Other';
+        if (!counts[category]) counts[category] = 0;
+        if (ans && ans.value === 'no') {
+          counts[category] += 1;
+        }
+      });
+    });
+    const labels = Object.keys(counts);
+    const data = labels.map(cat => counts[cat]);
+    // Destroy existing chart instance if present
+    if (window.analyticsChart) {
+      window.analyticsChart.destroy();
+    }
+    const ctx = canvas.getContext('2d');
+    window.analyticsChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Number of "No" answers',
+            data: data,
+            backgroundColor: 'rgba(99, 102, 241, 0.5)',
+            borderColor: 'rgba(99, 102, 241, 1)',
+            borderWidth: 1
+          }
+        ]
+      },
+      options: {
+        plugins: {
+          legend: {
+            display: false
+          },
+          title: {
+            display: false
+          }
+        },
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: 'Categories',
+              color: 'var(--text-secondary)',
+              font: { size: 12 }
+            },
+            ticks: {
+              color: 'var(--text-secondary)'
+            },
+            grid: {
+              color: 'rgba(255,255,255,0.1)'
+            }
+          },
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: 'Count',
+              color: 'var(--text-secondary)',
+              font: { size: 12 }
+            },
+            ticks: {
+              stepSize: 1,
+              color: 'var(--text-secondary)'
+            },
+            grid: {
+              color: 'rgba(255,255,255,0.1)'
+            }
+          }
+        }
+      }
+    });
   }
+
 
   /* ------------------------------------------------------------------ */
   /*                        Voice Input Support                       */
@@ -1027,10 +1335,7 @@ document.addEventListener('DOMContentLoaded', () => {
     recognition.start();
   }
 
-  // Attach voice recognition toggling to all existing voice buttons
-  document.querySelectorAll('.voice-btn').forEach(btn => {
-    btn.addEventListener('click', () => toggleVoice(btn));
-  });
+  // Voice buttons are attached during renderQuestions()
 
   /* ------------------------------------------------------------------ */
   /*                        Event Listener Wiring                     */
@@ -1039,7 +1344,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // the title. Use input and change events to capture text input,
   // selects and numbers. Using bubbling ensures new values trigger
   // correctly.
-  const formInputs = [locationSelect, typeSelect, auditorNamesInput, inspectionDateInput, observationsTextarea, extinguisherCountInput];
+  const formInputs = [locationSelect, typeSelect, auditorNamesInput, inspectionDateInput];
   formInputs.forEach(inputEl => {
     inputEl.addEventListener('input', () => {
       updateProgress();
@@ -1050,14 +1355,13 @@ document.addEventListener('DOMContentLoaded', () => {
       updateFormTitle();
     });
   });
-  // Radio buttons need separate listeners
-  document.querySelectorAll('input[name="fire-alarms"], input[name="evacuation-routes"]').forEach(radio => {
-    radio.addEventListener('change', updateProgress);
-  });
+  // Attach change listeners to all radio inputs dynamically when questions are rendered
+  // This is handled inside renderQuestions() for the current question set. No need to pre-bind here.
 
-  // New inspection button resets the form and scrolls into view
+  // New inspection button resets the form, switches to the Inspections section and scrolls to the form
   startInspectionBtn.addEventListener('click', event => {
     event.preventDefault();
+    setActiveSection('inspections');
     resetForm();
     scrollToForm();
   });
