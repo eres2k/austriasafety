@@ -1,0 +1,26 @@
+{
+  "name": "aurora-audit-platform",
+  "version": "1.0.0",
+  "description": "Professional safety inspection and audit management system",
+  "main": "index.js",
+  "scripts": {
+    "build": "echo 'No build required'",
+    "dev": "netlify dev",
+    "deploy": "netlify deploy --prod"
+  },
+  "keywords": [
+    "audit",
+    "safety",
+    "inspection",
+    "pwa",
+    "netlify"
+  ],
+  "author": "Aurora Systems",
+  "license": "MIT",
+  "dependencies": {
+    "@netlify/functions": "^2.4.0"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.0.0"
+  }
+}
