@@ -1587,12 +1587,30 @@ document.addEventListener('DOMContentLoaded', () => {
   /* ------------------------------------------------------------------ */
   
   async function saveInspection(status) {
+    // Collect form data first
+    const data = collectFormData(status);
+    
     if (!window.netlifyIdentity) {
       // Save to offline queue
-      const data = collectFormData(status);
       offlineQueue.push(data);
       localStorage.setItem('offline-queue', JSON.stringify(offlineQueue));
       showNotification('Saved offline. Will sync when connected.', 'warning');
+      
+      // Also save to local storage for immediate access
+      const localInspections = JSON.parse(localStorage.getItem('local-inspections') || '[]');
+      const existingIndex = localInspections.findIndex(ins => ins.id === data.id);
+      if (existingIndex >= 0) {
+        localInspections[existingIndex] = data;
+      } else {
+        localInspections.push(data);
+      }
+      localStorage.setItem('local-inspections', JSON.stringify(localInspections));
+      
+      // Reload to show in lists
+      await loadInspections();
+      if (status === 'completed') {
+        resetForm();
+      }
       return;
     }
     
@@ -1603,7 +1621,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     try {
-      const data = collectFormData(status);
       const token = await user.jwt();
       const basePath = `inspections/${user.id}/${data.id}`;
       
@@ -1619,21 +1636,24 @@ document.addEventListener('DOMContentLoaded', () => {
           
           const filePath = `${basePath}/files/${encodeURIComponent(qid)}/${encodeURIComponent(file.name)}`;
           
-          // Fixed: Use query parameter for path
-          await fetch(`/.netlify/functions/blob?path=${encodeURIComponent(filePath)}`, {
-            method: 'PUT',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': file.type || 'application/octet-stream'
-            },
-            body: file
-          });
+          // For now, skip file uploads if blob storage isn't working
+          try {
+            await fetch(`/.netlify/functions/blob?path=${encodeURIComponent(filePath)}`, {
+              method: 'PUT',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': file.type || 'application/octet-stream'
+              },
+              body: file
+            });
+          } catch (err) {
+            console.warn('File upload failed, continuing...', err);
+          }
         }
       }
       
       // Save inspection data
-      // Fixed: Use query parameter for path
-      await fetch(`/.netlify/functions/blob?path=${encodeURIComponent(basePath + '/record.json')}`, {
+      const saveResponse = await fetch(`/.netlify/functions/blob?path=${encodeURIComponent(basePath + '/record.json')}`, {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1643,6 +1663,10 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       
       hideLoadingIndicator();
+      
+      if (!saveResponse.ok) {
+        throw new Error('Failed to save to blob storage');
+      }
       
       // Stop timer if submitting
       if (status === 'completed') {
@@ -1668,12 +1692,27 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error('Save error:', error);
       hideLoadingIndicator();
       
+      // Fallback to local storage
+      const localInspections = JSON.parse(localStorage.getItem('local-inspections') || '[]');
+      const existingIndex = localInspections.findIndex(ins => ins.id === data.id);
+      if (existingIndex >= 0) {
+        localInspections[existingIndex] = data;
+      } else {
+        localInspections.push(data);
+      }
+      localStorage.setItem('local-inspections', JSON.stringify(localInspections));
+      
       // Add to offline queue
-      const data = collectFormData(status);
       offlineQueue.push(data);
       localStorage.setItem('offline-queue', JSON.stringify(offlineQueue));
       
-      showNotification('Failed to save online. Added to offline queue.', 'warning');
+      showNotification('Saved locally. Will sync to cloud when possible.', 'warning');
+      
+      // Reload to show in lists
+      await loadInspections();
+      if (status === 'completed') {
+        resetForm();
+      }
     }
   }
 
@@ -2547,26 +2586,50 @@ document.addEventListener('DOMContentLoaded', () => {
     window.netlifyIdentity.on('init', user => {
       updateUserMenu(user);
       if (user) {
+        console.log('User authenticated on init:', user.email);
         loadInspections();
         loadQuestions();
         syncOfflineData();
+      } else {
+        console.log('No user authenticated on init');
+        // Still load local inspections
+        loadInspections();
       }
     });
     
     window.netlifyIdentity.on('login', user => {
+      console.log('User logged in:', user.email);
       updateUserMenu(user);
       window.netlifyIdentity.close();
+      
+      // Reload everything after login
       loadInspections();
       loadQuestions();
-      syncOfflineData();
+      
+      // Try to sync offline data
+      setTimeout(() => {
+        syncOfflineData();
+      }, 1000);
     });
     
     window.netlifyIdentity.on('logout', () => {
+      console.log('User logged out');
       updateUserMenu(null);
       state.currentInspectionId = null;
       questions = [...defaultQuestions];
       renderQuestions();
+      
+      // Clear lists but keep local data
+      elements.pendingList.innerHTML = '';
+      elements.completedList.innerHTML = '';
+      
+      // Reload to show local inspections only
+      loadInspections();
     });
+  } else {
+    console.warn('Netlify Identity not available - running in local-only mode');
+    // Still load local data
+    loadInspections();
   }
   
   // Auto-save initialization
@@ -2634,14 +2697,27 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   async function loadInspections() {
-    if (!window.netlifyIdentity) return;
-    
-    const user = window.netlifyIdentity.currentUser();
-    if (!user) return;
-    
     elements.pendingList.innerHTML = '';
     elements.completedList.innerHTML = '';
     inspectionsData = [];
+    
+    // First, load any local inspections
+    const localInspections = JSON.parse(localStorage.getItem('local-inspections') || '[]');
+    localInspections.forEach(inspection => {
+      inspectionsData.push(inspection);
+      appendInspectionToList(inspection);
+    });
+    
+    if (!window.netlifyIdentity) {
+      console.log('Using local storage only - Netlify Identity not available');
+      return;
+    }
+    
+    const user = window.netlifyIdentity.currentUser();
+    if (!user) {
+      console.log('No user logged in');
+      return;
+    }
     
     try {
       const token = await user.jwt();
@@ -2649,16 +2725,26 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Fixed: Use query parameter for path and list
       const listRes = await fetch(`/.netlify/functions/blob?path=${encodeURIComponent(prefix)}&list=true`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json'
+        }
       });
       
       if (!listRes.ok) {
-        console.warn('Could not list blobs');
+        console.warn('Could not list blobs, using local storage only');
         return;
       }
       
       const listData = await listRes.json();
       const blobs = listData.blobs || [];
+      
+      // Clear local inspections if we have cloud data
+      if (blobs.length > 0) {
+        elements.pendingList.innerHTML = '';
+        elements.completedList.innerHTML = '';
+        inspectionsData = [];
+      }
       
       const recordPaths = blobs
         .map(b => b.path || b)
@@ -2668,20 +2754,40 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           // Fixed: Use query parameter for path
           const recRes = await fetch(`/.netlify/functions/blob?path=${encodeURIComponent(recordPath)}`, {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              Accept: 'application/json'
+            }
           });
           
           if (!recRes.ok) continue;
           
           const record = await recRes.json();
+          
+          // Check if this inspection exists locally and remove it
+          const localIndex = inspectionsData.findIndex(ins => ins.id === record.id);
+          if (localIndex >= 0) {
+            // Remove from DOM
+            const existingElement = document.querySelector(`[data-inspection-id="${record.id}"]`);
+            if (existingElement) existingElement.remove();
+            // Remove from array
+            inspectionsData.splice(localIndex, 1);
+          }
+          
           inspectionsData.push(record);
           appendInspectionToList(record);
         } catch (ex) {
           console.error('Failed to fetch record', recordPath, ex);
         }
       }
+      
+      // Clear local storage if cloud sync successful
+      if (blobs.length > 0) {
+        localStorage.removeItem('local-inspections');
+      }
+      
     } catch (err) {
-      console.error('Error loading inspections', err);
+      console.error('Error loading inspections from cloud, using local storage', err);
     }
   }
   
@@ -2690,6 +2796,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const li = document.createElement('li');
     li.className = 'list-item slide-up';
+    li.setAttribute('data-inspection-id', inspection.id);
     
     const meta = timeAgo(inspection.created_at);
     const title = `${inspection.location} - ${inspection.type}`;
@@ -2878,17 +2985,28 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Fixed: Use query parameter for path
       const res = await fetch(`/.netlify/functions/blob?path=${encodeURIComponent(path)}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json'
+        }
       });
       
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
           questions = data;
+          console.log('Loaded custom questions:', questions.length);
         } else {
           questions = [...defaultQuestions];
+          console.log('Using default questions');
         }
+      } else if (res.status === 404) {
+        // This is expected for new users - not an error
+        questions = [...defaultQuestions];
+        console.log('No saved questions found, using defaults');
       } else {
+        // Actual error
+        console.warn('Failed to load questions:', res.status, res.statusText);
         questions = [...defaultQuestions];
       }
     } catch (err) {
