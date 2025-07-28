@@ -1064,19 +1064,38 @@ document.addEventListener('DOMContentLoaded', () => {
   function requestGPSLocation() {
     if (!navigator.geolocation) return;
     
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        state.gpsLocation = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          timestamp: new Date().toISOString()
-        };
-      },
-      (error) => {
-        console.warn('GPS error:', error);
+    // Check if geolocation is allowed before trying to use it
+    navigator.permissions.query({ name: 'geolocation' }).then(result => {
+      if (result.state === 'granted' || result.state === 'prompt') {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            state.gpsLocation = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              timestamp: new Date().toISOString()
+            };
+          },
+          (error) => {
+            console.warn('GPS error:', error);
+            // Only show notification for user-denied permissions
+            if (error.code === 1) {
+              showNotification('Location access was denied. You can enable it in browser settings.', 'info');
+            }
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 0
+          }
+        );
+      } else if (result.state === 'denied') {
+        console.info('Geolocation permission denied by user or policy');
       }
-    );
+    }).catch(err => {
+      // Permissions API not supported or blocked by policy
+      console.info('Cannot check geolocation permissions:', err);
+    });
   }
 
   /* ------------------------------------------------------------------ */
@@ -1600,7 +1619,8 @@ document.addEventListener('DOMContentLoaded', () => {
           
           const filePath = `${basePath}/files/${encodeURIComponent(qid)}/${encodeURIComponent(file.name)}`;
           
-          await fetch(`/.netlify/blobs/${filePath}`, {
+          // Fixed: Use query parameter for path
+          await fetch(`/.netlify/functions/blob?path=${encodeURIComponent(filePath)}`, {
             method: 'PUT',
             headers: {
               Authorization: `Bearer ${token}`,
@@ -1612,7 +1632,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       // Save inspection data
-      await fetch(`/.netlify/blobs/${basePath}/record.json`, {
+      // Fixed: Use query parameter for path
+      await fetch(`/.netlify/functions/blob?path=${encodeURIComponent(basePath + '/record.json')}`, {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1682,7 +1703,8 @@ document.addEventListener('DOMContentLoaded', () => {
       for (const inspection of offlineQueue) {
         const basePath = `inspections/${user.id}/${inspection.id}`;
         
-        await fetch(`/.netlify/blobs/${basePath}/record.json`, {
+        // Fixed: Use query parameter for path
+        await fetch(`/.netlify/functions/blob?path=${encodeURIComponent(basePath + '/record.json')}`, {
           method: 'PUT',
           headers: {
             Authorization: `Bearer ${token}`,
@@ -2625,7 +2647,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const token = await user.jwt();
       const prefix = `inspections/${user.id}/`;
       
-      const listRes = await fetch(`/.netlify/blobs/${prefix}?list=true`, {
+      // Fixed: Use query parameter for path and list
+      const listRes = await fetch(`/.netlify/functions/blob?path=${encodeURIComponent(prefix)}&list=true`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -2643,7 +2666,8 @@ document.addEventListener('DOMContentLoaded', () => {
       
       for (const recordPath of recordPaths) {
         try {
-          const recRes = await fetch(`/.netlify/blobs/${recordPath}`, {
+          // Fixed: Use query parameter for path
+          const recRes = await fetch(`/.netlify/functions/blob?path=${encodeURIComponent(recordPath)}`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           
@@ -2775,7 +2799,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     try {
       // Fetch existing record
-      const recRes = await fetch(`/.netlify/blobs/${basePath}/record.json`, {
+      // Fixed: Use query parameter for path
+      const recRes = await fetch(`/.netlify/functions/blob?path=${encodeURIComponent(basePath + '/record.json')}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -2787,7 +2812,8 @@ document.addEventListener('DOMContentLoaded', () => {
       record.status = newStatus;
       
       // Persist updated record
-      await fetch(`/.netlify/blobs/${basePath}/record.json`, {
+      // Fixed: Use query parameter for path
+      await fetch(`/.netlify/functions/blob?path=${encodeURIComponent(basePath + '/record.json')}`, {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -2850,7 +2876,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const token = await user.jwt();
       const path = `questions/${user.id}/questions.json`;
       
-      const res = await fetch(`/.netlify/blobs/${path}`, {
+      // Fixed: Use query parameter for path
+      const res = await fetch(`/.netlify/functions/blob?path=${encodeURIComponent(path)}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -2882,7 +2909,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const token = await user.jwt();
       const path = `questions/${user.id}/questions.json`;
       
-      await fetch(`/.netlify/blobs/${path}`, {
+      // Fixed: Use query parameter for path
+      await fetch(`/.netlify/functions/blob?path=${encodeURIComponent(path)}`, {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${token}`,
