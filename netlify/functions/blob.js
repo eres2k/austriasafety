@@ -1,5 +1,7 @@
 // netlify/functions/blob.js
-// Minimal blob handler with extensive error handling
+// Blob storage handler using Netlify Blobs
+
+const { getStore } = require('@netlify/blobs');
 
 exports.handler = async (event, context) => {
   console.log('=== Blob Function Called ===');
@@ -39,79 +41,183 @@ exports.handler = async (event, context) => {
   const path = event.queryStringParameters?.path || '';
   const isList = event.queryStringParameters?.list === 'true';
   
-  // For now, use a simple in-memory store for testing
-  // This will reset on each function invocation, but helps test the connection
-  const mockData = {
-    [`questions/${user.id}/questions.json`]: JSON.stringify([
-      { id: 'test-1', type: 'boolean', question: 'Test question 1', required: true, category: 'Test' },
-      { id: 'test-2', type: 'text', question: 'Test question 2', required: false, category: 'Test' }
-    ])
-  };
+  // Get the blob store
+  let store;
+  try {
+    store = getStore('aurora-audit-data');
+  } catch (error) {
+    console.error('Failed to get store:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Failed to initialize storage',
+        message: error.message
+      })
+    };
+  }
   
   try {
     switch (event.httpMethod) {
       case 'GET':
         if (isList) {
-          // Mock list response
-          console.log('List request for:', path);
+          // List blobs with prefix
+          console.log('List request for prefix:', path);
           
-          // Return empty list for now
-          return {
-            statusCode: 200,
-            headers,
-            body: JSON.stringify({ blobs: [] })
-          };
-          
-        } else {
-          // Get specific item
-          console.log('Get request for:', path);
-          
-          // Check mock data first
-          if (mockData[path]) {
+          try {
+            const { blobs } = await store.list({ prefix: path });
+            console.log(`Found ${blobs.length} blobs`);
+            
             return {
               statusCode: 200,
               headers,
-              body: mockData[path]
+              body: JSON.stringify({ 
+                blobs: blobs.map(blob => ({ 
+                  path: blob.key,
+                  size: blob.size,
+                  etag: blob.etag
+                }))
+              })
+            };
+          } catch (listError) {
+            console.error('List error:', listError);
+            return {
+              statusCode: 500,
+              headers,
+              body: JSON.stringify({ 
+                error: 'List failed',
+                message: listError.message
+              })
             };
           }
           
-          // Return 404 for everything else
-          return {
-            statusCode: 404,
-            headers,
-            body: JSON.stringify({ 
-              error: 'Not found',
-              message: 'This is expected for new users'
-            })
-          };
+        } else {
+          // Get specific blob
+          console.log('Get request for:', path);
+          
+          try {
+            const data = await store.get(path, { type: 'json' });
+            
+            if (data === null) {
+              console.log('Blob not found:', path);
+              return {
+                statusCode: 404,
+                headers,
+                body: JSON.stringify({ 
+                  error: 'Not found',
+                  message: 'The requested data does not exist',
+                  path: path
+                })
+              };
+            }
+            
+            console.log('Successfully retrieved blob');
+            return {
+              statusCode: 200,
+              headers,
+              body: JSON.stringify(data)
+            };
+            
+          } catch (getError) {
+            console.error('Get error:', getError);
+            
+            // Check if it's a not found error
+            if (getError.message?.includes('not found') || getError.code === 'NotFound') {
+              return {
+                statusCode: 404,
+                headers,
+                body: JSON.stringify({ 
+                  error: 'Not found',
+                  message: 'The requested data does not exist',
+                  path: path
+                })
+              };
+            }
+            
+            return {
+              statusCode: 500,
+              headers,
+              body: JSON.stringify({ 
+                error: 'Get failed',
+                message: getError.message
+              })
+            };
+          }
         }
         
       case 'PUT':
         console.log('Put request for:', path);
         
-        // Mock successful save
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({ 
-            success: true,
-            message: 'Data saved (in mock mode)',
-            path: path
-          })
-        };
+        try {
+          let data;
+          
+          // Parse the body
+          try {
+            data = JSON.parse(event.body);
+          } catch (parseError) {
+            return {
+              statusCode: 400,
+              headers,
+              body: JSON.stringify({ 
+                error: 'Invalid JSON',
+                message: 'Request body must be valid JSON'
+              })
+            };
+          }
+          
+          // Store the data
+          await store.setJSON(path, data);
+          console.log('Successfully stored blob at:', path);
+          
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({ 
+              success: true,
+              message: 'Data saved successfully',
+              path: path
+            })
+          };
+          
+        } catch (putError) {
+          console.error('Put error:', putError);
+          return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ 
+              error: 'Save failed',
+              message: putError.message
+            })
+          };
+        }
         
       case 'DELETE':
         console.log('Delete request for:', path);
         
-        // Mock successful delete
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({ 
-            success: true,
-            message: 'Data deleted (in mock mode)'
-          })
-        };
+        try {
+          await store.delete(path);
+          console.log('Successfully deleted blob at:', path);
+          
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({ 
+              success: true,
+              message: 'Data deleted successfully'
+            })
+          };
+          
+        } catch (deleteError) {
+          console.error('Delete error:', deleteError);
+          return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ 
+              error: 'Delete failed',
+              message: deleteError.message
+            })
+          };
+        }
         
       default:
         return {
@@ -119,13 +225,13 @@ exports.handler = async (event, context) => {
           headers,
           body: JSON.stringify({ 
             error: 'Method not allowed',
-            allowed: ['GET', 'PUT', 'DELETE']
+            allowed: ['GET', 'PUT', 'DELETE', 'OPTIONS']
           })
         };
     }
     
   } catch (error) {
-    console.error('Function error:', error);
+    console.error('Unexpected error:', error);
     
     return {
       statusCode: 500,
@@ -133,7 +239,8 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({ 
         error: 'Internal server error',
         message: error.message,
-        type: error.constructor.name
+        type: error.constructor.name,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       })
     };
   }
