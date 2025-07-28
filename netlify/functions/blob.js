@@ -1,15 +1,10 @@
 // netlify/functions/blob.js
-// Blob storage handler using Netlify Blobs
-
-const { getStore } = require('@netlify/blobs');
+// Simplified blob handler with extensive error checking
 
 exports.handler = async (event, context) => {
-  console.log('=== Blob Function Called ===');
-  console.log('Method:', event.httpMethod);
-  console.log('Path:', event.queryStringParameters?.path);
-  console.log('Has Auth:', !!event.headers.authorization);
+  console.log('Blob function started');
   
-  // CORS headers for all responses
+  // CORS headers
   const headers = {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
@@ -22,10 +17,27 @@ exports.handler = async (event, context) => {
     return { statusCode: 200, headers, body: '' };
   }
   
+  // Check if we have the blobs module
+  let getStore;
+  try {
+    const blobsModule = require('@netlify/blobs');
+    getStore = blobsModule.getStore;
+    console.log('Blobs module loaded successfully');
+  } catch (error) {
+    console.error('Failed to load @netlify/blobs:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Module not found',
+        message: '@netlify/blobs package is not installed. Please check netlify/functions/package.json',
+        details: error.message
+      })
+    };
+  }
+  
   // Check authentication
   const user = context.clientContext?.user;
-  console.log('User:', user ? user.email : 'none');
-  
   if (!user) {
     return {
       statusCode: 401,
@@ -41,206 +53,111 @@ exports.handler = async (event, context) => {
   const path = event.queryStringParameters?.path || '';
   const isList = event.queryStringParameters?.list === 'true';
   
-  // Get the blob store
+  console.log(`Request: ${event.httpMethod} ${path} (list: ${isList})`);
+  
+  // Initialize store
   let store;
   try {
     store = getStore('aurora-audit-data');
+    console.log('Store initialized');
   } catch (error) {
-    console.error('Failed to get store:', error);
+    console.error('Failed to initialize store:', error);
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({ 
-        error: 'Failed to initialize storage',
-        message: error.message
+        error: 'Storage initialization failed',
+        message: 'Could not connect to blob storage',
+        details: error.message
       })
     };
   }
   
+  // Handle requests
   try {
     switch (event.httpMethod) {
       case 'GET':
         if (isList) {
-          // List blobs with prefix
-          console.log('List request for prefix:', path);
-          
-          try {
-            const { blobs } = await store.list({ prefix: path });
-            console.log(`Found ${blobs.length} blobs`);
-            
-            return {
-              statusCode: 200,
-              headers,
-              body: JSON.stringify({ 
-                blobs: blobs.map(blob => ({ 
-                  path: blob.key,
-                  size: blob.size,
-                  etag: blob.etag
-                }))
-              })
-            };
-          } catch (listError) {
-            console.error('List error:', listError);
-            return {
-              statusCode: 500,
-              headers,
-              body: JSON.stringify({ 
-                error: 'List failed',
-                message: listError.message
-              })
-            };
-          }
-          
+          // List blobs
+          console.log('Listing blobs with prefix:', path);
+          const listResult = await store.list({ prefix: path });
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({ 
+              blobs: listResult.blobs || []
+            })
+          };
         } else {
-          // Get specific blob
-          console.log('Get request for:', path);
+          // Get blob
+          console.log('Getting blob:', path);
+          const data = await store.get(path, { type: 'json' });
           
-          try {
-            const data = await store.get(path, { type: 'json' });
-            
-            if (data === null) {
-              console.log('Blob not found:', path);
-              return {
-                statusCode: 404,
-                headers,
-                body: JSON.stringify({ 
-                  error: 'Not found',
-                  message: 'The requested data does not exist',
-                  path: path
-                })
-              };
-            }
-            
-            console.log('Successfully retrieved blob');
+          if (data === null) {
             return {
-              statusCode: 200,
-              headers,
-              body: JSON.stringify(data)
-            };
-            
-          } catch (getError) {
-            console.error('Get error:', getError);
-            
-            // Check if it's a not found error
-            if (getError.message?.includes('not found') || getError.code === 'NotFound') {
-              return {
-                statusCode: 404,
-                headers,
-                body: JSON.stringify({ 
-                  error: 'Not found',
-                  message: 'The requested data does not exist',
-                  path: path
-                })
-              };
-            }
-            
-            return {
-              statusCode: 500,
+              statusCode: 404,
               headers,
               body: JSON.stringify({ 
-                error: 'Get failed',
-                message: getError.message
+                error: 'Not found',
+                message: 'Data not found at path: ' + path
               })
             };
           }
+          
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify(data)
+          };
         }
         
       case 'PUT':
-        console.log('Put request for:', path);
+        // Save blob
+        console.log('Saving blob:', path);
+        const body = JSON.parse(event.body);
+        await store.setJSON(path, body);
         
-        try {
-          let data;
-          
-          // Parse the body
-          try {
-            data = JSON.parse(event.body);
-          } catch (parseError) {
-            return {
-              statusCode: 400,
-              headers,
-              body: JSON.stringify({ 
-                error: 'Invalid JSON',
-                message: 'Request body must be valid JSON'
-              })
-            };
-          }
-          
-          // Store the data
-          await store.setJSON(path, data);
-          console.log('Successfully stored blob at:', path);
-          
-          return {
-            statusCode: 200,
-            headers,
-            body: JSON.stringify({ 
-              success: true,
-              message: 'Data saved successfully',
-              path: path
-            })
-          };
-          
-        } catch (putError) {
-          console.error('Put error:', putError);
-          return {
-            statusCode: 500,
-            headers,
-            body: JSON.stringify({ 
-              error: 'Save failed',
-              message: putError.message
-            })
-          };
-        }
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ 
+            success: true,
+            path: path
+          })
+        };
         
       case 'DELETE':
-        console.log('Delete request for:', path);
+        // Delete blob
+        console.log('Deleting blob:', path);
+        await store.delete(path);
         
-        try {
-          await store.delete(path);
-          console.log('Successfully deleted blob at:', path);
-          
-          return {
-            statusCode: 200,
-            headers,
-            body: JSON.stringify({ 
-              success: true,
-              message: 'Data deleted successfully'
-            })
-          };
-          
-        } catch (deleteError) {
-          console.error('Delete error:', deleteError);
-          return {
-            statusCode: 500,
-            headers,
-            body: JSON.stringify({ 
-              error: 'Delete failed',
-              message: deleteError.message
-            })
-          };
-        }
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ 
+            success: true
+          })
+        };
         
       default:
         return {
           statusCode: 405,
           headers,
           body: JSON.stringify({ 
-            error: 'Method not allowed',
-            allowed: ['GET', 'PUT', 'DELETE', 'OPTIONS']
+            error: 'Method not allowed'
           })
         };
     }
-    
   } catch (error) {
-    console.error('Unexpected error:', error);
-    
+    console.error('Operation failed:', error);
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({ 
-        error: 'Internal server error',
+        error: 'Operation failed',
         message: error.message,
-        type: error.constructor.name,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        operation: event.httpMethod,
+        path: path
       })
     };
   }
