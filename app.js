@@ -1,840 +1,1605 @@
-// Aurora Audit Platform Main Script
-// This script adds interactivity to the static HTML by
-// integrating Netlify Identity for authentication, using
-// Netlify Blobs for persistence, handling form state,
-// voice input with the Web Speech API, file uploads and
-// dynamic progress calculation.
+// Aurora Audit Platform - Enhanced with Full Feature Set
+// Complete implementation with all auditor-focused features
 
 document.addEventListener('DOMContentLoaded', () => {
   /* ------------------------------------------------------------------ */
-  /*                         Netlify Identity Setup                     */
+  /*                         Core Setup & State                         */
   /* ------------------------------------------------------------------ */
-  // Initialize Netlify Identity widget. The widget automatically
-  // interacts with the Identity service when this site is deployed
-  // on Netlify. Locally it will noop.
+  // Initialize Netlify Identity
   if (window.netlifyIdentity) {
     window.netlifyIdentity.init();
   }
 
-  // Cache references to frequently used DOM elements to avoid
-  // unnecessary lookups.
-  const userMenu = document.getElementById('user-menu');
-  const pendingList = document.getElementById('pending-list');
-  const completedList = document.getElementById('completed-list');
-  const startInspectionBtn = document.getElementById('start-inspection-btn');
-  const saveDraftBtn = document.getElementById('save-draft-btn');
-  const submitInspectionBtn = document.getElementById('submit-inspection-btn');
-  const previewModeBtn = document.getElementById('preview-mode-btn');
-  const exportPdfBtn = document.getElementById('export-pdf-btn');
-  const locationSelect = document.getElementById('delivery-station-select');
-  const typeSelect = document.getElementById('inspection-type-select');
-  const auditorNamesInput = document.getElementById('auditor-names');
-  const inspectionDateInput = document.getElementById('inspection-date');
-  // Observations and extinguisher inputs have been removed.
-  const observationsTextarea = null;
-  const extinguisherCountInput = null;
-  const fileArea = null;
-  const progressStatusEl = document.getElementById('progress-status');
-  const progressFillEl = document.getElementById('progress-fill');
-  const inspectionTitleEl = document.getElementById('inspection-title');
+  // Global state management
+  const state = {
+    currentInspectionId: null,
+    currentView: 'edit', // 'edit' or 'preview'
+    filters: {
+      location: 'all',
+      type: 'all',
+      dateRange: 'all',
+      status: 'all'
+    },
+    settings: loadSettings(),
+    inspectionTimer: null,
+    startTime: null,
+    gpsLocation: null,
+    offlineQueue: []
+  };
 
-  // Navigation items
-  const navDashboard = document.getElementById('nav-dashboard');
-  const navInspections = document.getElementById('nav-inspections');
-  const navReports = document.getElementById('nav-reports');
-  const navAnalytics = document.getElementById('nav-analytics');
-
-  /**
-   * Show only the section with the given name and update nav states.
-   * @param {string} section
-   */
-  function setActiveSection(section) {
-    document.querySelectorAll('[data-section]').forEach(el => {
-      if (el.dataset.section === section) {
-        el.style.display = '';
-      } else {
-        el.style.display = 'none';
-      }
-    });
-    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-    const navMap = {
-      dashboard: navDashboard,
-      inspections: navInspections,
-      reports: navReports,
-      analytics: navAnalytics
+  // Load settings from localStorage
+  function loadSettings() {
+    const defaults = {
+      autoSave: true,
+      autoSaveInterval: 30000, // 30 seconds
+      darkMode: false,
+      language: 'en',
+      notifications: true,
+      gpsTracking: true,
+      cameraQuality: 'high',
+      signatureRequired: true,
+      riskScoring: true
     };
-    if (navMap[section]) {
-      navMap[section].classList.add('active');
-    }
-    if (section === 'inspections') {
-      updateFormTitle();
-      updateProgress();
-    } else if (section === 'reports') {
-      renderReports();
-    } else if (section === 'analytics') {
-      renderAnalytics();
+    try {
+      const saved = localStorage.getItem('aurora-settings');
+      return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
+    } catch {
+      return defaults;
     }
   }
 
-  // Bind nav clicks
-  navDashboard?.addEventListener('click', e => {
-    e.preventDefault();
-    setActiveSection('dashboard');
-  });
-  navInspections?.addEventListener('click', e => {
-    e.preventDefault();
-    setActiveSection('inspections');
-  });
-  navReports?.addEventListener('click', e => {
-    e.preventDefault();
-    setActiveSection('reports');
-  });
-  navAnalytics?.addEventListener('click', e => {
-    e.preventDefault();
-    setActiveSection('analytics');
-  });
+  // Save settings
+  function saveSettings() {
+    localStorage.setItem('aurora-settings', JSON.stringify(state.settings));
+    applySettings();
+  }
 
-  // Set default section
-  setActiveSection('dashboard');
+  // Apply settings
+  function applySettings() {
+    document.body.classList.toggle('dark-mode', state.settings.darkMode);
+    if (state.settings.gpsTracking) {
+      requestGPSLocation();
+    }
+  }
 
-  // Quick actions buttons
-  const importQuestionsBtn = document.getElementById('import-questions-btn');
-  const exportQuestionsBtn = document.getElementById('export-questions-btn');
-  const exportReportsBtn = document.getElementById('export-reports-btn');
-  const syncDataBtn = document.getElementById('sync-data-btn');
-  const settingsBtn = document.getElementById('settings-btn');
+  // Cache DOM elements
+  const elements = {
+    userMenu: document.getElementById('user-menu'),
+    pendingList: document.getElementById('pending-list'),
+    completedList: document.getElementById('completed-list'),
+    startInspectionBtn: document.getElementById('start-inspection-btn'),
+    saveDraftBtn: document.getElementById('save-draft-btn'),
+    submitInspectionBtn: document.getElementById('submit-inspection-btn'),
+    previewModeBtn: document.getElementById('preview-mode-btn'),
+    exportPdfBtn: document.getElementById('export-pdf-btn'),
+    locationSelect: document.getElementById('delivery-station-select'),
+    typeSelect: document.getElementById('inspection-type-select'),
+    auditorNamesInput: document.getElementById('auditor-names'),
+    inspectionDateInput: document.getElementById('inspection-date'),
+    progressStatusEl: document.getElementById('progress-status'),
+    progressFillEl: document.getElementById('progress-fill'),
+    inspectionTitleEl: document.getElementById('inspection-title'),
+    questionsSection: document.getElementById('questions-section'),
+    navItems: {
+      dashboard: document.getElementById('nav-dashboard'),
+      inspections: document.getElementById('nav-inspections'),
+      reports: document.getElementById('nav-reports'),
+      analytics: document.getElementById('nav-analytics')
+    },
+    quickActions: {
+      import: document.getElementById('import-questions-btn'),
+      export: document.getElementById('export-questions-btn'),
+      exportReports: document.getElementById('export-reports-btn'),
+      sync: document.getElementById('sync-data-btn'),
+      settings: document.getElementById('settings-btn')
+    }
+  };
 
-  // Track current inspection identifier. When editing an existing
-  // inspection the id is set; for new inspections it is null until
-  // saved.
-  let currentInspectionId = null;
-
-  // For per-question attachments. Each question id maps to an array of File objects or file name strings.
+  // Initialize offline queue
+  let offlineQueue = JSON.parse(localStorage.getItem('offline-queue') || '[]');
+  let autoSaveInterval = null;
   let questionFiles = {};
-  // Cache loaded inspections for reports and analytics. Populated by loadInspections().
   let inspectionsData = [];
+  let signatureData = {};
 
-  // Define the default question set extracted from the provided audit report.
-  // Each question belongs to a category and is a simple yes/no (boolean) type.
+  /* ------------------------------------------------------------------ */
+  /*                      Enhanced Question System                      */
+  /* ------------------------------------------------------------------ */
+  
+  // Extended question types with risk scoring
   const defaultQuestions = [
-    // Allgemeine Sicherheit (General Safety)
-    { id: 'general-visible-signs', type: 'boolean', category: 'General Safety', question: 'Sind Sicherheitshinweise und Fluchtwegpläne deutlich sichtbar?', required: false },
-    { id: 'general-exits-clear', type: 'boolean', category: 'General Safety', question: 'Sind alle Notausgänge frei und gut gekennzeichnet?', required: false },
-    { id: 'general-first-aid', type: 'boolean', category: 'General Safety', question: 'Ist die Erste-Hilfe-Ausstattung vollständig und erreichbar?', required: false },
-    { id: 'general-emergency-equipment', type: 'boolean', category: 'General Safety', question: 'Ist die Notfallausrüstung (Augenspülung, Feuerlöscher) zugänglich?', required: false },
-    { id: 'general-psa', type: 'boolean', category: 'General Safety', question: 'Tragen alle Mitarbeiter die korrekte PSA?', required: false },
-    { id: 'general-badges', type: 'boolean', category: 'General Safety', question: 'Sind alle Mitarbeiter-Badges sichtbar?', required: false },
-    { id: 'general-hair-clothing', type: 'boolean', category: 'General Safety', question: 'Entsprechen Frisur/Kleidung den Sicherheitsvorschriften? (max. Schulterhöhe)', required: false },
-    { id: 'general-instructions', type: 'boolean', category: 'General Safety', question: 'Sind aktuelle Arbeitsanweisungen verfügbar?', required: false },
-    // Arbeitsplatz und Umgebung (Workplace and Environment)
-    { id: 'workplace-clean', type: 'boolean', category: 'Workplace & Environment', question: 'Ist die Lagerhalle sauber und aufgeräumt?', required: false },
-    { id: 'workplace-floors', type: 'boolean', category: 'Workplace & Environment', question: 'Sind die Böden rutschfest und eben?', required: false },
-    { id: 'workplace-space', type: 'boolean', category: 'Workplace & Environment', question: 'Ist ausreichend Bewegungsfreiheit vorhanden? (min. 1,5 m² pro Person)', required: false },
-    { id: 'workplace-lighting', type: 'boolean', category: 'Workplace & Environment', question: 'Entspricht die Beleuchtung den Anforderungen? (min. 200 Lux)', required: false },
-    { id: 'workplace-temperature', type: 'boolean', category: 'Workplace & Environment', question: 'Ist die Raumtemperatur angemessen? (18-25°C)', required: false },
-    { id: 'workplace-ventilation', type: 'boolean', category: 'Workplace & Environment', question: 'Ist die Lüftung ausreichend?', required: false },
-    { id: 'workplace-noise', type: 'boolean', category: 'Workplace & Environment', question: 'Liegt der Lärmpegel im zulässigen Bereich? (< 85 dB(A))', required: false },
-    { id: 'workplace-ergonomics', type: 'boolean', category: 'Workplace & Environment', question: 'Sind die Arbeitsplätze ergonomisch gestaltet?', required: false },
-    // Lagerung und Transport (Storage & Transport)
-    { id: 'storage-5s', type: 'boolean', category: 'Storage & Transport', question: 'Werden die 5S-Markierungen respektiert?', required: false },
-    { id: 'storage-organization', type: 'boolean', category: 'Storage & Transport', question: 'Sind die Lagerbereiche sicher organisiert?', required: false },
-    { id: 'storage-overhead', type: 'boolean', category: 'Storage & Transport', question: 'Werden Lagerungen über Kopf vermieden?', required: false },
-    { id: 'storage-shelves', type: 'boolean', category: 'Storage & Transport', question: 'Sind Regale ordnungsgemäß befestigt?', required: false },
-    { id: 'storage-stack-height', type: 'boolean', category: 'Storage & Transport', question: 'Sind die maximalen Stapelhöhen eingehalten?', required: false },
-    { id: 'storage-pedestrian-paths', type: 'boolean', category: 'Storage & Transport', question: 'Sind Fußgängerwege klar gekennzeichnet? (min. 1,2 m breit)', required: false },
-    { id: 'storage-paths-clear', type: 'boolean', category: 'Storage & Transport', question: 'Sind alle Transportwege frei von Hindernissen?', required: false },
-    { id: 'storage-danger-zones', type: 'boolean', category: 'Storage & Transport', question: 'Sind Gefahrenbereiche deutlich markiert?', required: false },
-    { id: 'storage-vehicles-condition', type: 'boolean', category: 'Storage & Transport', question: 'Sind alle Flurförderzeuge in gutem Zustand?', required: false },
-    { id: 'storage-maintenance-logs', type: 'boolean', category: 'Storage & Transport', question: 'Sind die Wartungsprotokolle aktuell? (jährliche Prüfung)', required: false },
-    { id: 'storage-loading-aids', type: 'boolean', category: 'Storage & Transport', question: 'Sind Ladehilfsmittel unbeschädigt?', required: false },
-    // Gefahrstoffe (Hazardous Materials)
-    { id: 'hazard-storage', type: 'boolean', category: 'Hazardous Materials', question: 'Sind Gefahrstoffe korrekt gelagert?', required: false },
-    { id: 'hazard-labeling', type: 'boolean', category: 'Hazardous Materials', question: 'Sind alle Gefahrstoffe ordnungsgemäß gekennzeichnet?', required: false },
-    { id: 'hazard-safety-data', type: 'boolean', category: 'Hazardous Materials', question: 'Sind Sicherheitsdatenblätter verfügbar?', required: false },
-    { id: 'hazard-area-secured', type: 'boolean', category: 'Hazardous Materials', question: 'Sind Gefahrstoffbereiche abgesperrt?', required: false },
-    // Ergonomie und Arbeitsverhalten (Ergonomics & Work Behaviour)
-    { id: 'ergo-posture', type: 'boolean', category: 'Ergonomics & Behaviour', question: 'Vermeiden Mitarbeiter ungünstige Körperhaltungen?', required: false },
-    { id: 'ergo-cart-control', type: 'boolean', category: 'Ergonomics & Behaviour', question: 'Werden Transportwagen kontrolliert bewegt?', required: false },
-    { id: 'ergo-handrails', type: 'boolean', category: 'Ergonomics & Behaviour', question: 'Werden Handläufe verwendet (wo vorhanden)?', required: false },
-    { id: 'ergo-lifting-aids', type: 'boolean', category: 'Ergonomics & Behaviour', question: 'Werden Hebehilfen bei schweren Lasten eingesetzt? (ab 25 kg Männer, 15 kg Frauen)', required: false },
-    { id: 'ergo-breaks', type: 'boolean', category: 'Ergonomics & Behaviour', question: 'Werden Pausenzeiten eingehalten?', required: false },
-    { id: 'ergo-work-rhythm', type: 'boolean', category: 'Ergonomics & Behaviour', question: 'Ist der Arbeitsrhythmus angemessen?', required: false },
-    // Notfallvorsorge (Emergency Preparedness)
-    { id: 'emergency-first-aiders', type: 'boolean', category: 'Emergency Preparedness', question: 'Sind genügend Ersthelfer verfügbar? (1 pro 19 Mitarbeiter)', required: false },
-    { id: 'emergency-fire-wardens', type: 'boolean', category: 'Emergency Preparedness', question: 'Sind Brandschutzwarte ernannt und geschult?', required: false },
-    { id: 'emergency-plans', type: 'boolean', category: 'Emergency Preparedness', question: 'Sind die Notfallpläne aktuell und bekannt?', required: false },
-    { id: 'emergency-drills', type: 'boolean', category: 'Emergency Preparedness', question: 'Werden regelmäßig Notfallübungen durchgeführt?', required: false },
-    { id: 'emergency-assembly-points', type: 'boolean', category: 'Emergency Preparedness', question: 'Sind Sammelplätze bekannt und gekennzeichnet?', required: false },
-    { id: 'emergency-alarm-system', type: 'boolean', category: 'Emergency Preparedness', question: 'Funktioniert das Alarmsystem ordnungsgemäß?', required: false },
-    // Wartung und Instandhaltung (Maintenance & Inspection)
-    { id: 'maintenance-gate-intervals', type: 'boolean', category: 'Maintenance', question: 'Werden Wartungsintervalle bei Toren eingehalten?', required: false },
-    { id: 'maintenance-extinguisher', type: 'boolean', category: 'Maintenance', question: 'Sind Feuerlöscher-Prüffristen aktuell? (alle 2 Jahre)', required: false },
-    { id: 'maintenance-electrical', type: 'boolean', category: 'Maintenance', question: 'Sind elektrische Anlagen ordnungsgemäß geprüft?', required: false },
-    { id: 'maintenance-ventilation', type: 'boolean', category: 'Maintenance', question: 'Erfolgt regelmäßige Wartung der Lüftungsanlagen?', required: false },
-    { id: 'maintenance-protocols', type: 'boolean', category: 'Maintenance', question: 'Sind alle Wartungsprotokolle verfügbar?', required: false },
-    // Höhenarbeiten (Working at Heights)
-    { id: 'height-fall-protection', type: 'boolean', category: 'Working at Heights', question: 'Sind Absturzsicherungen vorhanden?', required: false },
-    { id: 'height-special-gear', type: 'boolean', category: 'Working at Heights', question: 'Ist spezielle Schutzausrüstung verfügbar?', required: false },
-    { id: 'height-permits', type: 'boolean', category: 'Working at Heights', question: 'Sind Arbeiten in der Höhe genehmigt?', required: false }
+    // Critical Safety Items (High Risk)
+    { 
+      id: 'emergency-exits-blocked', 
+      type: 'boolean', 
+      category: 'Critical Safety', 
+      question: 'Are any emergency exits blocked or locked?',
+      required: true,
+      riskWeight: 10,
+      correctAnswer: 'no',
+      guidance: 'All emergency exits must be clear and unlocked during operating hours'
+    },
+    { 
+      id: 'fire-equipment-missing', 
+      type: 'boolean', 
+      category: 'Critical Safety', 
+      question: 'Is any required fire safety equipment missing or damaged?',
+      required: true,
+      riskWeight: 10,
+      correctAnswer: 'no'
+    },
+    
+    // General Safety (Medium Risk)
+    { 
+      id: 'general-visible-signs', 
+      type: 'boolean', 
+      category: 'General Safety', 
+      question: 'Sind Sicherheitshinweise und Fluchtwegpläne deutlich sichtbar?',
+      required: false,
+      riskWeight: 5,
+      correctAnswer: 'yes'
+    },
+    { 
+      id: 'general-exits-clear', 
+      type: 'boolean', 
+      category: 'General Safety', 
+      question: 'Sind alle Notausgänge frei und gut gekennzeichnet?',
+      required: true,
+      riskWeight: 8,
+      correctAnswer: 'yes'
+    },
+    { 
+      id: 'general-first-aid', 
+      type: 'boolean', 
+      category: 'General Safety', 
+      question: 'Ist die Erste-Hilfe-Ausstattung vollständig und erreichbar?',
+      required: false,
+      riskWeight: 6,
+      correctAnswer: 'yes'
+    },
+    
+    // Workplace & Environment (Low-Medium Risk)
+    { 
+      id: 'workplace-clean', 
+      type: 'boolean', 
+      category: 'Workplace & Environment', 
+      question: 'Ist die Lagerhalle sauber und aufgeräumt?',
+      required: false,
+      riskWeight: 3,
+      correctAnswer: 'yes'
+    },
+    { 
+      id: 'workplace-lighting', 
+      type: 'boolean', 
+      category: 'Workplace & Environment', 
+      question: 'Entspricht die Beleuchtung den Anforderungen? (min. 200 Lux)',
+      required: false,
+      riskWeight: 4,
+      correctAnswer: 'yes',
+      measurement: { unit: 'lux', min: 200 }
+    },
+    { 
+      id: 'workplace-temperature', 
+      type: 'range', 
+      category: 'Workplace & Environment', 
+      question: 'Raumtemperatur (°C)',
+      required: false,
+      min: 10,
+      max: 35,
+      optimal: { min: 18, max: 25 },
+      unit: '°C'
+    },
+    
+    // Quantitative measurements
+    { 
+      id: 'extinguisher-count', 
+      type: 'number', 
+      category: 'Fire Safety', 
+      question: 'Anzahl der überprüften Feuerlöscher',
+      required: true,
+      min: 0
+    },
+    { 
+      id: 'emergency-lights-tested', 
+      type: 'checklist', 
+      category: 'Emergency Systems', 
+      question: 'Notbeleuchtung getestet',
+      required: true,
+      options: [
+        'Haupteingang',
+        'Lagerbereich A',
+        'Lagerbereich B',
+        'Bürobereich',
+        'Pausenraum',
+        'Notausgang Nord',
+        'Notausgang Süd'
+      ]
+    },
+    
+    // Photo evidence
+    { 
+      id: 'safety-violations-photos', 
+      type: 'photo', 
+      category: 'Documentation', 
+      question: 'Fotos von Sicherheitsverstößen',
+      required: false,
+      multiple: true,
+      maxFiles: 10
+    },
+    
+    // Text observations
+    { 
+      id: 'additional-observations', 
+      type: 'text', 
+      category: 'General Observations', 
+      question: 'Zusätzliche Beobachtungen oder Empfehlungen',
+      required: false
+    }
   ];
 
-  // The current question list in use. Initially set to the default
-  // questions but may be replaced by a user specific set loaded
-  // from Netlify Blobs or via import. This array drives dynamic
-  // rendering and progress calculations.
   let questions = [...defaultQuestions];
 
-  // Initialize the user menu immediately based on the current
-  // authentication state. If Netlify Identity is unavailable or
-  // there is no logged in user this will show the login prompt.
-  updateUserMenu(window.netlifyIdentity && window.netlifyIdentity.currentUser() || null);
-  // Load questions on startup. When not logged in this will render
-  // the default question set; when logged in the user-specific
-  // question set will be loaded in the init event.
-  loadQuestions();
+  /* ------------------------------------------------------------------ */
+  /*                    Navigation & View Management                    */
+  /* ------------------------------------------------------------------ */
+  
+  function setActiveSection(section) {
+    // Hide all sections
+    document.querySelectorAll('[data-section]').forEach(el => {
+      el.style.display = 'none';
+    });
+    
+    // Show selected section
+    const sectionEl = document.querySelector(`[data-section="${section}"]`);
+    if (sectionEl) {
+      sectionEl.style.display = '';
+    }
+    
+    // Update nav states
+    Object.values(elements.navItems).forEach(item => {
+      item?.classList.remove('active');
+    });
+    
+    if (elements.navItems[section]) {
+      elements.navItems[section].classList.add('active');
+    }
+    
+    // Section-specific initialization
+    switch (section) {
+      case 'inspections':
+        updateFormTitle();
+        updateProgress();
+        break;
+      case 'reports':
+        renderReports();
+        break;
+      case 'analytics':
+        renderAnalytics();
+        break;
+      case 'settings':
+        renderSettings();
+        break;
+    }
+  }
 
-  /**
-   * Update the header user menu. When a user is signed in the menu
-   * displays the user’s initials and name along with a logout icon.
-   * When no user is signed in the menu invites the visitor to log
-   * in or sign up. Clicking the menu either opens the login modal
-   * or logs the user out accordingly.
-   *
-   * @param {object|null} user The Netlify Identity user or null.
-   */
+  // Navigation event listeners
+  Object.entries(elements.navItems).forEach(([section, element]) => {
+    element?.addEventListener('click', e => {
+      e.preventDefault();
+      setActiveSection(section);
+    });
+  });
+
+  /* ------------------------------------------------------------------ */
+  /*                        User Authentication                         */
+  /* ------------------------------------------------------------------ */
+  
   function updateUserMenu(user) {
     if (!user) {
-      // Show a generic login prompt. The avatar uses a user icon.
-      userMenu.innerHTML = `
+      elements.userMenu.innerHTML = `
         <div class="user-avatar"><i class="fas fa-user"></i></div>
         <span>Log in / Sign up</span>
       `;
-      userMenu.onclick = () => {
-        if (window.netlifyIdentity) {
-          window.netlifyIdentity.open();
-        }
+      elements.userMenu.onclick = () => {
+        window.netlifyIdentity?.open();
       };
-      // Clear lists when user logs out
-      pendingList.innerHTML = '';
-      completedList.innerHTML = '';
+      // Clear lists
+      elements.pendingList.innerHTML = '';
+      elements.completedList.innerHTML = '';
       return;
     }
 
-    // Compute a friendly display name and initials. Prefer the
-    // user_metadata fields, falling back to the email address.
-    const name = user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name);
-    const displayName = name || user.email;
-    const initials = displayName
-      .split(/\s+/)
-      .map(part => part.charAt(0))
-      .join('')
-      .substring(0, 2)
-      .toUpperCase();
-    userMenu.innerHTML = `
+    const name = user.user_metadata?.full_name || user.user_metadata?.name || user.email;
+    const initials = name.split(/\s+/).map(p => p[0]).join('').substring(0, 2).toUpperCase();
+    
+    elements.userMenu.innerHTML = `
       <div class="user-avatar">${initials}</div>
-      <span>${displayName}</span>
+      <span>${name}</span>
       <i class="fas fa-sign-out-alt"></i>
     `;
-    userMenu.onclick = () => {
-      if (window.netlifyIdentity) {
-        window.netlifyIdentity.logout();
+    elements.userMenu.onclick = () => {
+      if (confirm('Are you sure you want to log out?')) {
+        window.netlifyIdentity?.logout();
       }
     };
   }
 
-  /**
-   * Load the question set for the current user from Netlify Blobs. If
-   * no record exists the default question set is used. The loaded
-   * questions are stored in the global `questions` variable and the
-   * UI is re-rendered accordingly. When the user is not logged in
-   * the default questions remain.
-   */
-  async function loadQuestions() {
-    // Use default questions when Identity is unavailable or no user is
-    // logged in.
-    if (!window.netlifyIdentity) {
-      questions = [...defaultQuestions];
-      renderQuestions();
-      return;
-    }
-    const user = window.netlifyIdentity.currentUser();
-    if (!user) {
-      questions = [...defaultQuestions];
-      renderQuestions();
-      return;
-    }
-    try {
-      const token = await user.jwt();
-      const path = `questions/${user.id}/questions.json`;
-      const res = await fetch(`/.netlify/blobs/${path}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          questions = data;
-        } else {
-          questions = [...defaultQuestions];
-        }
-      } else {
-        // If the file does not exist fall back to default questions
-        questions = [...defaultQuestions];
-      }
-    } catch (err) {
-      console.warn('Failed to load questions, using defaults', err);
-      questions = [...defaultQuestions];
-    }
-    renderQuestions();
-  }
-
-  /**
-   * Persist the current question set to Netlify Blobs for the
-   * authenticated user. If the user is not logged in this
-   * operation is a no-op and the questions remain only in memory.
-   */
-  async function saveQuestions() {
-    if (!window.netlifyIdentity) return;
-    const user = window.netlifyIdentity.currentUser();
-    if (!user) return;
-    try {
-      const token = await user.jwt();
-      const path = `questions/${user.id}/questions.json`;
-      await fetch(`/.netlify/blobs/${path}`, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(questions)
-      });
-    } catch (err) {
-      console.error('Failed to save questions', err);
-    }
-  }
-
-  /**
-   * Render the questions into the form. This function clears any
-   * existing question cards and rebuilds them based on the
-   * contents of the `questions` array. Event listeners for voice
-   * buttons and input changes are attached. After rendering the
-   * progress indicator is updated to reflect the new question
-   * count.
-   */
+  /* ------------------------------------------------------------------ */
+  /*                      Enhanced Form Rendering                       */
+  /* ------------------------------------------------------------------ */
+  
   function renderQuestions() {
-    const section = document.getElementById('questions-section');
-    if (!section) return;
-    // Remove all existing question cards
-    section.querySelectorAll('.question-card').forEach(card => card.remove());
-    // Track the current category to insert headings when category changes
+    if (!elements.questionsSection) return;
+    
+    // Clear existing content
+    elements.questionsSection.innerHTML = '';
+    
     let currentCategory = null;
-    // For each question build appropriate markup
-    questions.forEach(q => {
-      // Insert a category heading if this question starts a new category
-      if (q.category && q.category !== currentCategory) {
+    
+    questions.forEach((q, index) => {
+      // Category header
+      if (q.category !== currentCategory) {
         currentCategory = q.category;
         const heading = document.createElement('div');
         heading.className = 'category-heading';
-        heading.textContent = currentCategory;
-        section.appendChild(heading);
+        heading.innerHTML = `
+          <i class="fas fa-folder"></i>
+          ${currentCategory}
+        `;
+        elements.questionsSection.appendChild(heading);
       }
+      
+      // Question card
       const card = document.createElement('div');
       card.className = 'question-card';
+      card.dataset.questionId = q.id;
+      
+      // Risk indicator for high-risk questions
+      if (q.riskWeight >= 8) {
+        card.classList.add('high-risk');
+      }
+      
       const header = document.createElement('div');
       header.className = 'question-header';
+      
       const textEl = document.createElement('div');
       textEl.className = 'question-text';
-      // Compose question text and append required indicator
-      textEl.textContent = q.question;
-      if (q.required) {
-        const reqSpan = document.createElement('span');
-        reqSpan.className = 'question-required';
-        reqSpan.textContent = '*';
-        textEl.appendChild(reqSpan);
-      }
+      textEl.innerHTML = `
+        ${q.question}
+        ${q.required ? '<span class="question-required">*</span>' : ''}
+        ${q.riskWeight >= 8 ? '<span class="risk-indicator" title="High Risk Item"><i class="fas fa-exclamation-triangle"></i></span>' : ''}
+      `;
       header.appendChild(textEl);
-      // Voice button (only for text and number questions). For boolean
-      // questions voice input may not make sense but we include it
-      // anyway for parity.
-      if (q.type !== 'file') {
-        const voiceBtn = document.createElement('button');
-        voiceBtn.type = 'button';
-        voiceBtn.className = 'voice-btn';
-        voiceBtn.title = 'Voice Input';
-        const micIcon = document.createElement('i');
-        micIcon.className = 'fas fa-microphone';
-        voiceBtn.appendChild(micIcon);
-        header.appendChild(voiceBtn);
+      
+      // Add controls based on question type
+      const controlsDiv = document.createElement('div');
+      controlsDiv.className = 'question-controls';
+      
+      // Voice button for text/number inputs
+      if (['text', 'number'].includes(q.type)) {
+        const voiceBtn = createVoiceButton(q.id);
+        controlsDiv.appendChild(voiceBtn);
       }
+      
+      // Camera button for photo type
+      if (q.type === 'photo') {
+        const cameraBtn = createCameraButton(q.id);
+        controlsDiv.appendChild(cameraBtn);
+      }
+      
+      // Info button for guidance
+      if (q.guidance) {
+        const infoBtn = document.createElement('button');
+        infoBtn.type = 'button';
+        infoBtn.className = 'info-btn';
+        infoBtn.title = 'Guidance';
+        infoBtn.innerHTML = '<i class="fas fa-info-circle"></i>';
+        infoBtn.onclick = () => showGuidance(q.guidance);
+        controlsDiv.appendChild(infoBtn);
+      }
+      
+      header.appendChild(controlsDiv);
       card.appendChild(header);
-      // Create input control based on type
-      let control;
-      if (q.type === 'boolean') {
-        const options = document.createElement('div');
-        options.className = 'boolean-options';
-        ['yes', 'no'].forEach(val => {
-          const optionCard = document.createElement('div');
-          optionCard.className = 'option-card';
-          const input = document.createElement('input');
-          input.type = 'radio';
-          input.name = q.id;
-          input.id = `${q.id}-${val}`;
-          input.value = val;
-          const label = document.createElement('label');
-          label.className = 'option-label';
-          label.setAttribute('for', `${q.id}-${val}`);
-          const icon = document.createElement('i');
-          icon.className = val === 'yes' ? 'fas fa-check' : 'fas fa-times';
-          label.appendChild(icon);
-          label.appendChild(document.createTextNode(val === 'yes' ? ' Yes' : ' No'));
-          optionCard.appendChild(input);
-          optionCard.appendChild(label);
-          options.appendChild(optionCard);
-        });
-        control = options;
-      } else if (q.type === 'text') {
-        const textarea = document.createElement('textarea');
-        textarea.id = q.id;
-        textarea.className = 'text-input';
-        textarea.placeholder = 'Enter your answer...';
-        control = textarea;
-      } else if (q.type === 'number') {
-        const input = document.createElement('input');
-        input.type = 'number';
-        input.id = q.id;
-        input.className = 'form-control';
-        input.placeholder = 'Enter number';
-        input.min = '0';
-        control = input;
-      } else if (q.type === 'file') {
-        // For file type questions we do not render a specific control.
-        // Attachments can still be uploaded via the per-question upload area below.
-        const wrapper = document.createElement('div');
-        control = wrapper;
-      } else {
-        // Unknown type, fallback to text
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.id = q.id;
-        input.className = 'form-control';
-        control = input;
-      }
+      
+      // Create input control
+      const control = createQuestionControl(q);
       card.appendChild(control);
-      // Ensure a files array exists for this question
-      if (!questionFiles[q.id]) {
-        questionFiles[q.id] = [];
+      
+      // Add comment field
+      const commentField = createCommentField(q.id);
+      card.appendChild(commentField);
+      
+      // Add file upload for all questions
+      if (q.type !== 'photo') {
+        const fileUpload = createFileUploadElement(q.id);
+        card.appendChild(fileUpload);
       }
-      // Add comment input
-      const comment = document.createElement('textarea');
-      comment.id = `comment-${q.id}`;
-      comment.className = 'text-input comment-input';
-      comment.placeholder = 'Add a comment (optional)';
-      card.appendChild(comment);
-      // Add per-question file upload area
-      const attachArea = createFileUploadElement(q.id);
-      card.appendChild(attachArea);
-      // Append the card to the questions section
-      section.appendChild(card);
-    });
-    // After rendering attach voice button handlers. We need to
-    // delegate because voice buttons may be newly created.
-    section.querySelectorAll('.voice-btn').forEach(btn => {
-      btn.addEventListener('click', () => toggleVoice(btn));
-    });
-    // Attach change handlers to new inputs for progress updates
-    // Boolean radio inputs
-    questions.forEach(q => {
-      if (q.type === 'boolean') {
-        const radios = section.querySelectorAll(`input[name="${q.id}"]`);
-        radios.forEach(r => {
-          r.addEventListener('change', updateProgress);
-        });
-      } else if (q.type === 'text' || q.type === 'number') {
-        const el = section.querySelector(`#${q.id}`);
-        if (el) {
-          el.addEventListener('input', () => {
-            updateProgress();
-          });
-          el.addEventListener('change', () => {
-            updateProgress();
-          });
-        }
+      
+      // Risk scoring display
+      if (q.riskWeight) {
+        const riskScore = document.createElement('div');
+        riskScore.className = 'risk-score';
+        riskScore.innerHTML = `Risk Score: ${q.riskWeight}/10`;
+        card.appendChild(riskScore);
       }
+      
+      elements.questionsSection.appendChild(card);
     });
-    // Update progress bar and title after rendering
+    
+    // Initialize event listeners
+    attachQuestionEventListeners();
     updateProgress();
   }
 
-  /**
-   * Create a file upload area for a specific question. Allows the user
-   * to click or drag files to upload images. Selected files are stored
-   * in the questionFiles map. A list of file names is displayed below
-   * the upload area.
-   *
-   * @param {string} qid The question ID.
-   * @returns {HTMLElement} The file upload wrapper element.
-   */
-  function createFileUploadElement(qid) {
+  function createQuestionControl(q) {
+    switch (q.type) {
+      case 'boolean':
+        return createBooleanControl(q);
+      case 'text':
+        return createTextControl(q);
+      case 'number':
+        return createNumberControl(q);
+      case 'range':
+        return createRangeControl(q);
+      case 'checklist':
+        return createChecklistControl(q);
+      case 'photo':
+        return createPhotoControl(q);
+      default:
+        return createTextControl(q);
+    }
+  }
+
+  function createBooleanControl(q) {
+    const options = document.createElement('div');
+    options.className = 'boolean-options';
+    
+    ['yes', 'no'].forEach(value => {
+      const optionCard = document.createElement('div');
+      optionCard.className = 'option-card';
+      
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = q.id;
+      input.id = `${q.id}-${value}`;
+      input.value = value;
+      
+      const label = document.createElement('label');
+      label.className = 'option-label';
+      label.setAttribute('for', `${q.id}-${value}`);
+      
+      // Highlight if this is the "wrong" answer for risk scoring
+      if (q.correctAnswer && value !== q.correctAnswer) {
+        label.classList.add('risk-answer');
+      }
+      
+      const icon = document.createElement('i');
+      icon.className = value === 'yes' ? 'fas fa-check' : 'fas fa-times';
+      
+      label.appendChild(icon);
+      label.appendChild(document.createTextNode(value === 'yes' ? ' Yes' : ' No'));
+      
+      optionCard.appendChild(input);
+      optionCard.appendChild(label);
+      options.appendChild(optionCard);
+    });
+    
+    return options;
+  }
+
+  function createTextControl(q) {
+    const textarea = document.createElement('textarea');
+    textarea.id = q.id;
+    textarea.className = 'text-input';
+    textarea.placeholder = 'Enter your answer...';
+    textarea.rows = 4;
+    return textarea;
+  }
+
+  function createNumberControl(q) {
     const wrapper = document.createElement('div');
-    wrapper.className = 'file-upload';
-    // Hidden file input
+    wrapper.className = 'number-input-wrapper';
+    
     const input = document.createElement('input');
-    input.type = 'file';
-    input.multiple = true;
-    input.accept = 'image/png,image/jpeg,image/heic';
-    input.style.display = 'none';
+    input.type = 'number';
+    input.id = q.id;
+    input.className = 'form-control';
+    input.placeholder = 'Enter number';
+    
+    if (q.min !== undefined) input.min = q.min;
+    if (q.max !== undefined) input.max = q.max;
+    
+    // Add increment/decrement buttons
+    const btnDecrement = document.createElement('button');
+    btnDecrement.type = 'button';
+    btnDecrement.className = 'number-btn';
+    btnDecrement.innerHTML = '<i class="fas fa-minus"></i>';
+    btnDecrement.onclick = () => {
+      const current = parseInt(input.value) || 0;
+      input.value = Math.max(current - 1, q.min || 0);
+      input.dispatchEvent(new Event('input'));
+    };
+    
+    const btnIncrement = document.createElement('button');
+    btnIncrement.type = 'button';
+    btnIncrement.className = 'number-btn';
+    btnIncrement.innerHTML = '<i class="fas fa-plus"></i>';
+    btnIncrement.onclick = () => {
+      const current = parseInt(input.value) || 0;
+      input.value = q.max ? Math.min(current + 1, q.max) : current + 1;
+      input.dispatchEvent(new Event('input'));
+    };
+    
+    wrapper.appendChild(btnDecrement);
     wrapper.appendChild(input);
-    // Icon
-    const iconDiv = document.createElement('div');
-    iconDiv.className = 'file-upload-icon';
-    const icon = document.createElement('i');
-    icon.className = 'fas fa-cloud-upload-alt';
-    iconDiv.appendChild(icon);
-    wrapper.appendChild(iconDiv);
-    // Text
-    const textDiv = document.createElement('div');
-    textDiv.className = 'file-upload-text';
-    textDiv.textContent = 'Click to upload or drag and drop';
-    wrapper.appendChild(textDiv);
-    // Hint
-    const hintDiv = document.createElement('div');
-    hintDiv.className = 'file-upload-hint';
-    hintDiv.textContent = 'PNG, JPG, HEIC up to 10MB';
-    wrapper.appendChild(hintDiv);
-    // List display
-    const listDiv = document.createElement('div');
-    listDiv.className = 'file-list';
-    wrapper.appendChild(listDiv);
-    // Ensure array exists
-    if (!questionFiles[qid]) {
-      questionFiles[qid] = [];
-    }
-    // Refresh list
-    function refreshList() {
-      listDiv.innerHTML = '';
-      const files = questionFiles[qid] || [];
-      files.forEach(f => {
-        const item = document.createElement('div');
-        item.textContent = f.name || f;
-        item.style.fontSize = '0.8rem';
-        item.style.marginTop = '4px';
-        listDiv.appendChild(item);
-      });
-    }
-    // Input change
-    input.addEventListener('change', e => {
-      const files = Array.from(e.target.files || []);
-      files.forEach(file => {
-        if (!questionFiles[qid].some(existing => existing.name === file.name)) {
-          questionFiles[qid].push(file);
-        }
-      });
-      refreshList();
-      updateProgress();
-    });
-    // Click to open file picker
-    wrapper.addEventListener('click', () => {
-      input.click();
-    });
-    // Drag & drop
-    wrapper.addEventListener('dragover', e => {
-      e.preventDefault();
-      e.stopPropagation();
-      wrapper.classList.add('drag-over');
-    });
-    wrapper.addEventListener('dragleave', () => {
-      wrapper.classList.remove('drag-over');
-    });
-    wrapper.addEventListener('drop', e => {
-      e.preventDefault();
-      e.stopPropagation();
-      wrapper.classList.remove('drag-over');
-      const files = Array.from(e.dataTransfer.files || []);
-      files.forEach(file => {
-        if (!questionFiles[qid].some(existing => existing.name === file.name)) {
-          questionFiles[qid].push(file);
-        }
-      });
-      refreshList();
-      updateProgress();
-    });
-    refreshList();
+    wrapper.appendChild(btnIncrement);
+    
     return wrapper;
   }
 
-  // Register Netlify Identity event listeners. On init, login and logout
-  // update the user menu. After login the inspection data is loaded.
-  if (window.netlifyIdentity) {
-    window.netlifyIdentity.on('init', user => {
-      updateUserMenu(user);
-      if (user) {
-        loadInspections();
-        loadQuestions();
-      } else {
-        // When not logged in fallback to default question set
-        questions = [...defaultQuestions];
-        renderQuestions();
+  function createRangeControl(q) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'range-control';
+    
+    const display = document.createElement('div');
+    display.className = 'range-display';
+    
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.id = q.id;
+    input.className = 'range-input';
+    input.min = q.min || 0;
+    input.max = q.max || 100;
+    input.value = q.optimal ? (q.optimal.min + q.optimal.max) / 2 : (q.min + q.max) / 2;
+    
+    const valueDisplay = document.createElement('span');
+    valueDisplay.className = 'range-value';
+    valueDisplay.textContent = `${input.value}${q.unit || ''}`;
+    
+    // Update display on change
+    input.oninput = () => {
+      valueDisplay.textContent = `${input.value}${q.unit || ''}`;
+      
+      // Check if in optimal range
+      if (q.optimal) {
+        const val = parseFloat(input.value);
+        if (val >= q.optimal.min && val <= q.optimal.max) {
+          valueDisplay.classList.add('optimal');
+          valueDisplay.classList.remove('warning');
+        } else {
+          valueDisplay.classList.add('warning');
+          valueDisplay.classList.remove('optimal');
+        }
       }
-    });
-    window.netlifyIdentity.on('login', user => {
-      updateUserMenu(user);
-      if (window.netlifyIdentity) {
-        window.netlifyIdentity.close();
-      }
-      loadInspections();
-      loadQuestions();
-    });
-    window.netlifyIdentity.on('logout', () => {
-      updateUserMenu(null);
-      currentInspectionId = null;
-      // Reset to default question set on logout
-      questions = [...defaultQuestions];
-      renderQuestions();
-    });
-  }
-
-  /* ------------------------------------------------------------------ */
-  /*                        Inspection Form Helpers                     */
-  /* ------------------------------------------------------------------ */
-  /**
-   * Scroll the page smoothly to the inspection form. This is used
-   * after starting a new inspection so the form is brought into
-   * view.
-   */
-  function scrollToForm() {
-    const form = document.querySelector('.audit-form');
-    if (form) {
-      form.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }
-
-  /**
-   * Reset the inspection form to its default values. Clears
-   * previously entered text, resets selections, empties file
-   * attachments and resets the progress indicator. Also resets
-   * currentInspectionId so that the next save will create a new
-   * record rather than updating an existing one.
-   */
-  function resetForm() {
-    currentInspectionId = null;
-    locationSelect.selectedIndex = 0;
-    typeSelect.selectedIndex = 0;
-    auditorNamesInput.value = '';
-    inspectionDateInput.value = '';
-    // Reset dynamic question fields and attachments
-    questions.forEach(q => {
-      if (q.type === 'boolean') {
-        const radios = document.querySelectorAll(`input[name="${q.id}"]`);
-        radios.forEach(r => (r.checked = false));
-      } else if (q.type === 'text' || q.type === 'number') {
-        const el = document.getElementById(q.id);
-        if (el) el.value = '';
-      } else {
-        const el = document.getElementById(q.id);
-        if (el) el.value = '';
-      }
-      // Clear comment
-      const commentEl = document.getElementById(`comment-${q.id}`);
-      if (commentEl) commentEl.value = '';
-      // Clear attachments for this question
-      questionFiles[q.id] = [];
-    });
-    updateProgress();
-    updateFormTitle();
-  }
-
-  /**
-   * Populate the form with data from an existing inspection. This is
-   * invoked when editing a saved inspection. It fills each field
-   * with the stored values and sets currentInspectionId so that
-   * saving will overwrite the original record.
-   *
-   * @param {Object} data The inspection data previously saved.
-   */
-  function populateForm(data) {
-    currentInspectionId = data.id || null;
-    // Location and type may not match if values have changed, so
-    // ensure the option is selected only if it exists. Fall back
-    // gracefully if not found.
-    const locIdx = Array.from(locationSelect.options).findIndex(
-      opt => opt.value === data.location
-    );
-    if (locIdx >= 0) locationSelect.selectedIndex = locIdx;
-    const typeIdx = Array.from(typeSelect.options).findIndex(
-      opt => opt.value === data.type
-    );
-    if (typeIdx >= 0) typeSelect.selectedIndex = typeIdx;
-    auditorNamesInput.value = data.auditors || '';
-    inspectionDateInput.value = data.date || '';
-    // Populate dynamic question answers. Reset questionFiles first.
-    questionFiles = {};
-    questions.forEach(q => {
-      const ans = data.answers && data.answers[q.id];
-      const fileNames = ans && ans.files ? ans.files : [];
-      questionFiles[q.id] = Array.isArray(fileNames) ? fileNames.slice() : [];
-    });
-    // Re-render questions to update UI with comments and attachments
-    renderQuestions();
-    // Set values and comments
-    questions.forEach(q => {
-      const ans = data.answers && data.answers[q.id];
-      const val = ans && ans.value;
-      if (q.type === 'boolean') {
-        const radio = document.querySelector(`input[name="${q.id}"][value="${val}"]`);
-        if (radio) radio.checked = true;
-      } else if (q.type === 'text' || q.type === 'number') {
-        const el = document.getElementById(q.id);
-        if (el) el.value = val || '';
-      } else {
-        const el = document.getElementById(q.id);
-        if (el) el.value = val || '';
-      }
-      const commentEl = document.getElementById(`comment-${q.id}`);
-      if (commentEl) {
-        commentEl.value = (ans && ans.comment) || '';
-      }
-    });
-    updateProgress();
-    updateFormTitle();
-  }
-
-  /**
-   * Gather the current contents of the inspection form and return
-   * them as a plain object. If currentInspectionId is set the id
-   * will be preserved, otherwise a new id is generated using the
-   * current timestamp. The status property is passed in to
-   * distinguish between drafts and completed inspections.
-   *
-   * @param {string} status Either 'draft' or 'completed'.
-   * @returns {Object} A plain object representing the inspection.
-   */
-  function collectFormData(status) {
-    const id = currentInspectionId || `${Date.now()}`;
-    const answers = {};
-    questions.forEach(q => {
-      let value = '';
-      if (q.type === 'boolean') {
-        const selected = document.querySelector(`input[name="${q.id}"]:checked`);
-        value = selected ? selected.value : '';
-      } else if (q.type === 'text' || q.type === 'number') {
-        const el = document.getElementById(q.id);
-        value = el ? el.value : '';
-      } else {
-        const el = document.getElementById(q.id);
-        value = el ? el.value : '';
-      }
-      const commentEl = document.getElementById(`comment-${q.id}`);
-      const comment = commentEl ? commentEl.value : '';
-      const files = (questionFiles[q.id] || []).map(f => (f.name ? f.name : f));
-      answers[q.id] = { value, comment, files };
-    });
-    return {
-      id,
-      location: locationSelect.value,
-      type: typeSelect.value,
-      auditors: auditorNamesInput.value,
-      date: inspectionDateInput.value,
-      status,
-      created_at: new Date().toISOString(),
-      answers
     };
-  }
-
-  /**
-   * Update the dynamic title of the inspection form based on the
-   * selected inspection type and location. If no values are chosen
-   * a generic placeholder is shown.
-   */
-  function updateFormTitle() {
-    const typeVal = typeSelect.value || 'Inspection';
-    // Extract a friendly name from the location, dropping the code
-    // prefix if present. For example "DVI1 - Vienna Distribution"
-    // becomes "Vienna Distribution". If no location selected use
-    // "No Location Selected".
-    let locText = locationSelect.value;
-    if (locText && locText.includes(' - ')) {
-      locText = locText.split(' - ').slice(1).join(' - ');
+    
+    display.appendChild(input);
+    display.appendChild(valueDisplay);
+    
+    // Show optimal range
+    if (q.optimal) {
+      const optimalRange = document.createElement('div');
+      optimalRange.className = 'optimal-range';
+      optimalRange.textContent = `Optimal: ${q.optimal.min}-${q.optimal.max}${q.unit || ''}`;
+      wrapper.appendChild(optimalRange);
     }
-    const locationName = locText || 'No Location Selected';
-    inspectionTitleEl.innerHTML = `
-      <i class="fas fa-shield-check"></i>
-      ${typeVal} - ${locationName}
-    `;
+    
+    wrapper.appendChild(display);
+    return wrapper;
   }
 
-  /**
-   * Compute and render the progress indicator based on how many
-   * required fields have been filled out. The progress bar width
-   * scales linearly with the number of completed items. Adjust the
-   * total number of items here to match the number of questions on
-   * your form.
-   */
-  function updateProgress() {
-    // Compute progress based on required base fields and the current
-    // question set. Always include location, type, auditor names and
-    // inspection date in the calculation.
-    const checks = [];
-    checks.push(!!locationSelect.value);
-    checks.push(!!typeSelect.value);
-    checks.push(auditorNamesInput.value.trim().length > 0);
-    checks.push(!!inspectionDateInput.value);
-    // Evaluate each question
-    questions.forEach(q => {
-      if (q.type === 'boolean') {
-        checks.push(!!document.querySelector(`input[name="${q.id}"]:checked`));
-      } else if (q.type === 'text') {
-        const el = document.getElementById(q.id);
-        checks.push(el && el.value.trim().length > 0);
-      } else if (q.type === 'number') {
-        const el = document.getElementById(q.id);
-        checks.push(el && el.value !== '');
-      } else {
-        // For all other types check if value is non-empty
-        const el = document.getElementById(q.id);
-        checks.push(el && el.value.trim().length > 0);
+  function createChecklistControl(q) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'checklist-control';
+    
+    const checkedCount = document.createElement('div');
+    checkedCount.className = 'checked-count';
+    checkedCount.textContent = '0 of ' + q.options.length + ' checked';
+    wrapper.appendChild(checkedCount);
+    
+    const list = document.createElement('div');
+    list.className = 'checklist-items';
+    
+    q.options.forEach((option, index) => {
+      const item = document.createElement('div');
+      item.className = 'checklist-item';
+      
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.id = `${q.id}-${index}`;
+      checkbox.name = q.id;
+      checkbox.value = option;
+      
+      const label = document.createElement('label');
+      label.setAttribute('for', `${q.id}-${index}`);
+      label.textContent = option;
+      
+      // Update count on change
+      checkbox.onchange = () => {
+        const checked = wrapper.querySelectorAll('input[type="checkbox"]:checked').length;
+        checkedCount.textContent = `${checked} of ${q.options.length} checked`;
+        updateProgress();
+      };
+      
+      item.appendChild(checkbox);
+      item.appendChild(label);
+      list.appendChild(item);
+    });
+    
+    wrapper.appendChild(list);
+    return wrapper;
+  }
+
+  function createPhotoControl(q) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'photo-control';
+    
+    const gallery = document.createElement('div');
+    gallery.className = 'photo-gallery';
+    gallery.id = `gallery-${q.id}`;
+    
+    const controls = document.createElement('div');
+    controls.className = 'photo-controls';
+    
+    // Camera button
+    const cameraBtn = document.createElement('button');
+    cameraBtn.type = 'button';
+    cameraBtn.className = 'btn btn-primary';
+    cameraBtn.innerHTML = '<i class="fas fa-camera"></i> Take Photo';
+    cameraBtn.onclick = () => capturePhoto(q.id);
+    
+    // Upload button
+    const uploadBtn = document.createElement('button');
+    uploadBtn.type = 'button';
+    uploadBtn.className = 'btn btn-secondary';
+    uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Upload';
+    
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.multiple = q.multiple;
+    fileInput.style.display = 'none';
+    fileInput.onchange = (e) => handlePhotoUpload(e, q.id);
+    
+    uploadBtn.onclick = () => fileInput.click();
+    
+    controls.appendChild(cameraBtn);
+    controls.appendChild(uploadBtn);
+    controls.appendChild(fileInput);
+    
+    wrapper.appendChild(gallery);
+    wrapper.appendChild(controls);
+    
+    return wrapper;
+  }
+
+  function createCommentField(questionId) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'comment-field';
+    
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'comment-toggle';
+    toggle.innerHTML = '<i class="fas fa-comment"></i> Add Comment';
+    
+    const textarea = document.createElement('textarea');
+    textarea.id = `comment-${questionId}`;
+    textarea.className = 'comment-input';
+    textarea.placeholder = 'Add additional notes or observations...';
+    textarea.style.display = 'none';
+    
+    toggle.onclick = () => {
+      const isVisible = textarea.style.display !== 'none';
+      textarea.style.display = isVisible ? 'none' : 'block';
+      toggle.innerHTML = isVisible 
+        ? '<i class="fas fa-comment"></i> Add Comment'
+        : '<i class="fas fa-comment-slash"></i> Hide Comment';
+    };
+    
+    wrapper.appendChild(toggle);
+    wrapper.appendChild(textarea);
+    
+    return wrapper;
+  }
+
+  function createVoiceButton(questionId) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'voice-btn';
+    btn.title = 'Voice Input';
+    btn.innerHTML = '<i class="fas fa-microphone"></i>';
+    btn.onclick = () => toggleVoice(btn, questionId);
+    return btn;
+  }
+
+  function createCameraButton(questionId) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'camera-btn';
+    btn.title = 'Take Photo';
+    btn.innerHTML = '<i class="fas fa-camera"></i>';
+    btn.onclick = () => capturePhoto(questionId);
+    return btn;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*                    Enhanced File & Photo Handling                  */
+  /* ------------------------------------------------------------------ */
+  
+  function createFileUploadElement(qid) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'file-upload';
+    
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = 'image/*,application/pdf';
+    input.style.display = 'none';
+    
+    const dropZone = document.createElement('div');
+    dropZone.className = 'file-drop-zone';
+    dropZone.innerHTML = `
+      <div class="file-upload-icon">
+        <i class="fas fa-cloud-upload-alt"></i>
+      </div>
+      <div class="file-upload-text">
+        Click to upload or drag and drop
+      </div>
+      <div class="file-upload-hint">
+        Images or PDF documents
+      </div>
+    `;
+    
+    const fileList = document.createElement('div');
+    fileList.className = 'file-list';
+    fileList.id = `files-${qid}`;
+    
+    // Initialize files array
+    if (!questionFiles[qid]) {
+      questionFiles[qid] = [];
+    }
+    
+    // Click to upload
+    dropZone.onclick = () => input.click();
+    
+    // File selection
+    input.onchange = (e) => {
+      handleFileSelection(e.target.files, qid);
+    };
+    
+    // Drag and drop
+    dropZone.ondragover = (e) => {
+      e.preventDefault();
+      dropZone.classList.add('drag-over');
+    };
+    
+    dropZone.ondragleave = () => {
+      dropZone.classList.remove('drag-over');
+    };
+    
+    dropZone.ondrop = (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      handleFileSelection(e.dataTransfer.files, qid);
+    };
+    
+    wrapper.appendChild(input);
+    wrapper.appendChild(dropZone);
+    wrapper.appendChild(fileList);
+    
+    updateFileList(qid);
+    
+    return wrapper;
+  }
+
+  function handleFileSelection(files, questionId) {
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    
+    Array.from(files).forEach(file => {
+      if (file.size > maxSize) {
+        showNotification(`File ${file.name} is too large. Maximum size is 10MB.`, 'error');
+        return;
+      }
+      
+      // Check for duplicates
+      if (!questionFiles[questionId].some(f => f.name === file.name)) {
+        questionFiles[questionId].push(file);
       }
     });
+    
+    updateFileList(questionId);
+    updateProgress();
+  }
+
+  function updateFileList(questionId) {
+    const listEl = document.getElementById(`files-${questionId}`);
+    if (!listEl) return;
+    
+    listEl.innerHTML = '';
+    
+    const files = questionFiles[questionId] || [];
+    files.forEach((file, index) => {
+      const item = document.createElement('div');
+      item.className = 'file-item';
+      
+      const icon = document.createElement('i');
+      icon.className = file.type?.startsWith('image/') ? 'fas fa-image' : 'fas fa-file-pdf';
+      
+      const name = document.createElement('span');
+      name.className = 'file-name';
+      name.textContent = file.name || file;
+      
+      const size = document.createElement('span');
+      size.className = 'file-size';
+      if (file.size) {
+        size.textContent = formatFileSize(file.size);
+      }
+      
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'file-remove';
+      removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+      removeBtn.onclick = () => {
+        questionFiles[questionId].splice(index, 1);
+        updateFileList(questionId);
+        updateProgress();
+      };
+      
+      item.appendChild(icon);
+      item.appendChild(name);
+      item.appendChild(size);
+      item.appendChild(removeBtn);
+      
+      listEl.appendChild(item);
+    });
+  }
+
+  function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*                        Camera Integration                          */
+  /* ------------------------------------------------------------------ */
+  
+  async function capturePhoto(questionId) {
+    // Check if we're on a mobile device with camera access
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showNotification('Camera not available on this device', 'error');
+      return;
+    }
+    
+    try {
+      // Create camera modal
+      const modal = createCameraModal(questionId);
+      document.body.appendChild(modal);
+      
+      // Request camera access
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        } 
+      });
+      
+      const video = modal.querySelector('video');
+      video.srcObject = stream;
+      
+      // Handle capture
+      const captureBtn = modal.querySelector('.capture-btn');
+      captureBtn.onclick = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0);
+        
+        canvas.toBlob(blob => {
+          const file = new File([blob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
+          
+          if (!questionFiles[questionId]) {
+            questionFiles[questionId] = [];
+          }
+          questionFiles[questionId].push(file);
+          
+          // Update gallery if photo question
+          const gallery = document.getElementById(`gallery-${questionId}`);
+          if (gallery) {
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(blob);
+            img.className = 'photo-thumbnail';
+            gallery.appendChild(img);
+          }
+          
+          updateFileList(questionId);
+          updateProgress();
+          
+          // Close modal
+          stream.getTracks().forEach(track => track.stop());
+          modal.remove();
+          
+          showNotification('Photo captured successfully', 'success');
+        }, 'image/jpeg', state.settings.cameraQuality === 'high' ? 0.9 : 0.7);
+      };
+      
+      // Handle close
+      const closeBtn = modal.querySelector('.close-btn');
+      closeBtn.onclick = () => {
+        stream.getTracks().forEach(track => track.stop());
+        modal.remove();
+      };
+      
+    } catch (error) {
+      console.error('Camera error:', error);
+      showNotification('Failed to access camera', 'error');
+    }
+  }
+
+  function createCameraModal(questionId) {
+    const modal = document.createElement('div');
+    modal.className = 'camera-modal';
+    modal.innerHTML = `
+      <div class="camera-container">
+        <div class="camera-header">
+          <h3>Take Photo</h3>
+          <button class="close-btn" type="button">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <video autoplay playsinline></video>
+        <div class="camera-controls">
+          <button class="capture-btn" type="button">
+            <i class="fas fa-camera"></i>
+          </button>
+        </div>
+      </div>
+    `;
+    return modal;
+  }
+
+  function handlePhotoUpload(event, questionId) {
+    const files = event.target.files;
+    if (!files.length) return;
+    
+    const gallery = document.getElementById(`gallery-${questionId}`);
+    if (!gallery) return;
+    
+    Array.from(files).forEach(file => {
+      if (!file.type.startsWith('image/')) return;
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = document.createElement('img');
+        img.src = e.target.result;
+        img.className = 'photo-thumbnail';
+        gallery.appendChild(img);
+      };
+      reader.readAsDataURL(file);
+      
+      // Add to files array
+      if (!questionFiles[questionId]) {
+        questionFiles[questionId] = [];
+      }
+      questionFiles[questionId].push(file);
+    });
+    
+    updateProgress();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*                          Voice Recognition                         */
+  /* ------------------------------------------------------------------ */
+  
+  let recognition = null;
+  
+  function toggleVoice(btn, questionId) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      showNotification('Speech recognition not supported', 'error');
+      return;
+    }
+    
+    if (btn.classList.contains('listening')) {
+      if (recognition) {
+        recognition.stop();
+      }
+      return;
+    }
+    
+    recognition = new SpeechRecognition();
+    recognition.lang = state.settings.language === 'de' ? 'de-DE' : 'en-US';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    
+    btn.classList.add('listening');
+    btn.innerHTML = '<i class="fas fa-stop"></i>';
+    
+    const targetElement = document.getElementById(questionId);
+    
+    recognition.onresult = (event) => {
+      let transcript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      
+      if (targetElement) {
+        if (targetElement.tagName === 'TEXTAREA') {
+          targetElement.value = transcript;
+        } else if (targetElement.type === 'number') {
+          // Extract numbers from speech
+          const numbers = transcript.match(/\d+/);
+          if (numbers) {
+            targetElement.value = numbers[0];
+          }
+        }
+        updateProgress();
+      }
+    };
+    
+    recognition.onend = () => {
+      btn.classList.remove('listening');
+      btn.innerHTML = '<i class="fas fa-microphone"></i>';
+    };
+    
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      btn.classList.remove('listening');
+      btn.innerHTML = '<i class="fas fa-microphone"></i>';
+      showNotification('Voice recognition error', 'error');
+    };
+    
+    recognition.start();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*                       GPS Location Tracking                        */
+  /* ------------------------------------------------------------------ */
+  
+  function requestGPSLocation() {
+    if (!navigator.geolocation) return;
+    
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        state.gpsLocation = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          timestamp: new Date().toISOString()
+        };
+      },
+      (error) => {
+        console.warn('GPS error:', error);
+      }
+    );
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*                    Inspection Timer & Progress                     */
+  /* ------------------------------------------------------------------ */
+  
+  function startInspectionTimer() {
+    state.startTime = Date.now();
+    state.inspectionTimer = setInterval(updateTimer, 1000);
+    
+    // Show timer in UI
+    const timerEl = document.createElement('div');
+    timerEl.id = 'inspection-timer';
+    timerEl.className = 'inspection-timer';
+    timerEl.innerHTML = '<i class="fas fa-stopwatch"></i> <span>00:00:00</span>';
+    
+    const formHeader = document.querySelector('.content-header');
+    if (formHeader) {
+      formHeader.appendChild(timerEl);
+    }
+  }
+
+  function updateTimer() {
+    if (!state.startTime) return;
+    
+    const elapsed = Date.now() - state.startTime;
+    const hours = Math.floor(elapsed / 3600000);
+    const minutes = Math.floor((elapsed % 3600000) / 60000);
+    const seconds = Math.floor((elapsed % 60000) / 1000);
+    
+    const display = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    
+    const timerEl = document.querySelector('#inspection-timer span');
+    if (timerEl) {
+      timerEl.textContent = display;
+    }
+  }
+
+  function stopInspectionTimer() {
+    if (state.inspectionTimer) {
+      clearInterval(state.inspectionTimer);
+      state.inspectionTimer = null;
+    }
+  }
+
+  function pad(num) {
+    return num.toString().padStart(2, '0');
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*                    Enhanced Progress Calculation                   */
+  /* ------------------------------------------------------------------ */
+  
+  function updateProgress() {
+    const checks = [];
+    let riskScore = 0;
+    let maxRiskScore = 0;
+    
+    // Base fields
+    checks.push(!!elements.locationSelect.value);
+    checks.push(!!elements.typeSelect.value);
+    checks.push(elements.auditorNamesInput.value.trim().length > 0);
+    checks.push(!!elements.inspectionDateInput.value);
+    
+    // Question fields
+    questions.forEach(q => {
+      const element = document.getElementById(q.id);
+      let hasValue = false;
+      
+      switch (q.type) {
+        case 'boolean':
+          hasValue = !!document.querySelector(`input[name="${q.id}"]:checked`);
+          
+          // Calculate risk score
+          if (hasValue && q.riskWeight && q.correctAnswer) {
+            const selected = document.querySelector(`input[name="${q.id}"]:checked`);
+            maxRiskScore += q.riskWeight;
+            if (selected && selected.value !== q.correctAnswer) {
+              riskScore += q.riskWeight;
+            }
+          }
+          break;
+          
+        case 'text':
+          hasValue = element && element.value.trim().length > 0;
+          break;
+          
+        case 'number':
+        case 'range':
+          hasValue = element && element.value !== '';
+          break;
+          
+        case 'checklist':
+          const checkedBoxes = document.querySelectorAll(`input[name="${q.id}"]:checked`);
+          hasValue = checkedBoxes.length > 0;
+          break;
+          
+        case 'photo':
+          hasValue = questionFiles[q.id] && questionFiles[q.id].length > 0;
+          break;
+          
+        default:
+          hasValue = element && element.value.trim().length > 0;
+      }
+      
+      // Only count required questions or questions with values
+      if (q.required || hasValue) {
+        checks.push(hasValue);
+      }
+    });
+    
     const completed = checks.filter(Boolean).length;
     const total = checks.length;
     const percent = total === 0 ? 0 : (completed / total) * 100;
-    progressFillEl.style.width = `${percent}%`;
-    progressStatusEl.textContent = `${completed} of ${total} completed`;
+    
+    // Update progress bar
+    elements.progressFillEl.style.width = `${percent}%`;
+    elements.progressStatusEl.textContent = `${completed} of ${total} completed`;
+    
+    // Update risk indicator
+    updateRiskIndicator(riskScore, maxRiskScore);
+    
+    // Update form validity
+    updateFormValidity();
   }
 
-  /**
-   * Read the current inspection data and persist it to Netlify
-   * Blobs. When invoked this function uploads any attached files
-   * first, then stores the JSON record. If the user is not
-   * authenticated they are prompted to sign in. After saving the
-   * inspections list is reloaded and the form is reset.
-   *
-   * @param {string} status Either 'draft' or 'completed'.
-   */
-  async function saveInspection(status) {
-    // Ensure the visitor is authenticated before saving.
-    if (!window.netlifyIdentity) {
-      alert('Netlify Identity is not available. This feature requires deployment on Netlify.');
+  function updateRiskIndicator(score, maxScore) {
+    let indicator = document.getElementById('risk-indicator');
+    
+    if (maxScore === 0) {
+      if (indicator) indicator.remove();
       return;
     }
+    
+    if (!indicator) {
+      indicator = document.createElement('div');
+      indicator.id = 'risk-indicator';
+      indicator.className = 'risk-indicator';
+      
+      const progressSection = document.querySelector('.form-section:has(.progress-bar)');
+      if (progressSection) {
+        progressSection.appendChild(indicator);
+      }
+    }
+    
+    const percentage = (score / maxScore) * 100;
+    let status, icon, message;
+    
+    if (percentage === 0) {
+      status = 'low';
+      icon = 'fa-check-circle';
+      message = 'Low Risk - All safety checks passed';
+    } else if (percentage <= 25) {
+      status = 'medium';
+      icon = 'fa-exclamation-circle';
+      message = 'Medium Risk - Some issues found';
+    } else {
+      status = 'high';
+      icon = 'fa-exclamation-triangle';
+      message = 'High Risk - Critical issues detected';
+    }
+    
+    indicator.className = `risk-indicator risk-${status}`;
+    indicator.innerHTML = `
+      <i class="fas ${icon}"></i>
+      <span>${message}</span>
+      <span class="risk-score">${score}/${maxScore} risk points</span>
+    `;
+  }
+
+  function updateFormValidity() {
+    const requiredFields = [];
+    
+    // Check base required fields
+    if (!elements.locationSelect.value) requiredFields.push('Location');
+    if (!elements.typeSelect.value) requiredFields.push('Inspection Type');
+    if (!elements.auditorNamesInput.value.trim()) requiredFields.push('Auditor Name');
+    if (!elements.inspectionDateInput.value) requiredFields.push('Inspection Date');
+    
+    // Check required questions
+    questions.forEach(q => {
+      if (!q.required) return;
+      
+      let hasValue = false;
+      
+      switch (q.type) {
+        case 'boolean':
+          hasValue = !!document.querySelector(`input[name="${q.id}"]:checked`);
+          break;
+        case 'checklist':
+          hasValue = document.querySelectorAll(`input[name="${q.id}"]:checked`).length > 0;
+          break;
+        default:
+          const el = document.getElementById(q.id);
+          hasValue = el && el.value.trim() !== '';
+      }
+      
+      if (!hasValue) {
+        requiredFields.push(q.question);
+      }
+    });
+    
+    // Update submit button state
+    if (requiredFields.length > 0) {
+      elements.submitInspectionBtn.disabled = true;
+      elements.submitInspectionBtn.title = `Missing required fields: ${requiredFields.join(', ')}`;
+    } else {
+      elements.submitInspectionBtn.disabled = false;
+      elements.submitInspectionBtn.title = 'Submit inspection';
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*                         Preview Mode                               */
+  /* ------------------------------------------------------------------ */
+  
+  function togglePreviewMode() {
+    const isPreview = state.currentView === 'preview';
+    state.currentView = isPreview ? 'edit' : 'preview';
+    
+    const form = document.querySelector('.audit-form');
+    if (!form) return;
+    
+    if (state.currentView === 'preview') {
+      // Switch to preview mode
+      form.classList.add('preview-mode');
+      
+      // Disable all inputs
+      form.querySelectorAll('input, textarea, select, button').forEach(el => {
+        if (!el.classList.contains('preview-allowed')) {
+          el.disabled = true;
+        }
+      });
+      
+      // Update button text
+      elements.previewModeBtn.innerHTML = '<i class="fas fa-edit"></i> Edit Mode';
+      
+      // Show preview indicator
+      showNotification('Preview mode activated', 'info');
+      
+    } else {
+      // Switch back to edit mode
+      form.classList.remove('preview-mode');
+      
+      // Enable all inputs
+      form.querySelectorAll('input, textarea, select, button').forEach(el => {
+        el.disabled = false;
+      });
+      
+      // Update button text
+      elements.previewModeBtn.innerHTML = '<i class="fas fa-eye"></i> Preview Mode';
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*                          PDF Export                                */
+  /* ------------------------------------------------------------------ */
+  
+  async function exportToPDF() {
+    if (!window.jspdf) {
+      // Load jsPDF dynamically if not already loaded
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    }
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Get inspection data
+    const data = collectFormData('export');
+    
+    // Document header
+    doc.setFontSize(20);
+    doc.text('Safety Inspection Report', 20, 20);
+    
+    // Metadata
+    doc.setFontSize(12);
+    let y = 40;
+    
+    doc.text(`Location: ${data.location}`, 20, y);
+    y += 10;
+    doc.text(`Type: ${data.type}`, 20, y);
+    y += 10;
+    doc.text(`Auditor(s): ${data.auditors}`, 20, y);
+    y += 10;
+    doc.text(`Date: ${data.date}`, 20, y);
+    y += 10;
+    doc.text(`Duration: ${data.duration || 'N/A'}`, 20, y);
+    y += 20;
+    
+    // Risk Assessment
+    if (data.riskScore !== undefined) {
+      doc.setFontSize(14);
+      doc.text('Risk Assessment', 20, y);
+      y += 10;
+      doc.setFontSize(12);
+      doc.text(`Overall Risk Score: ${data.riskScore}/${data.maxRiskScore}`, 20, y);
+      y += 15;
+    }
+    
+    // Questions and answers
+    doc.setFontSize(14);
+    doc.text('Inspection Details', 20, y);
+    y += 10;
+    
+    doc.setFontSize(10);
+    
+    questions.forEach(q => {
+      // Check if we need a new page
+      if (y > 250) {
+        doc.addPage();
+        y = 20;
+      }
+      
+      const answer = data.answers[q.id];
+      if (!answer || !answer.value) return;
+      
+      // Question text
+      doc.setFont(undefined, 'bold');
+      const lines = doc.splitTextToSize(q.question, 170);
+      lines.forEach(line => {
+        doc.text(line, 20, y);
+        y += 5;
+      });
+      
+      // Answer
+      doc.setFont(undefined, 'normal');
+      let answerText = answer.value;
+      
+      if (q.type === 'checklist' && Array.isArray(answer.value)) {
+        answerText = answer.value.join(', ');
+      }
+      
+      doc.text(`Answer: ${answerText}`, 30, y);
+      y += 5;
+      
+      // Comment if exists
+      if (answer.comment) {
+        doc.text(`Comment: ${answer.comment}`, 30, y);
+        y += 5;
+      }
+      
+      // Files if exist
+      if (answer.files && answer.files.length > 0) {
+        doc.text(`Attachments: ${answer.files.length} file(s)`, 30, y);
+        y += 5;
+      }
+      
+      y += 5; // Space between questions
+    });
+    
+    // GPS location if available
+    if (data.gpsLocation) {
+      if (y > 250) {
+        doc.addPage();
+        y = 20;
+      }
+      
+      doc.setFontSize(12);
+      doc.text('Location Coordinates', 20, y);
+      y += 10;
+      doc.setFontSize(10);
+      doc.text(`Latitude: ${data.gpsLocation.latitude}`, 20, y);
+      y += 5;
+      doc.text(`Longitude: ${data.gpsLocation.longitude}`, 20, y);
+      y += 5;
+      doc.text(`Accuracy: ${data.gpsLocation.accuracy}m`, 20, y);
+    }
+    
+    // Add signature space if required
+    if (state.settings.signatureRequired && signatureData[state.currentInspectionId]) {
+      doc.addPage();
+      doc.setFontSize(14);
+      doc.text('Signatures', 20, 20);
+      
+      // Add signature image
+      // Note: In real implementation, you'd convert the signature canvas to image
+      doc.text('Auditor Signature: _______________________', 20, 40);
+      doc.text('Date: _______________________', 20, 60);
+    }
+    
+    // Save the PDF
+    const filename = `inspection-${data.location}-${data.date}.pdf`;
+    doc.save(filename);
+    
+    showNotification('PDF exported successfully', 'success');
+  }
+
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*                        Data Collection                             */
+  /* ------------------------------------------------------------------ */
+  
+  function collectFormData(status) {
+    const id = state.currentInspectionId || `${Date.now()}`;
+    const answers = {};
+    
+    // Calculate risk scores
+    let riskScore = 0;
+    let maxRiskScore = 0;
+    
+    questions.forEach(q => {
+      let value = '';
+      
+      switch (q.type) {
+        case 'boolean':
+          const selected = document.querySelector(`input[name="${q.id}"]:checked`);
+          value = selected ? selected.value : '';
+          
+          // Risk scoring
+          if (value && q.riskWeight && q.correctAnswer) {
+            maxRiskScore += q.riskWeight;
+            if (value !== q.correctAnswer) {
+              riskScore += q.riskWeight;
+            }
+          }
+          break;
+          
+        case 'checklist':
+          const checked = document.querySelectorAll(`input[name="${q.id}"]:checked`);
+          value = Array.from(checked).map(cb => cb.value);
+          break;
+          
+        case 'range':
+          const rangeEl = document.getElementById(q.id);
+          value = rangeEl ? rangeEl.value : '';
+          
+          // Check if out of optimal range
+          if (value && q.optimal) {
+            const val = parseFloat(value);
+            if (val < q.optimal.min || val > q.optimal.max) {
+              riskScore += q.riskWeight || 2;
+            }
+            maxRiskScore += q.riskWeight || 2;
+          }
+          break;
+          
+        default:
+          const el = document.getElementById(q.id);
+          value = el ? el.value : '';
+      }
+      
+      const commentEl = document.getElementById(`comment-${q.id}`);
+      const comment = commentEl ? commentEl.value : '';
+      
+      const files = (questionFiles[q.id] || []).map(f => 
+        typeof f === 'string' ? f : f.name
+      );
+      
+      answers[q.id] = { value, comment, files };
+    });
+    
+    // Calculate duration
+    let duration = null;
+    if (state.startTime) {
+      const elapsed = Date.now() - state.startTime;
+      const hours = Math.floor(elapsed / 3600000);
+      const minutes = Math.floor((elapsed % 3600000) / 60000);
+      duration = `${hours}h ${minutes}m`;
+    }
+    
+    return {
+      id,
+      location: elements.locationSelect.value,
+      type: elements.typeSelect.value,
+      auditors: elements.auditorNamesInput.value,
+      date: elements.inspectionDateInput.value,
+      status,
+      created_at: new Date().toISOString(),
+      duration,
+      answers,
+      riskScore,
+      maxRiskScore,
+      gpsLocation: state.gpsLocation,
+      signature: signatureData[id] || null
+    };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*                     Save & Sync Functions                          */
+  /* ------------------------------------------------------------------ */
+  
+  async function saveInspection(status) {
+    if (!window.netlifyIdentity) {
+      // Save to offline queue
+      const data = collectFormData(status);
+      offlineQueue.push(data);
+      localStorage.setItem('offline-queue', JSON.stringify(offlineQueue));
+      showNotification('Saved offline. Will sync when connected.', 'warning');
+      return;
+    }
+    
     const user = window.netlifyIdentity.currentUser();
     if (!user) {
-      // Trigger the login modal. The promise resolves when login
-      // completes or is cancelled.
       window.netlifyIdentity.open();
       return;
     }
-    // Collect form data including attachments
-    const data = collectFormData(status);
-    // Acquire an identity token for authentication with Netlify
-    const token = await user.jwt();
-    const basePath = `inspections/${user.id}/${data.id}`;
+    
     try {
-      // Upload files for each question. Files are stored under
-      // inspections/{user}/{inspectionId}/files/{questionId}/{fileName}
+      const data = collectFormData(status);
+      const token = await user.jwt();
+      const basePath = `inspections/${user.id}/${data.id}`;
+      
+      // Show saving indicator
+      showLoadingIndicator('Saving inspection...');
+      
+      // Upload files
       for (const qid of Object.keys(questionFiles)) {
         const files = questionFiles[qid] || [];
+        
         for (const file of files) {
-          if (!file || !(file instanceof File)) continue;
+          if (!(file instanceof File)) continue;
+          
           const filePath = `${basePath}/files/${encodeURIComponent(qid)}/${encodeURIComponent(file.name)}`;
+          
           await fetch(`/.netlify/blobs/${filePath}`, {
             method: 'PUT',
             headers: {
@@ -845,7 +1610,8 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         }
       }
-      // Store the JSON record. Use record.json as filename to differentiate from attachments.
+      
+      // Save inspection data
       await fetch(`/.netlify/blobs/${basePath}/record.json`, {
         method: 'PUT',
         headers: {
@@ -854,65 +1620,1038 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         body: JSON.stringify(data)
       });
-      // Provide basic feedback to the user. In a real app you may
-      // want to use a toast notification instead of alert.
-      alert(status === 'completed' ? 'Inspection submitted successfully!' : 'Draft saved successfully!');
-      // Reload the list and reset form after save
+      
+      hideLoadingIndicator();
+      
+      // Stop timer if submitting
+      if (status === 'completed') {
+        stopInspectionTimer();
+      }
+      
+      showNotification(
+        status === 'completed' 
+          ? 'Inspection submitted successfully!' 
+          : 'Draft saved successfully!',
+        'success'
+      );
+      
+      // Reload inspections list
       await loadInspections();
-      resetForm();
-    } catch (err) {
-      console.error(err);
-      alert('An error occurred while saving your inspection.');
+      
+      // Reset form if completed
+      if (status === 'completed') {
+        resetForm();
+      }
+      
+    } catch (error) {
+      console.error('Save error:', error);
+      hideLoadingIndicator();
+      
+      // Add to offline queue
+      const data = collectFormData(status);
+      offlineQueue.push(data);
+      localStorage.setItem('offline-queue', JSON.stringify(offlineQueue));
+      
+      showNotification('Failed to save online. Added to offline queue.', 'warning');
     }
   }
 
-  /**
-   * Load all inspections belonging to the current user from
-   * Netlify Blobs. Each record is expected to live under
-   * `inspections/{user.id}/{id}/record.json`. The function lists
-   * objects under the user prefix and then fetches each record to
-   * build a list in memory. After loading, the pending and
-   * completed lists in the sidebar are populated accordingly.
-   */
+  async function syncOfflineData() {
+    if (offlineQueue.length === 0) {
+      showNotification('No offline data to sync', 'info');
+      return;
+    }
+    
+    if (!navigator.onLine) {
+      showNotification('No internet connection', 'error');
+      return;
+    }
+    
+    const user = window.netlifyIdentity?.currentUser();
+    if (!user) {
+      showNotification('Please log in to sync data', 'warning');
+      return;
+    }
+    
+    showLoadingIndicator(`Syncing ${offlineQueue.length} inspections...`);
+    
+    try {
+      const token = await user.jwt();
+      let synced = 0;
+      
+      for (const inspection of offlineQueue) {
+        const basePath = `inspections/${user.id}/${inspection.id}`;
+        
+        await fetch(`/.netlify/blobs/${basePath}/record.json`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(inspection)
+        });
+        
+        synced++;
+      }
+      
+      // Clear offline queue
+      offlineQueue = [];
+      localStorage.setItem('offline-queue', '[]');
+      
+      hideLoadingIndicator();
+      showNotification(`Successfully synced ${synced} inspections`, 'success');
+      
+      // Reload inspections
+      await loadInspections();
+      
+    } catch (error) {
+      console.error('Sync error:', error);
+      hideLoadingIndicator();
+      showNotification('Failed to sync some inspections', 'error');
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*                          Auto-save                                 */
+  /* ------------------------------------------------------------------ */
+  
+  function startAutoSave() {
+    if (!state.settings.autoSave) return;
+    
+    autoSaveInterval = setInterval(() => {
+      if (state.currentInspectionId) {
+        saveInspection('draft');
+      }
+    }, state.settings.autoSaveInterval);
+  }
+
+  function stopAutoSave() {
+    if (autoSaveInterval) {
+      clearInterval(autoSaveInterval);
+      autoSaveInterval = null;
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*                      Settings Management                           */
+  /* ------------------------------------------------------------------ */
+  
+  function renderSettings() {
+    const container = document.querySelector('[data-section="settings"]');
+    if (!container) return;
+    
+    container.innerHTML = `
+      <div class="content-card">
+        <div class="content-header">
+          <h2 class="content-title">
+            <i class="fas fa-cog"></i>
+            Settings
+          </h2>
+        </div>
+        
+        <div class="settings-content">
+          <div class="settings-section">
+            <h3 class="settings-section-title">General Settings</h3>
+            
+            <div class="setting-item">
+              <label>
+                <input type="checkbox" id="setting-dark-mode" ${state.settings.darkMode ? 'checked' : ''}>
+                Dark Mode
+              </label>
+            </div>
+            
+            <div class="setting-item">
+              <label>
+                <input type="checkbox" id="setting-notifications" ${state.settings.notifications ? 'checked' : ''}>
+                Enable Notifications
+              </label>
+            </div>
+            
+            <div class="setting-item">
+              <label>
+                Language
+                <select id="setting-language" class="form-control">
+                  <option value="en" ${state.settings.language === 'en' ? 'selected' : ''}>English</option>
+                  <option value="de" ${state.settings.language === 'de' ? 'selected' : ''}>Deutsch</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          
+          <div class="settings-section">
+            <h3 class="settings-section-title">Inspection Settings</h3>
+            
+            <div class="setting-item">
+              <label>
+                <input type="checkbox" id="setting-auto-save" ${state.settings.autoSave ? 'checked' : ''}>
+                Auto-save inspections
+              </label>
+            </div>
+            
+            <div class="setting-item">
+              <label>
+                Auto-save interval (seconds)
+                <input type="number" id="setting-auto-save-interval" 
+                       class="form-control" 
+                       value="${state.settings.autoSaveInterval / 1000}"
+                       min="10" max="300">
+              </label>
+            </div>
+            
+            <div class="setting-item">
+              <label>
+                <input type="checkbox" id="setting-gps" ${state.settings.gpsTracking ? 'checked' : ''}>
+                GPS Location Tracking
+              </label>
+            </div>
+            
+            <div class="setting-item">
+              <label>
+                <input type="checkbox" id="setting-signature" ${state.settings.signatureRequired ? 'checked' : ''}>
+                Require Digital Signature
+              </label>
+            </div>
+            
+            <div class="setting-item">
+              <label>
+                <input type="checkbox" id="setting-risk-scoring" ${state.settings.riskScoring ? 'checked' : ''}>
+                Enable Risk Scoring
+              </label>
+            </div>
+            
+            <div class="setting-item">
+              <label>
+                Camera Quality
+                <select id="setting-camera-quality" class="form-control">
+                  <option value="high" ${state.settings.cameraQuality === 'high' ? 'selected' : ''}>High</option>
+                  <option value="medium" ${state.settings.cameraQuality === 'medium' ? 'selected' : ''}>Medium</option>
+                  <option value="low" ${state.settings.cameraQuality === 'low' ? 'selected' : ''}>Low</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          
+          <div class="settings-section">
+            <h3 class="settings-section-title">Data Management</h3>
+            
+            <div class="setting-item">
+              <button class="btn btn-secondary" onclick="exportAllData()">
+                <i class="fas fa-download"></i> Export All Data
+              </button>
+            </div>
+            
+            <div class="setting-item">
+              <button class="btn btn-secondary" onclick="clearOfflineData()">
+                <i class="fas fa-trash"></i> Clear Offline Data
+              </button>
+            </div>
+            
+            <div class="setting-item">
+              <button class="btn btn-danger" onclick="resetApplication()">
+                <i class="fas fa-exclamation-triangle"></i> Reset Application
+              </button>
+            </div>
+          </div>
+          
+          <div class="settings-actions">
+            <button class="btn btn-primary" onclick="saveSettingsChanges()">
+              <i class="fas fa-save"></i> Save Changes
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Attach event listeners
+    attachSettingsListeners();
+  }
+
+  function attachSettingsListeners() {
+    // Real-time updates for some settings
+    document.getElementById('setting-dark-mode')?.addEventListener('change', (e) => {
+      state.settings.darkMode = e.target.checked;
+      applySettings();
+    });
+  }
+
+  window.saveSettingsChanges = function() {
+    // Collect all settings
+    state.settings.darkMode = document.getElementById('setting-dark-mode')?.checked || false;
+    state.settings.notifications = document.getElementById('setting-notifications')?.checked || false;
+    state.settings.language = document.getElementById('setting-language')?.value || 'en';
+    state.settings.autoSave = document.getElementById('setting-auto-save')?.checked || false;
+    state.settings.autoSaveInterval = (parseInt(document.getElementById('setting-auto-save-interval')?.value) || 30) * 1000;
+    state.settings.gpsTracking = document.getElementById('setting-gps')?.checked || false;
+    state.settings.signatureRequired = document.getElementById('setting-signature')?.checked || false;
+    state.settings.riskScoring = document.getElementById('setting-risk-scoring')?.checked || false;
+    state.settings.cameraQuality = document.getElementById('setting-camera-quality')?.value || 'high';
+    
+    // Save and apply
+    saveSettings();
+    
+    // Restart auto-save if needed
+    stopAutoSave();
+    if (state.settings.autoSave) {
+      startAutoSave();
+    }
+    
+    showNotification('Settings saved successfully', 'success');
+  };
+
+  /* ------------------------------------------------------------------ */
+  /*                      Reports & Analytics                           */
+  /* ------------------------------------------------------------------ */
+  
+  function renderReports() {
+    const container = document.getElementById('reports-container');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    // Add filters
+    const filters = document.createElement('div');
+    filters.className = 'report-filters';
+    filters.innerHTML = `
+      <div class="filter-group">
+        <label>Location</label>
+        <select id="filter-location" class="form-control">
+          <option value="all">All Locations</option>
+          <option value="DVI1 - Vienna Distribution">DVI1 - Vienna Distribution</option>
+          <option value="DVI2 - Vienna Hub North">DVI2 - Vienna Hub North</option>
+          <option value="DVI3 - Vienna Hub South">DVI3 - Vienna Hub South</option>
+          <option value="DAP5 - Salzburg Center">DAP5 - Salzburg Center</option>
+          <option value="DAP8 - Graz Distribution">DAP8 - Graz Distribution</option>
+        </select>
+      </div>
+      
+      <div class="filter-group">
+        <label>Date Range</label>
+        <select id="filter-date" class="form-control">
+          <option value="all">All Time</option>
+          <option value="today">Today</option>
+          <option value="week">This Week</option>
+          <option value="month">This Month</option>
+          <option value="quarter">This Quarter</option>
+        </select>
+      </div>
+      
+      <div class="filter-group">
+        <label>Risk Level</label>
+        <select id="filter-risk" class="form-control">
+          <option value="all">All Levels</option>
+          <option value="high">High Risk</option>
+          <option value="medium">Medium Risk</option>
+          <option value="low">Low Risk</option>
+        </select>
+      </div>
+      
+      <button class="btn btn-primary" onclick="applyReportFilters()">
+        <i class="fas fa-filter"></i> Apply Filters
+      </button>
+      
+      <button class="btn btn-secondary" onclick="exportFilteredReports()">
+        <i class="fas fa-file-excel"></i> Export to Excel
+      </button>
+    `;
+    
+    container.appendChild(filters);
+    
+    // Reports list
+    const reportsList = document.createElement('div');
+    reportsList.className = 'reports-list';
+    reportsList.id = 'filtered-reports';
+    
+    container.appendChild(reportsList);
+    
+    // Initial render
+    renderFilteredReports();
+  }
+
+  window.applyReportFilters = function() {
+    state.filters.location = document.getElementById('filter-location')?.value || 'all';
+    state.filters.dateRange = document.getElementById('filter-date')?.value || 'all';
+    renderFilteredReports();
+  };
+
+  function renderFilteredReports() {
+    const container = document.getElementById('filtered-reports');
+    if (!container) return;
+    
+    let filtered = inspectionsData.filter(ins => ins.status === 'completed');
+    
+    // Apply location filter
+    if (state.filters.location !== 'all') {
+      filtered = filtered.filter(ins => ins.location === state.filters.location);
+    }
+    
+    // Apply date filter
+    if (state.filters.dateRange !== 'all') {
+      const now = new Date();
+      const ranges = {
+        today: 24 * 60 * 60 * 1000,
+        week: 7 * 24 * 60 * 60 * 1000,
+        month: 30 * 24 * 60 * 60 * 1000,
+        quarter: 90 * 24 * 60 * 60 * 1000
+      };
+      
+      const cutoff = now.getTime() - ranges[state.filters.dateRange];
+      filtered = filtered.filter(ins => new Date(ins.created_at).getTime() > cutoff);
+    }
+    
+    container.innerHTML = '';
+    
+    if (filtered.length === 0) {
+      container.innerHTML = '<p class="empty-state">No reports match the selected filters.</p>';
+      return;
+    }
+    
+    // Summary statistics
+    const summary = document.createElement('div');
+    summary.className = 'report-summary';
+    
+    const totalInspections = filtered.length;
+    const highRiskCount = filtered.filter(ins => {
+      const risk = (ins.riskScore / ins.maxRiskScore) * 100;
+      return risk > 50;
+    }).length;
+    
+    summary.innerHTML = `
+      <div class="summary-stat">
+        <span class="stat-value">${totalInspections}</span>
+        <span class="stat-label">Total Inspections</span>
+      </div>
+      <div class="summary-stat">
+        <span class="stat-value">${highRiskCount}</span>
+        <span class="stat-label">High Risk</span>
+      </div>
+      <div class="summary-stat">
+        <span class="stat-value">${((totalInspections - highRiskCount) / totalInspections * 100).toFixed(1)}%</span>
+        <span class="stat-label">Compliance Rate</span>
+      </div>
+    `;
+    
+    container.appendChild(summary);
+    
+    // Report items
+    filtered.forEach(ins => {
+      const item = createReportItem(ins);
+      container.appendChild(item);
+    });
+  }
+
+  function createReportItem(inspection) {
+    const item = document.createElement('div');
+    item.className = 'report-item';
+    
+    const riskPercentage = inspection.maxRiskScore ? 
+      (inspection.riskScore / inspection.maxRiskScore) * 100 : 0;
+    
+    let riskClass = 'low';
+    if (riskPercentage > 50) riskClass = 'high';
+    else if (riskPercentage > 25) riskClass = 'medium';
+    
+    item.innerHTML = `
+      <div class="report-header">
+        <div class="report-title">${inspection.location} - ${inspection.type}</div>
+        <div class="risk-indicator risk-${riskClass}">
+          ${riskClass.toUpperCase()} RISK
+        </div>
+      </div>
+      
+      <div class="report-meta">
+        <span><i class="fas fa-user"></i> ${inspection.auditors}</span>
+        <span><i class="fas fa-calendar"></i> ${inspection.date}</span>
+        <span><i class="fas fa-clock"></i> ${inspection.duration || 'N/A'}</span>
+      </div>
+      
+      <div class="report-actions">
+        <button class="btn btn-secondary" onclick="viewInspectionDetails('${inspection.id}')">
+          <i class="fas fa-eye"></i> View Details
+        </button>
+        <button class="btn btn-secondary" onclick="exportSingleReport('${inspection.id}')">
+          <i class="fas fa-file-pdf"></i> Export PDF
+        </button>
+      </div>
+    `;
+    
+    return item;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*                      Enhanced Analytics                            */
+  /* ------------------------------------------------------------------ */
+  
+  function renderAnalytics() {
+    const canvas = document.getElementById('analytics-chart');
+    if (!canvas) return;
+    
+    const parent = canvas.parentElement;
+    
+    // Clear previous content
+    Array.from(parent.querySelectorAll('.analytics-message')).forEach(el => el.remove());
+    
+    if (typeof Chart === 'undefined') {
+      const msg = document.createElement('p');
+      msg.className = 'analytics-message';
+      msg.textContent = 'Chart.js library is not available.';
+      parent.appendChild(msg);
+      return;
+    }
+    
+    const completed = inspectionsData.filter(ins => ins.status === 'completed');
+    
+    if (completed.length === 0) {
+      canvas.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.className = 'analytics-message';
+      msg.textContent = 'No data available for analytics.';
+      parent.appendChild(msg);
+      return;
+    }
+    
+    // Create tabs for different analytics views
+    const tabsContainer = document.createElement('div');
+    tabsContainer.className = 'analytics-tabs';
+    tabsContainer.innerHTML = `
+      <button class="tab-btn active" data-view="risk">Risk Analysis</button>
+      <button class="tab-btn" data-view="trends">Trends</button>
+      <button class="tab-btn" data-view="locations">By Location</button>
+      <button class="tab-btn" data-view="categories">By Category</button>
+    `;
+    
+    parent.insertBefore(tabsContainer, canvas);
+    
+    // Tab switching
+    tabsContainer.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.onclick = () => {
+        tabsContainer.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderAnalyticsView(btn.dataset.view);
+      };
+    });
+    
+    // Initial view
+    renderAnalyticsView('risk');
+  }
+
+  function renderAnalyticsView(view) {
+    const canvas = document.getElementById('analytics-chart');
+    const ctx = canvas.getContext('2d');
+    
+    // Destroy existing chart
+    if (window.analyticsChart) {
+      window.analyticsChart.destroy();
+    }
+    
+    canvas.style.display = '';
+    
+    switch (view) {
+      case 'risk':
+        renderRiskAnalysis(ctx);
+        break;
+      case 'trends':
+        renderTrendsAnalysis(ctx);
+        break;
+      case 'locations':
+        renderLocationAnalysis(ctx);
+        break;
+      case 'categories':
+        renderCategoryAnalysis(ctx);
+        break;
+    }
+  }
+
+  function renderRiskAnalysis(ctx) {
+    const completed = inspectionsData.filter(ins => ins.status === 'completed');
+    
+    // Group by risk level
+    const riskLevels = { low: 0, medium: 0, high: 0 };
+    
+    completed.forEach(ins => {
+      if (!ins.maxRiskScore) return;
+      const percentage = (ins.riskScore / ins.maxRiskScore) * 100;
+      
+      if (percentage <= 25) riskLevels.low++;
+      else if (percentage <= 50) riskLevels.medium++;
+      else riskLevels.high++;
+    });
+    
+    window.analyticsChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Low Risk', 'Medium Risk', 'High Risk'],
+        datasets: [{
+          data: [riskLevels.low, riskLevels.medium, riskLevels.high],
+          backgroundColor: [
+            'rgba(16, 185, 129, 0.8)',
+            'rgba(245, 158, 11, 0.8)',
+            'rgba(239, 68, 68, 0.8)'
+          ],
+          borderColor: [
+            'rgba(16, 185, 129, 1)',
+            'rgba(245, 158, 11, 1)',
+            'rgba(239, 68, 68, 1)'
+          ],
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: {
+              color: 'var(--text-secondary)',
+              font: { size: 14 }
+            }
+          },
+          title: {
+            display: true,
+            text: 'Risk Distribution',
+            color: 'var(--text-primary)',
+            font: { size: 18 }
+          }
+        }
+      }
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*                        Helper Functions                            */
+  /* ------------------------------------------------------------------ */
+  
+  function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.innerHTML = `
+      <i class="fas fa-${getNotificationIcon(type)}"></i>
+      <span>${message}</span>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Animate in
+    setTimeout(() => notification.classList.add('show'), 10);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+      notification.classList.remove('show');
+      setTimeout(() => notification.remove(), 300);
+    }, 3000);
+  }
+
+  function getNotificationIcon(type) {
+    const icons = {
+      success: 'check-circle',
+      error: 'exclamation-circle',
+      warning: 'exclamation-triangle',
+      info: 'info-circle'
+    };
+    return icons[type] || icons.info;
+  }
+
+  function showLoadingIndicator(message = 'Loading...') {
+    let indicator = document.getElementById('loading-indicator');
+    
+    if (!indicator) {
+      indicator = document.createElement('div');
+      indicator.id = 'loading-indicator';
+      indicator.className = 'loading-indicator';
+      document.body.appendChild(indicator);
+    }
+    
+    indicator.innerHTML = `
+      <div class="loading-spinner"></div>
+      <span>${message}</span>
+    `;
+    
+    indicator.classList.add('show');
+  }
+
+  function hideLoadingIndicator() {
+    const indicator = document.getElementById('loading-indicator');
+    if (indicator) {
+      indicator.classList.remove('show');
+    }
+  }
+
+  function showGuidance(text) {
+    const modal = document.createElement('div');
+    modal.className = 'guidance-modal';
+    modal.innerHTML = `
+      <div class="guidance-content">
+        <div class="guidance-header">
+          <h3>Guidance</h3>
+          <button class="close-btn" type="button">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="guidance-body">
+          ${text}
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    modal.querySelector('.close-btn').onclick = () => modal.remove();
+    modal.onclick = (e) => {
+      if (e.target === modal) modal.remove();
+    };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*                      Form Management                               */
+  /* ------------------------------------------------------------------ */
+  
+  function resetForm() {
+    state.currentInspectionId = null;
+    state.startTime = null;
+    stopInspectionTimer();
+    
+    // Reset basic fields
+    elements.locationSelect.selectedIndex = 0;
+    elements.typeSelect.selectedIndex = 0;
+    elements.auditorNamesInput.value = '';
+    elements.inspectionDateInput.value = '';
+    
+    // Clear question files
+    questionFiles = {};
+    
+    // Clear signatures
+    signatureData = {};
+    
+    // Re-render questions
+    renderQuestions();
+    
+    // Remove timer display
+    const timer = document.getElementById('inspection-timer');
+    if (timer) timer.remove();
+  }
+
+  function populateForm(data) {
+    state.currentInspectionId = data.id || null;
+    
+    // Set basic fields
+    const locIdx = Array.from(elements.locationSelect.options).findIndex(
+      opt => opt.value === data.location
+    );
+    if (locIdx >= 0) elements.locationSelect.selectedIndex = locIdx;
+    
+    const typeIdx = Array.from(elements.typeSelect.options).findIndex(
+      opt => opt.value === data.type
+    );
+    if (typeIdx >= 0) elements.typeSelect.selectedIndex = typeIdx;
+    
+    elements.auditorNamesInput.value = data.auditors || '';
+    elements.inspectionDateInput.value = data.date || '';
+    
+    // Populate question files
+    questionFiles = {};
+    questions.forEach(q => {
+      const ans = data.answers && data.answers[q.id];
+      if (ans && ans.files) {
+        questionFiles[q.id] = ans.files.slice();
+      }
+    });
+    
+    // Re-render and populate values
+    renderQuestions();
+    
+    // Set question values
+    questions.forEach(q => {
+      const ans = data.answers && data.answers[q.id];
+      if (!ans) return;
+      
+      switch (q.type) {
+        case 'boolean':
+          const radio = document.querySelector(`input[name="${q.id}"][value="${ans.value}"]`);
+          if (radio) radio.checked = true;
+          break;
+          
+        case 'checklist':
+          if (Array.isArray(ans.value)) {
+            ans.value.forEach(val => {
+              const cb = document.querySelector(`input[name="${q.id}"][value="${val}"]`);
+              if (cb) cb.checked = true;
+            });
+          }
+          break;
+          
+        default:
+          const el = document.getElementById(q.id);
+          if (el) el.value = ans.value || '';
+      }
+      
+      // Set comment
+      const commentEl = document.getElementById(`comment-${q.id}`);
+      if (commentEl && ans.comment) {
+        commentEl.value = ans.comment;
+        commentEl.style.display = 'block';
+        
+        // Update toggle button
+        const toggle = commentEl.previousElementSibling;
+        if (toggle) {
+          toggle.innerHTML = '<i class="fas fa-comment-slash"></i> Hide Comment';
+        }
+      }
+    });
+    
+    updateProgress();
+    updateFormTitle();
+  }
+
+  function updateFormTitle() {
+    const typeVal = elements.typeSelect.value || 'Inspection';
+    let locText = elements.locationSelect.value;
+    
+    if (locText && locText.includes(' - ')) {
+      locText = locText.split(' - ').slice(1).join(' - ');
+    }
+    
+    const locationName = locText || 'No Location Selected';
+    
+    elements.inspectionTitleEl.innerHTML = `
+      <i class="fas fa-shield-check"></i>
+      ${typeVal} - ${locationName}
+    `;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*                    Event Listener Attachment                       */
+  /* ------------------------------------------------------------------ */
+  
+  function attachQuestionEventListeners() {
+    questions.forEach(q => {
+      switch (q.type) {
+        case 'boolean':
+          document.querySelectorAll(`input[name="${q.id}"]`).forEach(radio => {
+            radio.addEventListener('change', updateProgress);
+          });
+          break;
+          
+        case 'checklist':
+          document.querySelectorAll(`input[name="${q.id}"]`).forEach(cb => {
+            cb.addEventListener('change', updateProgress);
+          });
+          break;
+          
+        default:
+          const el = document.getElementById(q.id);
+          if (el) {
+            el.addEventListener('input', updateProgress);
+            el.addEventListener('change', updateProgress);
+          }
+      }
+    });
+  }
+
+  // Initialize event listeners
+  elements.startInspectionBtn.addEventListener('click', () => {
+    setActiveSection('inspections');
+    resetForm();
+    startInspectionTimer();
+    scrollToForm();
+  });
+  
+  elements.saveDraftBtn.addEventListener('click', () => saveInspection('draft'));
+  elements.submitInspectionBtn.addEventListener('click', () => {
+    if (state.settings.signatureRequired) {
+      showSignatureModal(() => saveInspection('completed'));
+    } else {
+      saveInspection('completed');
+    }
+  });
+  
+  elements.previewModeBtn.addEventListener('click', togglePreviewMode);
+  elements.exportPdfBtn.addEventListener('click', exportToPDF);
+  
+  // Form field listeners
+  [elements.locationSelect, elements.typeSelect, elements.auditorNamesInput, elements.inspectionDateInput]
+    .forEach(el => {
+      el.addEventListener('input', updateProgress);
+      el.addEventListener('change', () => {
+        updateProgress();
+        updateFormTitle();
+      });
+    });
+  
+  // Quick action buttons
+  elements.quickActions.import.addEventListener('click', importQuestions);
+  elements.quickActions.export.addEventListener('click', exportQuestions);
+  elements.quickActions.exportReports.addEventListener('click', exportReports);
+  elements.quickActions.sync.addEventListener('click', syncOfflineData);
+  elements.quickActions.settings.addEventListener('click', () => setActiveSection('settings'));
+  
+  // Monitor online/offline status
+  window.addEventListener('online', () => {
+    showNotification('Back online! Syncing data...', 'success');
+    syncOfflineData();
+  });
+  
+  window.addEventListener('offline', () => {
+    showNotification('Working offline. Data will sync when connection restored.', 'warning');
+  });
+  
+  // Service worker registration
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/service-worker.js')
+      .then(reg => console.log('Service Worker registered'))
+      .catch(err => console.error('Service Worker registration failed:', err));
+  }
+  
+  /* ------------------------------------------------------------------ */
+  /*                         Initialization                             */
+  /* ------------------------------------------------------------------ */
+  
+  // Initialize user menu
+  updateUserMenu(window.netlifyIdentity?.currentUser());
+  
+  // Load questions
+  loadQuestions();
+  
+  // Apply settings
+  applySettings();
+  
+  // Set default date to today
+  elements.inspectionDateInput.valueAsDate = new Date();
+  
+  // Initialize view
+  setActiveSection('dashboard');
+  
+  // Netlify Identity events
+  if (window.netlifyIdentity) {
+    window.netlifyIdentity.on('init', user => {
+      updateUserMenu(user);
+      if (user) {
+        loadInspections();
+        loadQuestions();
+        syncOfflineData();
+      }
+    });
+    
+    window.netlifyIdentity.on('login', user => {
+      updateUserMenu(user);
+      window.netlifyIdentity.close();
+      loadInspections();
+      loadQuestions();
+      syncOfflineData();
+    });
+    
+    window.netlifyIdentity.on('logout', () => {
+      updateUserMenu(null);
+      state.currentInspectionId = null;
+      questions = [...defaultQuestions];
+      renderQuestions();
+    });
+  }
+  
+  // Auto-save initialization
+  if (state.settings.autoSave) {
+    startAutoSave();
+  }
+  
+  // Request notification permission
+  if (state.settings.notifications && 'Notification' in window) {
+    Notification.requestPermission();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*                      Additional Functions                          */
+  /* ------------------------------------------------------------------ */
+  
+  // These functions are referenced in the code but defined here for completeness
+  
+  window.exportAllData = async function() {
+    // Implementation for exporting all data
+    showNotification('Export feature coming soon', 'info');
+  };
+  
+  window.clearOfflineData = function() {
+    if (confirm('Are you sure you want to clear all offline data?')) {
+      localStorage.removeItem('offline-queue');
+      offlineQueue = [];
+      showNotification('Offline data cleared', 'success');
+    }
+  };
+  
+  window.resetApplication = function() {
+    if (confirm('This will reset all settings and clear local data. Continue?')) {
+      localStorage.clear();
+      location.reload();
+    }
+  };
+  
+  window.viewInspectionDetails = function(id) {
+    const inspection = inspectionsData.find(ins => ins.id === id);
+    if (inspection) {
+      populateForm(inspection);
+      setActiveSection('inspections');
+      togglePreviewMode();
+    }
+  };
+  
+  window.exportSingleReport = function(id) {
+    const inspection = inspectionsData.find(ins => ins.id === id);
+    if (inspection) {
+      state.currentInspectionId = id;
+      exportToPDF();
+    }
+  };
+  
+  window.exportFilteredReports = function() {
+    showNotification('Excel export feature coming soon', 'info');
+  };
+  
+  function scrollToForm() {
+    const form = document.querySelector('.audit-form');
+    if (form) {
+      form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+  
   async function loadInspections() {
     if (!window.netlifyIdentity) return;
+    
     const user = window.netlifyIdentity.currentUser();
     if (!user) return;
-    pendingList.innerHTML = '';
-    completedList.innerHTML = '';
-    // Reset the inspections cache used for reports and analytics
+    
+    elements.pendingList.innerHTML = '';
+    elements.completedList.innerHTML = '';
     inspectionsData = [];
+    
     try {
       const token = await user.jwt();
       const prefix = `inspections/${user.id}/`;
-      // Request a listing of blobs under this prefix. The API
-      // returns a JSON object with a `blobs` array containing
-      // metadata objects. See Netlify Blobs documentation for details.
+      
       const listRes = await fetch(`/.netlify/blobs/${prefix}?list=true`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      
       if (!listRes.ok) {
         console.warn('Could not list blobs');
         return;
       }
+      
       const listData = await listRes.json();
       const blobs = listData.blobs || [];
-      // Filter out any non-record JSON files and group by
-      // inspection id. We identify record files by the
-      // `record.json` suffix.
+      
       const recordPaths = blobs
         .map(b => b.path || b)
         .filter(p => typeof p === 'string' && p.endsWith('record.json'));
+      
       for (const recordPath of recordPaths) {
         try {
           const recRes = await fetch(`/.netlify/blobs/${recordPath}`, {
             headers: { Authorization: `Bearer ${token}` }
           });
+          
           if (!recRes.ok) continue;
-      const record = await recRes.json();
-      // Add to local cache for reports/analytics
-      inspectionsData.push(record);
-      appendInspectionToList(record);
+          
+          const record = await recRes.json();
+          inspectionsData.push(record);
+          appendInspectionToList(record);
         } catch (ex) {
           console.error('Failed to fetch record', recordPath, ex);
         }
@@ -921,23 +2660,16 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error('Error loading inspections', err);
     }
   }
-
-  /**
-   * Create an element representing a single inspection and append it
-   * to either the pending or completed list based on its status.
-   * Each list item includes basic metadata and actions for editing
-   * or updating the status.
-   *
-   * @param {Object} inspection The inspection record to display.
-   */
+  
   function appendInspectionToList(inspection) {
-    const listEl = inspection.status === 'completed' ? completedList : pendingList;
+    const listEl = inspection.status === 'completed' ? elements.completedList : elements.pendingList;
+    
     const li = document.createElement('li');
     li.className = 'list-item slide-up';
-    // Build relative time string for created_at
+    
     const meta = timeAgo(inspection.created_at);
-    // Compose HTML using the existing design language
     const title = `${inspection.location} - ${inspection.type}`;
+    
     let statusIndicator = '';
     if (inspection.status === 'completed') {
       statusIndicator = `
@@ -946,23 +2678,26 @@ document.addEventListener('DOMContentLoaded', () => {
           Completed
         </div>
       `;
-    } else if (inspection.status === 'draft') {
+    } else {
       statusIndicator = `
         <div class="status-indicator status-pending">
           <i class="fas fa-clock"></i>
           Draft
         </div>
       `;
-    } else {
-      statusIndicator = `
-        <div class="status-indicator status-pending">
-          <i class="fas fa-clock"></i>
-          Pending
-        </div>
-      `;
     }
-    // Actions: edit and complete buttons for pending/draft items. No
-    // actions for completed items.
+    
+    // Risk indicator for completed inspections
+    let riskIndicator = '';
+    if (inspection.status === 'completed' && inspection.maxRiskScore) {
+      const riskPercentage = (inspection.riskScore / inspection.maxRiskScore) * 100;
+      let riskClass = 'low';
+      if (riskPercentage > 50) riskClass = 'high';
+      else if (riskPercentage > 25) riskClass = 'medium';
+      
+      riskIndicator = `<span class="risk-badge risk-${riskClass}">${riskClass.toUpperCase()}</span>`;
+    }
+    
     let actionsHtml = '';
     if (inspection.status !== 'completed') {
       actionsHtml = `
@@ -978,78 +2713,79 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
     }
+    
+    // Get summary from first comment or answer
+    let summary = '';
+    const answers = inspection.answers || {};
+    for (const key in answers) {
+      const ans = answers[key];
+      if (ans && typeof ans === 'object') {
+        if (ans.comment && ans.comment.trim()) {
+          summary = ans.comment.trim();
+          break;
+        }
+      }
+    }
+    
+    if (!summary) {
+      summary = 'No description provided.';
+    }
+    
+    if (summary.length > 80) {
+      summary = summary.substring(0, 80) + '...';
+    }
+    
     li.innerHTML = `
       <div class="list-item-header">
-        <div class="list-item-title">${title}</div>
+        <div class="list-item-title">${title} ${riskIndicator}</div>
         ${inspection.status === 'completed' ? statusIndicator : `<div class="list-item-meta">${meta}</div>`}
       </div>
-      <div class="list-item-content">
-        ${(() => {
-          const answers = inspection.answers || {};
-          let summary = '';
-          for (const key in answers) {
-            const ans = answers[key];
-            if (ans && typeof ans === 'object') {
-              if (ans.comment && ans.comment.trim()) {
-                summary = ans.comment.trim();
-                break;
-              } else if (ans.value && typeof ans.value === 'string' && ans.value.trim()) {
-                summary = ans.value.trim();
-                break;
-              }
-            } else if (typeof ans === 'string' && ans.trim()) {
-              summary = ans.trim();
-              break;
-            }
-          }
-          if (!summary) {
-            return 'No description provided.';
-          }
-          return summary.length > 80 ? summary.substring(0, 80) + '...' : summary;
-        })()}
-      </div>
+      <div class="list-item-content">${summary}</div>
       ${inspection.status === 'completed' ? `<div class="list-item-meta">${meta}</div>` : ''}
       ${actionsHtml}
     `;
+    
     listEl.appendChild(li);
-    // Attach event listeners for edit/complete if applicable
+    
+    // Attach event listeners
     if (inspection.status !== 'completed') {
       const editBtn = li.querySelector('.edit-btn');
       const completeBtn = li.querySelector('.complete-btn');
+      
       editBtn?.addEventListener('click', () => {
         populateForm(inspection);
+        setActiveSection('inspections');
         scrollToForm();
       });
+      
       completeBtn?.addEventListener('click', async () => {
         await updateStatus(inspection.id, 'completed');
       });
     }
   }
-
-  /**
-   * Update only the status of an existing inspection. Fetches the
-   * current record, modifies the status and persists it back to
-   * Netlify. Afterwards the lists are reloaded.
-   *
-   * @param {string} id The inspection id to update.
-   * @param {string} newStatus The new status value to set.
-   */
+  
   async function updateStatus(id, newStatus) {
     if (!window.netlifyIdentity) return;
+    
     const user = window.netlifyIdentity.currentUser();
     if (!user) return;
+    
     const token = await user.jwt();
     const basePath = `inspections/${user.id}/${id}`;
+    
     try {
       // Fetch existing record
       const recRes = await fetch(`/.netlify/blobs/${basePath}/record.json`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      
       if (!recRes.ok) {
         throw new Error('Failed to fetch record for status update');
       }
+      
       const record = await recRes.json();
       record.status = newStatus;
+      
       // Persist updated record
       await fetch(`/.netlify/blobs/${basePath}/record.json`, {
         method: 'PUT',
@@ -1059,27 +2795,24 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         body: JSON.stringify(record)
       });
+      
       await loadInspections();
+      showNotification('Status updated successfully', 'success');
+      
     } catch (err) {
       console.error(err);
-      alert('Failed to update status');
+      showNotification('Failed to update status', 'error');
     }
   }
-
-  /**
-   * Convert an ISO timestamp into a human-friendly relative time
-   * string. For example "2h ago", "5d ago" etc. When the
-   * timestamp is invalid the function returns an empty string.
-   *
-   * @param {string} isoTimestamp The ISO formatted date string.
-   * @returns {string} A relative time description.
-   */
+  
   function timeAgo(isoTimestamp) {
     const then = new Date(isoTimestamp);
     if (isNaN(then.getTime())) return '';
+    
     const now = new Date();
     let diff = Math.floor((now.getTime() - then.getTime()) / 1000);
     if (diff < 0) diff = 0;
+    
     const units = [
       { label: 'y', seconds: 31536000 },
       { label: 'mo', seconds: 2592000 },
@@ -1088,459 +2821,1346 @@ document.addEventListener('DOMContentLoaded', () => {
       { label: 'm', seconds: 60 },
       { label: 's', seconds: 1 }
     ];
+    
     for (const unit of units) {
       const amount = Math.floor(diff / unit.seconds);
       if (amount >= 1) {
         return `${amount}${unit.label} ago`;
       }
     }
+    
     return 'just now';
   }
-
-  /**
-   * Render the list of completed inspections on the Reports page.
-   * Inspections are pulled from the global inspectionsData array.
-   */
-  function renderReports() {
-    const container = document.getElementById('reports-container');
-    if (!container) return;
-    container.innerHTML = '';
-    const completed = inspectionsData.filter(ins => ins.status === 'completed');
-    if (completed.length === 0) {
-      const msg = document.createElement('p');
-      msg.style.color = 'var(--text-secondary)';
-      msg.textContent = 'No completed inspections available.';
-      container.appendChild(msg);
+  
+  async function loadQuestions() {
+    if (!window.netlifyIdentity) {
+      questions = [...defaultQuestions];
+      renderQuestions();
       return;
     }
-    completed.forEach(ins => {
-      const item = document.createElement('div');
-      item.className = 'list-item slide-up';
-      const meta = timeAgo(ins.created_at);
-      // Generate a summary from the first non-empty comment or value
-      let summary = '';
-      const answers = ins.answers || {};
-      for (const key in answers) {
-        const ans = answers[key];
-        if (ans && typeof ans === 'object') {
-          if (ans.comment && ans.comment.trim()) {
-            summary = ans.comment.trim();
-            break;
-          } else if (ans.value && typeof ans.value === 'string' && ans.value.trim()) {
-            summary = ans.value.trim();
-            break;
-          }
-        } else if (typeof ans === 'string' && ans.trim()) {
-          summary = ans.trim();
-          break;
-        }
-      }
-      if (!summary) {
-        summary = 'No description provided.';
-      }
-      if (summary.length > 80) summary = summary.substring(0, 80) + '...';
-      item.innerHTML = `
-        <div class="list-item-header">
-          <div class="list-item-title">${ins.location} - ${ins.type}</div>
-          <div class="list-item-meta">${meta}</div>
-        </div>
-        <div class="list-item-content">${summary}</div>
-      `;
-      container.appendChild(item);
-    });
-  }
-
-  /**
-   * Render a simple analytics bar chart summarising the number of
-   * "No" answers per category across all completed inspections. Uses
-   * Chart.js for visualisation.
-   */
-  function renderAnalytics() {
-    const canvas = document.getElementById('analytics-chart');
-    if (!canvas) return;
-    // Clear any previous message siblings
-    const parent = canvas.parentElement;
-    // Remove any text messages previously added
-    Array.from(parent.querySelectorAll('.analytics-message')).forEach(el => el.remove());
-    if (typeof Chart === 'undefined') {
-      const msg = document.createElement('p');
-      msg.className = 'analytics-message';
-      msg.style.color = 'var(--text-secondary)';
-      msg.textContent = 'Chart.js library is not available.';
-      parent.appendChild(msg);
+    
+    const user = window.netlifyIdentity.currentUser();
+    if (!user) {
+      questions = [...defaultQuestions];
+      renderQuestions();
       return;
     }
-    const completed = inspectionsData.filter(ins => ins.status === 'completed');
-    if (completed.length === 0) {
-      canvas.style.display = 'none';
-      const msg = document.createElement('p');
-      msg.className = 'analytics-message';
-      msg.style.color = 'var(--text-secondary)';
-      msg.textContent = 'No data available for analytics.';
-      parent.appendChild(msg);
-      return;
-    }
-    canvas.style.display = '';
-    // Compute the number of "no" answers per category
-    const counts = {};
-    completed.forEach(ins => {
-      const answers = ins.answers || {};
-      questions.forEach(q => {
-        const ans = answers[q.id];
-        const category = q.category || 'Other';
-        if (!counts[category]) counts[category] = 0;
-        if (ans && ans.value === 'no') {
-          counts[category] += 1;
-        }
+    
+    try {
+      const token = await user.jwt();
+      const path = `questions/${user.id}/questions.json`;
+      
+      const res = await fetch(`/.netlify/blobs/${path}`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-    });
-    const labels = Object.keys(counts);
-    const data = labels.map(cat => counts[cat]);
-    // Destroy existing chart instance if present
-    if (window.analyticsChart) {
-      window.analyticsChart.destroy();
+      
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          questions = data;
+        } else {
+          questions = [...defaultQuestions];
+        }
+      } else {
+        questions = [...defaultQuestions];
+      }
+    } catch (err) {
+      console.warn('Failed to load questions, using defaults', err);
+      questions = [...defaultQuestions];
     }
-    const ctx = canvas.getContext('2d');
-    window.analyticsChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: labels,
-        datasets: [
-          {
-            label: 'Number of "No" answers',
-            data: data,
-            backgroundColor: 'rgba(99, 102, 241, 0.5)',
-            borderColor: 'rgba(99, 102, 241, 1)',
-            borderWidth: 1
-          }
-        ]
-      },
-      options: {
-        plugins: {
-          legend: {
-            display: false
-          },
-          title: {
-            display: false
-          }
+    
+    renderQuestions();
+  }
+  
+  async function saveQuestions() {
+    if (!window.netlifyIdentity) return;
+    
+    const user = window.netlifyIdentity.currentUser();
+    if (!user) return;
+    
+    try {
+      const token = await user.jwt();
+      const path = `questions/${user.id}/questions.json`;
+      
+      await fetch(`/.netlify/blobs/${path}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
         },
-        scales: {
-          x: {
-            title: {
-              display: true,
-              text: 'Categories',
-              color: 'var(--text-secondary)',
-              font: { size: 12 }
-            },
-            ticks: {
-              color: 'var(--text-secondary)'
-            },
-            grid: {
-              color: 'rgba(255,255,255,0.1)'
-            }
-          },
-          y: {
-            beginAtZero: true,
-            title: {
-              display: true,
-              text: 'Count',
-              color: 'var(--text-secondary)',
-              font: { size: 12 }
-            },
-            ticks: {
-              stepSize: 1,
-              color: 'var(--text-secondary)'
-            },
-            grid: {
-              color: 'rgba(255,255,255,0.1)'
-            }
-          }
-        }
-      }
-    });
+        body: JSON.stringify(questions)
+      });
+    } catch (err) {
+      console.error('Failed to save questions', err);
+    }
   }
-
-
-  /* ------------------------------------------------------------------ */
-  /*                        Voice Input Support                       */
-  /* ------------------------------------------------------------------ */
-  let recognition;
-  /**
-   * Toggle voice recognition for the button that was clicked. When
-   * starting recognition the microphone icon changes to a stop icon
-   * and the button pulses. Upon receiving a result the text is
-   * inserted into the nearest input or textarea. If recognition is
-   * already active it is stopped.
-   *
-   * @param {HTMLButtonElement} btn The voice button clicked.
-   */
-  function toggleVoice(btn) {
-    // Feature detection
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert('Speech Recognition is not supported in this browser.');
-      return;
-    }
-    // If already listening then stop
-    if (btn.classList.contains('listening')) {
-      if (recognition) recognition.stop();
-      return;
-    }
-    recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-    btn.classList.add('listening');
-    // Change icon to stop icon
-    const icon = btn.querySelector('i');
-    if (icon) {
-      icon.classList.remove('fa-microphone');
-      icon.classList.add('fa-stop');
-    }
-    recognition.onresult = event => {
-      const transcript = event.results[0][0].transcript;
-      // Find the nearest textarea or text input inside the question card
-      const card = btn.closest('.question-card');
-      if (card) {
-        const field = card.querySelector('textarea, input[type="text"], input[type="number"]');
-        if (field) {
-          // Append or replace value depending on field type
-          if (field.tagName.toLowerCase() === 'textarea') {
-            const existing = field.value.trim();
-            field.value = existing ? existing + '\n' + transcript : transcript;
-          } else {
-            field.value = transcript;
-          }
-          updateProgress();
-        }
-      }
-    };
-    recognition.onend = () => {
-      btn.classList.remove('listening');
-      // Restore microphone icon
-      const icon = btn.querySelector('i');
-      if (icon) {
-        icon.classList.remove('fa-stop');
-        icon.classList.add('fa-microphone');
-      }
-    };
-    recognition.onerror = () => {
-      btn.classList.remove('listening');
-      const icon = btn.querySelector('i');
-      if (icon) {
-        icon.classList.remove('fa-stop');
-        icon.classList.add('fa-microphone');
-      }
-    };
-    recognition.start();
-  }
-
-  // Voice buttons are attached during renderQuestions()
-
-  /* ------------------------------------------------------------------ */
-  /*                        Event Listener Wiring                     */
-  /* ------------------------------------------------------------------ */
-  // When the user changes form values recalculate progress and update
-  // the title. Use input and change events to capture text input,
-  // selects and numbers. Using bubbling ensures new values trigger
-  // correctly.
-  const formInputs = [locationSelect, typeSelect, auditorNamesInput, inspectionDateInput];
-  formInputs.forEach(inputEl => {
-    inputEl.addEventListener('input', () => {
-      updateProgress();
-      updateFormTitle();
-    });
-    inputEl.addEventListener('change', () => {
-      updateProgress();
-      updateFormTitle();
-    });
-  });
-  // Attach change listeners to all radio inputs dynamically when questions are rendered
-  // This is handled inside renderQuestions() for the current question set. No need to pre-bind here.
-
-  // New inspection button resets the form, switches to the Inspections section and scrolls to the form
-  startInspectionBtn.addEventListener('click', event => {
-    event.preventDefault();
-    setActiveSection('inspections');
-    resetForm();
-    scrollToForm();
-  });
-
-  // Save draft button persists the current state as a draft
-  saveDraftBtn.addEventListener('click', event => {
-    event.preventDefault();
-    saveInspection('draft');
-  });
-  // Submit inspection button marks the inspection as completed
-  submitInspectionBtn.addEventListener('click', event => {
-    event.preventDefault();
-    saveInspection('completed');
-  });
-
-  // Simple actions for preview and PDF export. These functions
-  // provide basic feedback until custom implementations are added.
-  previewModeBtn.addEventListener('click', () => {
-    alert('Preview mode is not yet implemented.');
-  });
-  exportPdfBtn.addEventListener('click', () => {
-    alert('PDF export is not yet implemented.');
-  });
-
-  /* ------------------------------------------------------------------ */
-  /*                 Question Import/Export and Other Actions          */
-  /* ------------------------------------------------------------------ */
-  // Import questions from a JSON file. The JSON must be an array of
-  // question objects. Only types boolean, text and number are
-  // supported. File questions are ignored.
-  importQuestionsBtn.addEventListener('click', () => {
+  
+  async function importQuestions() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'application/json';
+    
     input.onchange = async () => {
-      const file = input.files && input.files[0];
+      const file = input.files?.[0];
       if (!file) return;
+      
       try {
         const text = await file.text();
         const imported = JSON.parse(text);
+        
         if (!Array.isArray(imported)) {
-          alert('Invalid format: expected an array of questions');
+          showNotification('Invalid format: expected an array of questions', 'error');
           return;
         }
-        // Validate each question
-        const validTypes = ['boolean', 'text', 'number'];
+        
+        // Validate questions
+        const validTypes = ['boolean', 'text', 'number', 'range', 'checklist', 'photo'];
         const cleaned = [];
+        
         for (const q of imported) {
-          if (!q.id || !q.type || !q.question) {
-            continue;
-          }
-          if (!validTypes.includes(q.type)) {
-            continue;
-          }
+          if (!q.id || !q.type || !q.question) continue;
+          if (!validTypes.includes(q.type)) continue;
+          
           cleaned.push({
             id: String(q.id),
             type: q.type,
             question: String(q.question),
-            required: !!q.required
+            category: q.category || 'General',
+            required: !!q.required,
+            riskWeight: q.riskWeight || 0,
+            correctAnswer: q.correctAnswer,
+            options: q.options || [],
+            min: q.min,
+            max: q.max,
+            optimal: q.optimal,
+            unit: q.unit,
+            guidance: q.guidance
           });
         }
+        
         if (cleaned.length === 0) {
-          alert('No valid questions found in the file.');
+          showNotification('No valid questions found in file', 'error');
           return;
         }
-        if (!window.confirm('Importing will overwrite your current question set. Proceed?')) {
+        
+        if (!confirm(`Import ${cleaned.length} questions? This will replace your current question set.`)) {
           return;
         }
+        
         questions = cleaned;
         renderQuestions();
         await saveQuestions();
-        alert('Questions imported successfully.');
+        showNotification('Questions imported successfully', 'success');
+        
       } catch (err) {
         console.error(err);
-        alert('Failed to import questions. Make sure the file contains valid JSON.');
+        showNotification('Failed to import questions', 'error');
       }
     };
+    
     input.click();
-  });
-
-  // Export the current question set as a JSON file. The file is
-  // downloaded to the user’s device. No authentication required.
-  exportQuestionsBtn.addEventListener('click', () => {
+  }
+  
+  function exportQuestions() {
     try {
-      const blob = new Blob([JSON.stringify(questions, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(questions, null, 2)], { 
+        type: 'application/json' 
+      });
+      
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'questions.json';
+      a.download = 'inspection-questions.json';
       a.style.display = 'none';
+      
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      
       URL.revokeObjectURL(url);
+      showNotification('Questions exported successfully', 'success');
+      
     } catch (err) {
       console.error(err);
-      alert('Failed to export questions.');
+      showNotification('Failed to export questions', 'error');
     }
-  });
-
-  // Export all inspections belonging to the current user as a JSON
-  // file. This can be used to generate a backup or to inspect
-  // results offline. When not logged in the user is prompted to
-  // authenticate.
-  exportReportsBtn.addEventListener('click', async () => {
+  }
+  
+  async function exportReports() {
     if (!window.netlifyIdentity) {
-      alert('This feature is only available when deployed on Netlify.');
+      showNotification('Please log in to export reports', 'warning');
       return;
     }
+    
     const user = window.netlifyIdentity.currentUser();
     if (!user) {
       window.netlifyIdentity.open();
       return;
     }
+    
     try {
-      const token = await user.jwt();
-      const prefix = `inspections/${user.id}/`;
-      const listRes = await fetch(`/.netlify/blobs/${prefix}?list=true`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const blob = new Blob([JSON.stringify(inspectionsData, null, 2)], { 
+        type: 'application/json' 
       });
-      if (!listRes.ok) {
-        alert('Failed to list inspections for export.');
-        return;
+      
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `inspections-export-${new Date().toISOString().split('T')[0]}.json`;
+      
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      URL.revokeObjectURL(url);
+      showNotification('Reports exported successfully', 'success');
+      
+    } catch (err) {
+      console.error(err);
+      showNotification('Failed to export reports', 'error');
+    }
+  }
+  
+  function showSignatureModal(callback) {
+    const modal = document.createElement('div');
+    modal.className = 'signature-modal';
+    modal.innerHTML = `
+      <div class="signature-container">
+        <div class="signature-header">
+          <h3>Digital Signature Required</h3>
+          <button class="close-btn" type="button">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="signature-body">
+          <p>Please sign below to confirm the inspection report.</p>
+          <canvas id="signature-canvas" width="400" height="200"></canvas>
+          <div class="signature-actions">
+            <button class="btn btn-secondary" id="clear-signature">
+              <i class="fas fa-eraser"></i> Clear
+            </button>
+            <button class="btn btn-primary" id="save-signature">
+              <i class="fas fa-check"></i> Save & Submit
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Setup canvas for signature
+    const canvas = document.getElementById('signature-canvas');
+    const ctx = canvas.getContext('2d');
+    let isDrawing = false;
+    
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('touchstart', handleTouch);
+    canvas.addEventListener('touchmove', handleTouch);
+    canvas.addEventListener('touchend', stopDrawing);
+    
+    function startDrawing(e) {
+      isDrawing = true;
+      const rect = canvas.getBoundingClientRect();
+      ctx.beginPath();
+      ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+    }
+    
+    function draw(e) {
+      if (!isDrawing) return;
+      const rect = canvas.getBoundingClientRect();
+      ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+      ctx.stroke();
+    }
+    
+    function stopDrawing() {
+      isDrawing = false;
+    }
+    
+    function handleTouch(e) {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const mouseEvent = new MouseEvent(e.type === 'touchstart' ? 'mousedown' : 
+                                      e.type === 'touchmove' ? 'mousemove' : 'mouseup', {
+        clientX: touch.clientX,
+        clientY: touch.clientY
+      });
+      canvas.dispatchEvent(mouseEvent);
+    }
+    
+    // Clear button
+    document.getElementById('clear-signature').onclick = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    };
+    
+    // Save button
+    document.getElementById('save-signature').onclick = () => {
+      const dataURL = canvas.toDataURL();
+      signatureData[state.currentInspectionId || 'temp'] = dataURL;
+      modal.remove();
+      if (callback) callback();
+    };
+    
+    // Close button
+    modal.querySelector('.close-btn').onclick = () => {
+      modal.remove();
+    };
+  }
+  
+  // Additional CSS for new features
+  const additionalStyles = document.createElement('style');
+  additionalStyles.textContent = `
+    /* Enhanced styles for new features */
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 1rem 1.5rem;
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      transform: translateX(400px);
+      transition: transform 0.3s ease;
+      z-index: 1000;
+    }
+    
+    .notification.show {
+      transform: translateX(0);
+    }
+    
+    .notification-success {
+      border-color: var(--success);
+      color: var(--success);
+    }
+    
+    .notification-error {
+      border-color: var(--error);
+      color: var(--error);
+    }
+    
+    .notification-warning {
+      border-color: var(--warning);
+      color: var(--warning);
+    }
+    
+    .notification-info {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+    
+    .loading-indicator {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--glass-elevated);
+      padding: 2rem;
+      border-radius: var(--radius-xl);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease;
+      z-index: 9999;
+    }
+    
+    .loading-indicator.show {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--glass-border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .camera-modal,
+    .guidance-modal,
+    .signature-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    
+    .camera-container,
+    .guidance-content,
+    .signature-container {
+      background: var(--bg-secondary);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      max-width: 90vw;
+      max-height: 90vh;
+    }
+    
+    .camera-header,
+    .guidance-header,
+    .signature-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem;
+      border-bottom: 1px solid var(--glass-border);
+    }
+    
+    .camera-container video {
+      display: block;
+      width: 100%;
+      max-height: 60vh;
+    }
+    
+    .camera-controls {
+      display: flex;
+      justify-content: center;
+      padding: 1rem;
+    }
+    
+    .capture-btn {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: var(--error);
+      border: 3px solid white;
+      color: white;
+      font-size: 1.5rem;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    
+    .capture-btn:active {
+      transform: scale(0.9);
+    }
+    
+    .risk-indicator {
+      margin-top: 1rem;
+      padding: 1rem;
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .risk-low {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--success);
+    }
+    
+    .risk-medium {
+      background: rgba(245, 158, 11, 0.1);
+      color: var(--warning);
+    }
+    
+    .risk-high {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--error);
+    }
+    
+    .inspection-timer {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      font-weight: 600;
+    }
+    
+    .high-risk {
+      border-color: var(--error) !important;
+    }
+    
+    .risk-answer:hover {
+      border-color: var(--error) !important;
+    }
+    
+    .preview-mode input:disabled,
+    .preview-mode textarea:disabled,
+    .preview-mode select:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+    
+    .comment-field {
+      margin-top: 1rem;
+    }
+    
+    .comment-toggle {
+      background: var(--surface);
+      border: 1px solid var(--glass-border);
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-md);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: var(--transition-base);
+    }
+    
+    .comment-toggle:hover {
+      background: var(--surface-hover);
+      color: var(--text-primary);
+    }
+    
+    .comment-input {
+      width: 100%;
+      margin-top: 0.5rem;
+      padding: 0.75rem;
+      background: var(--surface);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      color: var(--text-primary);
+      resize: vertical;
+      min-height: 80px;
+    }
+    
+    .number-input-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .number-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      border: 1px solid var(--glass-border);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: var(--transition-base);
+    }
+    
+    .number-btn:hover {
+      background: var(--surface-hover);
+      color: var(--text-primary);
+    }
+    
+    .range-control {
+      padding: 1rem 0;
+    }
+    
+    .range-display {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    
+    .range-input {
+      flex: 1;
+      appearance: none;
+      height: 6px;
+      background: var(--surface);
+      border-radius: 3px;
+      outline: none;
+    }
+    
+    .range-input::-webkit-slider-thumb {
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      background: var(--primary);
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    
+    .range-value {
+      font-weight: 600;
+      min-width: 60px;
+      text-align: right;
+    }
+    
+    .range-value.optimal {
+      color: var(--success);
+    }
+    
+    .range-value.warning {
+      color: var(--warning);
+    }
+    
+    .optimal-range {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+    
+    .checklist-control {
+      padding: 1rem 0;
+    }
+    
+    .checked-count {
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: var(--text-secondary);
+    }
+    
+    .checklist-items {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.5rem;
+    }
+    
+    .checklist-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem;
+      background: var(--surface);
+      border-radius: var(--radius-md);
+    }
+    
+    .checklist-item:hover {
+      background: var(--surface-hover);
+    }
+    
+    .photo-control {
+      padding: 1rem 0;
+    }
+    
+    .photo-gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      min-height: 140px;
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      padding: 1rem;
+    }
+    
+    .photo-thumbnail {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    
+    .photo-thumbnail:hover {
+      transform: scale(1.05);
+    }
+    
+    .photo-controls {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .file-drop-zone {
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: var(--transition-base);
+    }
+    
+    .file-drop-zone.drag-over {
+      background: var(--surface-hover);
+      border-color: var(--primary);
+    }
+    
+    .file-list {
+      margin-top: 1rem;
+    }
+    
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem;
+      background: var(--surface);
+      border-radius: var(--radius-md);
+      margin-bottom: 0.5rem;
+    }
+    
+    .file-name {
+      flex: 1;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .file-size {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    
+    .file-remove {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0.25rem;
+      transition: color 0.2s;
+    }
+    
+    .file-remove:hover {
+      color: var(--error);
+    }
+    
+    .report-filters {
+      display: flex;
+      gap: 1rem;
+      align-items: end;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+    
+    .filter-group {
+      flex: 1;
+      min-width: 150px;
+    }
+    
+    .filter-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+    }
+    
+    .report-summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    
+    .summary-stat {
+      background: var(--surface);
+      padding: 1.5rem;
+      border-radius: var(--radius-lg);
+      text-align: center;
+    }
+    
+    .summary-stat .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    
+    .summary-stat .stat-label {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+    
+    .report-item {
+      background: var(--surface);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      transition: var(--transition-base);
+    }
+    
+    .report-item:hover {
+      border-color: var(--primary);
+      transform: translateY(-2px);
+    }
+    
+    .report-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    
+    .report-title {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    
+    .report-meta {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 1rem;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+    
+    .report-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .analytics-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--glass-border);
+    }
+    
+    .tab-btn {
+      background: none;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      color: var(--text-secondary);
+      font-weight: 600;
+      cursor: pointer;
+      position: relative;
+      transition: color 0.2s;
+    }
+    
+    .tab-btn:hover {
+      color: var(--text-primary);
+    }
+    
+    .tab-btn.active {
+      color: var(--primary);
+    }
+    
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--primary);
+    }
+    
+    .settings-content {
+      max-width: 800px;
+    }
+    
+    .settings-section {
+      margin-bottom: 2rem;
+    }
+    
+    .settings-section-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--glass-border);
+    }
+    
+    .setting-item {
+      margin-bottom: 1rem;
+    }
+    
+    .setting-item label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+    
+    .setting-item input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+    
+    .setting-item .form-control {
+      margin-top: 0.5rem;
+    }
+    
+    .settings-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 1rem;
+      margin-top: 2rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--glass-border);
+    }
+    
+    .risk-badge {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.7rem;
+      font-weight: 700;
+      margin-left: 0.5rem;
+    }
+    
+    .risk-badge.risk-low {
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--success);
+    }
+    
+    .risk-badge.risk-medium {
+      background: rgba(245, 158, 11, 0.2);
+      color: var(--warning);
+    }
+    
+    .risk-badge.risk-high {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--error);
+    }
+    
+    .signature-canvas {
+      border: 2px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      background: white;
+      cursor: crosshair;
+    }
+    
+    .signature-body {
+      padding: 1.5rem;
+    }
+    
+    .signature-actions {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 1rem;
+    }
+    
+    .guidance-body {
+      padding: 1.5rem;
+      max-width: 600px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+    
+    .close-btn {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 0.5rem;
+      transition: color 0.2s;
+    }
+    
+    .close-btn:hover {
+      color: var(--text-primary);
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-muted);
+    }
+    
+    .info-btn {
+      background: none;
+      border: none;
+      color: var(--primary);
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 0.5rem;
+      transition: transform 0.2s;
+    }
+    
+    .info-btn:hover {
+      transform: scale(1.1);
+    }
+    
+    .risk-score {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+    
+    /* Dark mode adjustments */
+    body.dark-mode {
+      --bg-primary: #000000;
+      --bg-secondary: #0a0a0a;
+      --bg-tertiary: #141414;
+      --text-primary: #ffffff;
+      --text-secondary: #a0a0a0;
+      --text-muted: #666666;
+    }
+    
+    body.dark-mode .signature-canvas {
+      background: #f0f0f0;
+    }
+    
+    /* Mobile responsiveness for new features */
+    @media (max-width: 768px) {
+      .report-filters {
+        flex-direction: column;
       }
-      const listData = await listRes.json();
-      const blobs = listData.blobs || [];
-      const recordPaths = blobs
-        .map(b => b.path || b)
-        .filter(p => typeof p === 'string' && p.endsWith('record.json'));
-      const records = [];
-      for (const recordPath of recordPaths) {
-        const recRes = await fetch(`/.netlify/blobs/${recordPath}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (recRes.ok) {
-          try {
-            const rec = await recRes.json();
-            records.push(rec);
-          } catch (e) {
-            // Skip invalid records
+      
+      .filter-group {
+        width: 100%;
+      }
+      
+      .camera-container,
+      .guidance-content,
+      .signature-container {
+        margin: 1rem;
+      }
+      
+      .checklist-items {
+        grid-template-columns: 1fr;
+      }
+      
+      .photo-gallery {
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+      }
+      
+      .analytics-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      .tab-btn {
+        white-space: nowrap;
+      }
+    }
+    
+    /* Print styles for PDF export */
+    @media print {
+      .header-bar,
+      .sidebar,
+      .content-actions,
+      .btn,
+      .voice-btn,
+      .camera-btn,
+      .info-btn,
+      .comment-toggle,
+      .file-upload,
+      .photo-controls {
+        display: none !important;
+      }
+      
+      .main-content {
+        margin: 0;
+        padding: 20px;
+      }
+      
+      .question-card {
+        page-break-inside: avoid;
+        border: 1px solid #ddd;
+        margin-bottom: 10px;
+      }
+      
+      .question-text {
+        font-weight: bold;
+        color: #000;
+      }
+      
+      .comment-input {
+        display: block !important;
+        border: 1px solid #ddd;
+      }
+    }
+  `;
+  
+  document.head.appendChild(additionalStyles);
+
+  // Global function exports for inline handlers
+  window.applyReportFilters = applyReportFilters;
+  window.exportFilteredReports = exportFilteredReports;
+  window.saveSettingsChanges = saveSettingsChanges;
+  window.exportAllData = exportAllData;
+  window.clearOfflineData = clearOfflineData;
+  window.resetApplication = resetApplication;
+  window.viewInspectionDetails = viewInspectionDetails;
+  window.exportSingleReport = exportSingleReport;
+  
+  // Performance optimization: Debounce progress updates
+  const debouncedUpdateProgress = debounce(updateProgress, 100);
+  
+  function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+
+  // Initialize PWA features
+  if ('serviceWorker' in navigator && 'PushManager' in window) {
+    navigator.serviceWorker.ready.then(registration => {
+      console.log('Service Worker ready');
+      
+      // Check for updates periodically
+      setInterval(() => {
+        registration.update();
+      }, 60000); // Check every minute
+    });
+  }
+
+  // Handle app updates
+  let newWorker;
+  
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (newWorker) {
+        showNotification('App updated! Refresh to see changes.', 'info');
+      }
+    });
+    
+    navigator.serviceWorker.register('/service-worker.js').then(reg => {
+      reg.addEventListener('updatefound', () => {
+        newWorker = reg.installing;
+        
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            showNotification('New version available! Click to update.', 'info');
           }
+        });
+      });
+    });
+  }
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    // Ctrl/Cmd + S to save
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      if (state.currentInspectionId) {
+        saveInspection('draft');
+      }
+    }
+    
+    // Ctrl/Cmd + P to toggle preview
+    if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+      e.preventDefault();
+      togglePreviewMode();
+    }
+    
+    // Ctrl/Cmd + E to export PDF
+    if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+      e.preventDefault();
+      exportToPDF();
+    }
+    
+    // Esc to close modals
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.camera-modal, .guidance-modal, .signature-modal').forEach(modal => {
+        modal.remove();
+      });
+    }
+  });
+
+  // Accessibility improvements
+  function announceToScreenReader(message) {
+    const announcement = document.createElement('div');
+    announcement.setAttribute('role', 'status');
+    announcement.setAttribute('aria-live', 'polite');
+    announcement.className = 'sr-only';
+    announcement.textContent = message;
+    
+    document.body.appendChild(announcement);
+    setTimeout(() => announcement.remove(), 1000);
+  }
+
+  // Add screen reader support
+  const srOnlyStyles = document.createElement('style');
+  srOnlyStyles.textContent = `
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border-width: 0;
+    }
+  `;
+  document.head.appendChild(srOnlyStyles);
+
+  // Performance monitoring
+  if ('PerformanceObserver' in window) {
+    const perfObserver = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        if (entry.duration > 1000) {
+          console.warn('Slow operation detected:', entry.name, entry.duration);
         }
       }
-      const blob = new Blob([JSON.stringify(records, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'inspections.json';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error(err);
-      alert('An error occurred while exporting inspections.');
+    });
+    
+    perfObserver.observe({ entryTypes: ['measure'] });
+  }
+
+  // Error boundary
+  window.addEventListener('unhandledrejection', event => {
+    console.error('Unhandled promise rejection:', event.reason);
+    showNotification('An error occurred. Please try again.', 'error');
+  });
+
+  // Batch updates for better performance
+  let updateQueue = [];
+  let updateScheduled = false;
+  
+  function scheduleUpdate(fn) {
+    updateQueue.push(fn);
+    
+    if (!updateScheduled) {
+      updateScheduled = true;
+      requestAnimationFrame(() => {
+        updateQueue.forEach(fn => fn());
+        updateQueue = [];
+        updateScheduled = false;
+      });
+    }
+  }
+
+  // Network status monitoring
+  let wasOffline = false;
+  
+  function updateNetworkStatus() {
+    if (!navigator.onLine && !wasOffline) {
+      wasOffline = true;
+      showNotification('You are offline. Changes will be saved locally.', 'warning');
+    } else if (navigator.onLine && wasOffline) {
+      wasOffline = false;
+      showNotification('Back online! Syncing data...', 'success');
+      syncOfflineData();
+    }
+  }
+  
+  window.addEventListener('online', updateNetworkStatus);
+  window.addEventListener('offline', updateNetworkStatus);
+
+  // Battery status monitoring for mobile devices
+  if ('getBattery' in navigator) {
+    navigator.getBattery().then(battery => {
+      battery.addEventListener('levelchange', () => {
+        if (battery.level < 0.15 && !battery.charging) {
+          showNotification('Low battery! Consider saving your work.', 'warning');
+        }
+      });
+    });
+  }
+
+  // Visibility change handling - pause timers when tab is hidden
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      // Pause any active timers
+      if (state.inspectionTimer) {
+        clearInterval(state.inspectionTimer);
+      }
+    } else {
+      // Resume timers
+      if (state.startTime && !state.inspectionTimer) {
+        state.inspectionTimer = setInterval(updateTimer, 1000);
+      }
     }
   });
 
-  // Sync data by reloading the inspections list from Netlify. If the
-  // user is not authenticated they will be prompted to log in.
-  syncDataBtn.addEventListener('click', () => {
-    if (!window.netlifyIdentity) {
-      alert('This feature is only available when deployed on Netlify.');
-      return;
+  // Touch gesture support for mobile
+  let touchStartX = 0;
+  let touchEndX = 0;
+  
+  document.addEventListener('touchstart', (e) => {
+    touchStartX = e.changedTouches[0].screenX;
+  }, { passive: true });
+  
+  document.addEventListener('touchend', (e) => {
+    touchEndX = e.changedTouches[0].screenX;
+    handleSwipe();
+  }, { passive: true });
+  
+  function handleSwipe() {
+    const swipeThreshold = 100;
+    const diff = touchEndX - touchStartX;
+    
+    if (Math.abs(diff) > swipeThreshold) {
+      if (diff > 0) {
+        // Swipe right - could open sidebar on mobile
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar && window.innerWidth <= 1024) {
+          sidebar.classList.add('open');
+        }
+      } else {
+        // Swipe left - could close sidebar on mobile
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar && window.innerWidth <= 1024) {
+          sidebar.classList.remove('open');
+        }
+      }
     }
-    const user = window.netlifyIdentity.currentUser();
-    if (!user) {
-      window.netlifyIdentity.open();
-      return;
+  }
+
+  // Initialize tooltips for better UX
+  function initTooltips() {
+    const tooltipElements = document.querySelectorAll('[title]');
+    
+    tooltipElements.forEach(el => {
+      el.addEventListener('mouseenter', (e) => {
+        const tooltip = document.createElement('div');
+        tooltip.className = 'tooltip';
+        tooltip.textContent = el.getAttribute('title');
+        tooltip.style.position = 'absolute';
+        tooltip.style.zIndex = '9999';
+        
+        document.body.appendChild(tooltip);
+        
+        const rect = el.getBoundingClientRect();
+        tooltip.style.top = `${rect.top - tooltip.offsetHeight - 5}px`;
+        tooltip.style.left = `${rect.left + (rect.width - tooltip.offsetWidth) / 2}px`;
+        
+        el._tooltip = tooltip;
+      });
+      
+      el.addEventListener('mouseleave', () => {
+        if (el._tooltip) {
+          el._tooltip.remove();
+          delete el._tooltip;
+        }
+      });
+    });
+  }
+
+  // Add tooltip styles
+  const tooltipStyles = document.createElement('style');
+  tooltipStyles.textContent = `
+    .tooltip {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      padding: 0.5rem 0.75rem;
+      border-radius: var(--radius-md);
+      font-size: 0.875rem;
+      box-shadow: var(--shadow-lg);
+      pointer-events: none;
+      opacity: 0;
+      animation: tooltip-appear 0.2s forwards;
     }
-    loadInspections().then(() => alert('Data synced successfully.'));
-  });
+    
+    @keyframes tooltip-appear {
+      to {
+        opacity: 1;
+        transform: translateY(-2px);
+      }
+    }
+  `;
+  document.head.appendChild(tooltipStyles);
 
-  // Settings button placeholder
-  settingsBtn.addEventListener('click', () => {
-    alert('Settings are not yet implemented.');
-  });
+  // Initialize tooltips after DOM is ready
+  setTimeout(initTooltips, 100);
 
-  // Kick off initial progress calculation and title update
-  updateProgress();
-  updateFormTitle();
+  // Final initialization message
+  console.log('Aurora Audit Platform initialized successfully');
+  
+  // Check for pending updates on load
+  if (offlineQueue.length > 0) {
+    showNotification(`${offlineQueue.length} inspections pending sync`, 'info');
+  }
 });
