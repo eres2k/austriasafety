@@ -1,6 +1,5 @@
 [build]
-  # The directory to publish. We ship everything from the repository root
-  # because this is a static client‑side application.
+  # The directory to publish
   publish = "./"
   # Functions directory
   functions = "netlify/functions"
@@ -17,8 +16,10 @@
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
-    Content-Security-Policy = "default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://identity.netlify.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://identity.netlify.com"
+    # Fixed: Allow geolocation
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(self)"
+    # Fixed: Allow blob: URLs for dynamically created scripts and proper CSP
+    Content-Security-Policy = "default-src 'self' https: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://identity.netlify.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://identity.netlify.com /.netlify/functions/* /.netlify/blobs/*; media-src 'self' blob:; worker-src 'self' blob:;"
 
 [[headers]]
   for = "/manifest.json"
@@ -34,7 +35,7 @@
 # Redirects for SPA and API
 [[redirects]]
   from = "/.netlify/blobs/*"
-  to = "/.netlify/functions/blob"
+  to = "/.netlify/functions/blob?path=:splat"
   status = 200
   force = true
 
@@ -44,8 +45,7 @@
   status = 200
 
 [[redirects]]
-  # Serve index.html for all routes. This makes the SPA work when
-  # navigating directly to nested paths.
+  # Serve index.html for all routes
   from = "/*"
   to = "/index.html"
   status = 200
