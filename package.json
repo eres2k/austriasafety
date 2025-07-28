@@ -6,7 +6,8 @@
   "scripts": {
     "build": "echo 'No build required'",
     "dev": "netlify dev",
-    "deploy": "netlify deploy --prod"
+    "deploy": "netlify deploy --prod",
+    "install-functions": "cd netlify/functions && npm install"
   },
   "keywords": [
     "audit",
@@ -18,7 +19,8 @@
   "author": "Aurora Systems",
   "license": "MIT",
   "dependencies": {
-    "@netlify/functions": "^2.4.0"
+    "@netlify/functions": "^2.4.0",
+    "@netlify/blobs": "^7.0.0"
   },
   "devDependencies": {
     "netlify-cli": "^17.0.0"
