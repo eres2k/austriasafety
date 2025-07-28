@@ -1,65 +1,43 @@
 [build]
-  # The directory to publish
   publish = "./"
-  # Functions directory
   functions = "netlify/functions"
 
 [functions]
-  # Configure the blob function
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
-# Headers for security and PWA
+# Simplified headers that work
 [[headers]]
   for = "/*"
   [headers.values]
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    # Fixed: Allow geolocation
     Permissions-Policy = "camera=(), microphone=(), geolocation=(self)"
-    # Fixed: Allow blob: URLs for dynamically created scripts and proper CSP
-    Content-Security-Policy = "default-src 'self' https: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://identity.netlify.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://identity.netlify.com /.netlify/functions/* /.netlify/blobs/*; media-src 'self' blob:; worker-src 'self' blob:;"
+    # Simplified CSP without wildcards
+    Content-Security-Policy = "default-src 'self' https: blob: data:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' data: https:; img-src 'self' data: blob: https:; connect-src 'self' https:; media-src 'self' blob:; worker-src 'self' blob:;"
 
 [[headers]]
   for = "/manifest.json"
   [headers.values]
     Content-Type = "application/manifest+json"
-    Cache-Control = "public, max-age=3600"
 
 [[headers]]
   for = "/service-worker.js"
   [headers.values]
     Cache-Control = "no-cache"
 
-# Redirects for SPA and API
-[[redirects]]
-  from = "/.netlify/blobs/*"
-  to = "/.netlify/functions/blob?path=:splat"
-  status = 200
-  force = true
-
+# API redirects
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
 
+# SPA support
 [[redirects]]
-  # Serve index.html for all routes
   from = "/*"
   to = "/index.html"
   status = 200
 
-# Enable Netlify Identity
-[build.environment]
-  NETLIFY_USE_YARN = "false"
-
-# Context specific settings
-[context.production]
-  environment = { NODE_ENV = "production" }
-
-[context.deploy-preview]
-  environment = { NODE_ENV = "development" }
-
-[context.branch-deploy]
-  environment = { NODE_ENV = "development" }
+[context.production.environment]
+  NODE_ENV = "production"
