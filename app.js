@@ -252,12 +252,12 @@ document.addEventListener('DOMContentLoaded', () => {
   /*                    Navigation & View Management                    */
   /* ------------------------------------------------------------------ */
   
-  function setActiveSection(section) {
+function setActiveSection(section) {
     console.log('Setting active section:', section);
     
-    // Hide all sections
+    // Remove active class from all sections
     document.querySelectorAll('[data-section]').forEach(el => {
-      el.style.display = 'none';
+      el.classList.remove('active');
     });
     
     // Hide all category sections
@@ -265,11 +265,32 @@ document.addEventListener('DOMContentLoaded', () => {
       el.style.display = 'none';
     });
     
-    // Show selected section
+    // Add active class to selected section
     const sectionEl = document.querySelector(`[data-section="${section}"]`);
     if (sectionEl) {
-      sectionEl.style.display = 'block';
-      console.log('Section found and displayed:', section);
+      sectionEl.classList.add('active');
+      console.log('Section found and activated:', section);
+      
+      // Section-specific initialization
+      switch (section) {
+        case 'dashboard':
+          // Dashboard is already visible, just update stats if needed
+          break;
+        case 'inspections':
+          if (!state.currentCategory) {
+            showInspectionOverview();
+          }
+          break;
+        case 'reports':
+          renderReports();
+          break;
+        case 'analytics':
+          renderAnalytics();
+          break;
+        case 'settings':
+          renderSettings();
+          break;
+      }
     } else {
       console.error('Section not found:', section);
     }
@@ -293,32 +314,11 @@ document.addEventListener('DOMContentLoaded', () => {
       closeMobileMenu();
     }
     
-    // Section-specific initialization
-    switch (section) {
-      case 'dashboard':
-        // Dashboard is already visible, just update stats if needed
-        break;
-      case 'inspections':
-        if (!state.currentCategory) {
-          showInspectionOverview();
-        }
-        break;
-      case 'reports':
-        renderReports();
-        break;
-      case 'analytics':
-        renderAnalytics();
-        break;
-      case 'settings':
-        renderSettings();
-        break;
-    }
-    
     // Reset current category when switching main sections
     if (section !== 'inspections') {
       state.currentCategory = null;
     }
-  }
+}
 
   function setCategorySection(category) {
     console.log('Setting category section:', category);
@@ -2441,11 +2441,17 @@ document.addEventListener('DOMContentLoaded', () => {
   /*                      Settings Management                           */
   /* ------------------------------------------------------------------ */
   
-  function renderSettings() {
+ function renderSettings() {
     const container = document.querySelector('[data-section="settings"]');
-    if (!container) return;
+    if (!container) {
+      console.error('Settings container not found');
+      return;
+    }
     
-    container.innerHTML = `
+    // Clear existing content
+    container.innerHTML = '';
+    
+    const settingsHTML = `
       <div class="content-card">
         <div class="content-header">
           <h2 class="content-title">
@@ -2566,6 +2572,8 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
     `;
+    
+   container.innerHTML = settingsHTML;
     
     // Attach event listeners
     attachSettingsListeners();
@@ -3233,8 +3241,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // Set default date to today
   elements.inspectionDateInput.valueAsDate = new Date();
   
-  // Initialize view
-  setActiveSection('dashboard');
+ // Initialize view - ensure only dashboard is visible at start
+document.querySelectorAll('[data-section]').forEach(section => {
+    if (section.dataset.section === 'dashboard') {
+        section.classList.add('active');
+    } else {
+        section.classList.remove('active');
+    }
+});
+setActiveSection('dashboard');
   
   // Setup mobile menu
   setupMobileMenu();

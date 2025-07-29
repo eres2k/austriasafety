@@ -1125,10 +1125,6 @@ html, body {
 .z-10 { z-index: 10; }
 .z-50 { z-index: 50; }
 
-/* Force dashboard visibility on load */
-[data-section="dashboard"] {
-    display: block !important;
-}
 
 /* Analytics canvas styling */
 #analytics-chart {
@@ -1853,4 +1849,52 @@ html, body {
     .touchable:active {
         transform: scale(0.98);
     }
+}
+
+/* Add this to the end of your mystyle.css file */
+
+/* Section visibility management */
+[data-section] {
+    display: none; /* Hide all sections by default */
+}
+
+/* Only show the active section */
+[data-section].active {
+    display: block !important;
+}
+
+/* Category sections */
+[data-category-section] {
+    display: none;
+}
+
+[data-category-section].active {
+    display: block !important;
+}
+
+/* Ensure sections take full space when visible */
+.main-content > [data-section] {
+    width: 100%;
+    min-height: 100%;
+}
+
+/* Fix any z-index issues */
+.main-content {
+    position: relative;
+    z-index: 1;
+}
+
+[data-section] {
+    position: relative;
+    z-index: 2;
+}
+
+/* Ensure category sections are also handled */
+[data-category-section] {
+    display: none;
+}
+
+[data-category-section].active,
+[data-category-section][style*="display: block"] {
+    display: block !important;
 }
