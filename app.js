@@ -243,44 +243,49 @@ document.addEventListener('DOMContentLoaded', () => {
   /*                    Navigation & View Management                    */
   /* ------------------------------------------------------------------ */
   
-  function setActiveSection(section) {
+function setActiveSection(section) {
+    console.log('Setting active section:', section); // Debug log
+    
     // Hide all sections
     document.querySelectorAll('[data-section]').forEach(el => {
-      el.style.display = 'none';
+        el.style.display = 'none';
     });
     
     // Show selected section
     const sectionEl = document.querySelector(`[data-section="${section}"]`);
     if (sectionEl) {
-      sectionEl.style.display = '';
+        sectionEl.style.display = 'block'; // Use 'block' instead of empty string
+        console.log('Section found and displayed:', section);
+    } else {
+        console.error('Section not found:', section);
     }
     
     // Update nav states
     Object.values(elements.navItems).forEach(item => {
-      item?.classList.remove('active');
+        item?.classList.remove('active');
     });
     
     if (elements.navItems[section]) {
-      elements.navItems[section].classList.add('active');
+        elements.navItems[section].classList.add('active');
     }
     
     // Section-specific initialization
     switch (section) {
-      case 'inspections':
-        updateFormTitle();
-        updateProgress();
-        break;
-      case 'reports':
-        renderReports();
-        break;
-      case 'analytics':
-        renderAnalytics();
-        break;
-      case 'settings':
-        renderSettings();
-        break;
+        case 'inspections':
+            updateFormTitle();
+            updateProgress();
+            break;
+        case 'reports':
+            renderReports();
+            break;
+        case 'analytics':
+            renderAnalytics();
+            break;
+        case 'settings':
+            renderSettings();
+            break;
     }
-  }
+}
 
   // Navigation event listeners
   Object.entries(elements.navItems).forEach(([section, element]) => {
