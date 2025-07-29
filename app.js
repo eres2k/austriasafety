@@ -4991,8 +4991,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     renderQuestions();
   }
-  
-  async function saveQuestions() {
+
+javascript  async function saveQuestions() {
     if (!window.netlifyIdentity) return;
     
     const user = window.netlifyIdentity.currentUser();
@@ -5011,4 +5011,10 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         body: JSON.stringify(questions)
       });
-    } catch (err)
+    } catch (err) {
+      console.error('Failed to save questions', err);
+    }
+  }
+  
+  // Close the DOMContentLoaded event listener
+});
