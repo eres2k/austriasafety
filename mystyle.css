@@ -1863,6 +1863,17 @@ html, body {
     display: block !important;
 }
 
+/* Ensure sections take full space when visible */
+.main-content > [data-section] {
+    width: 100%;
+    min-height: 100%;
+}
+
+/* Fix initial visibility */
+[data-section="dashboard"] {
+    display: block; /* Dashboard visible by default */
+}
+
 /* Category sections */
 [data-category-section] {
     display: none;
