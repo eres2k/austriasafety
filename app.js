@@ -4315,3 +4315,40 @@ function setActiveSection(section) {
     showNotification(`${offlineQueue.length} inspections pending sync`, 'info');
   }
 });
+
+
+
+// Immediate initialization to ensure dashboard is visible
+(function() {
+    // Wait for DOM to be ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeApp);
+    } else {
+        // DOM is already ready
+        initializeApp();
+    }
+    
+    function initializeApp() {
+        console.log('Initializing Aurora Audit Platform...');
+        
+        // Force dashboard to be visible immediately
+        const dashboardSection = document.querySelector('[data-section="dashboard"]');
+        if (dashboardSection) {
+            dashboardSection.style.display = 'block';
+            console.log('Dashboard section made visible');
+        } else {
+            console.error('Dashboard section not found!');
+            // Debug: show what sections exist
+            console.log('Available sections:', document.querySelectorAll('[data-section]'));
+        }
+        
+        // Hide other sections
+        ['inspections', 'reports', 'analytics', 'settings'].forEach(section => {
+            const el = document.querySelector(`[data-section="${section}"]`);
+            if (el) el.style.display = 'none';
+        });
+        
+        // Run the rest of your initialization
+        // This ensures the dashboard is visible even if other initialization fails
+    }
+})();
