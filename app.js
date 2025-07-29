@@ -3241,15 +3241,27 @@ function setActiveSection(section) {
   // Set default date to today
   elements.inspectionDateInput.valueAsDate = new Date();
   
- // Initialize view - ensure only dashboard is visible at start
-document.querySelectorAll('[data-section]').forEach(section => {
-    if (section.dataset.section === 'dashboard') {
-        section.classList.add('active');
-    } else {
-        section.classList.remove('active');
-    }
+// Initialize view - ensure only dashboard is visible at start
+document.addEventListener('DOMContentLoaded', () => {
+    // Wait for DOM to be fully loaded
+    setTimeout(() => {
+        // Reset all sections first
+        document.querySelectorAll('[data-section]').forEach(section => {
+            section.style.display = 'none';
+            section.classList.remove('active');
+        });
+        
+        // Show dashboard
+        const dashboardSection = document.querySelector('[data-section="dashboard"]');
+        if (dashboardSection) {
+            dashboardSection.style.display = 'block';
+            dashboardSection.classList.add('active');
+        }
+        
+        // Initialize navigation
+        setActiveSection('dashboard');
+    }, 100);
 });
-setActiveSection('dashboard');
   
   // Setup mobile menu
   setupMobileMenu();
