@@ -1855,17 +1855,20 @@ html, body {
 
 /* Section visibility management */
 [data-section] {
-    display: none !important; /* Hide all sections by default */
+    display: none; /* Hide all sections by default */
 }
 
 /* Only show the active section */
-[data-section].active,
-[data-section][style*="display: block"] {
-    display: block !important; /* Override any inline styles */
+[data-section].active {
+    display: block !important;
 }
 
-/* Initial state - show dashboard */
-[data-section="dashboard"] {
+/* Category sections */
+[data-category-section] {
+    display: none;
+}
+
+[data-category-section].active {
     display: block !important;
 }
 
