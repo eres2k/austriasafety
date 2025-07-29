@@ -255,9 +255,9 @@ document.addEventListener('DOMContentLoaded', () => {
 function setActiveSection(section) {
     console.log('Setting active section:', section);
     
-    // Hide all sections first
+    // Remove active class from all sections
     document.querySelectorAll('[data-section]').forEach(el => {
-      el.style.display = 'none';
+      el.classList.remove('active');
     });
     
     // Hide all category sections
@@ -265,11 +265,11 @@ function setActiveSection(section) {
       el.style.display = 'none';
     });
     
-    // Show selected section
+    // Add active class to selected section
     const sectionEl = document.querySelector(`[data-section="${section}"]`);
     if (sectionEl) {
-      sectionEl.style.display = 'block';
-      console.log('Section found and displayed:', section);
+      sectionEl.classList.add('active');
+      console.log('Section found and activated:', section);
       
       // Section-specific initialization
       switch (section) {
@@ -318,7 +318,7 @@ function setActiveSection(section) {
     if (section !== 'inspections') {
       state.currentCategory = null;
     }
-  }
+}
 
   function setCategorySection(category) {
     console.log('Setting category section:', category);
@@ -3241,11 +3241,15 @@ function setActiveSection(section) {
   // Set default date to today
   elements.inspectionDateInput.valueAsDate = new Date();
   
-  // Initialize view - ensure only dashboard is visible at start
-  document.querySelectorAll('[data-section]').forEach(section => {
-    section.style.display = section.dataset.section === 'dashboard' ? 'block' : 'none';
-  });
-  setActiveSection('dashboard');
+ // Initialize view - ensure only dashboard is visible at start
+document.querySelectorAll('[data-section]').forEach(section => {
+    if (section.dataset.section === 'dashboard') {
+        section.classList.add('active');
+    } else {
+        section.classList.remove('active');
+    }
+});
+setActiveSection('dashboard');
   
   // Setup mobile menu
   setupMobileMenu();
