@@ -3576,7 +3576,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (offlineQueue.length > 0) {
     showNotification(`${offlineQueue.length} inspections pending sync`, 'info');
   }
-}); {
+}); 
             console.warn('File upload failed, continuing...', err);
           }
         }
