@@ -1850,3 +1850,48 @@ html, body {
         transform: scale(0.98);
     }
 }
+
+/* Add this to the end of your mystyle.css file */
+
+/* Section visibility management */
+[data-section] {
+    display: none !important; /* Hide all sections by default */
+}
+
+/* Only show the active section */
+[data-section].active,
+[data-section][style*="display: block"] {
+    display: block !important; /* Override any inline styles */
+}
+
+/* Initial state - show dashboard */
+[data-section="dashboard"] {
+    display: block !important;
+}
+
+/* Ensure sections take full space when visible */
+.main-content > [data-section] {
+    width: 100%;
+    min-height: 100%;
+}
+
+/* Fix any z-index issues */
+.main-content {
+    position: relative;
+    z-index: 1;
+}
+
+[data-section] {
+    position: relative;
+    z-index: 2;
+}
+
+/* Ensure category sections are also handled */
+[data-category-section] {
+    display: none;
+}
+
+[data-category-section].active,
+[data-category-section][style*="display: block"] {
+    display: block !important;
+}
