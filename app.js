@@ -252,10 +252,10 @@ document.addEventListener('DOMContentLoaded', () => {
   /*                    Navigation & View Management                    */
   /* ------------------------------------------------------------------ */
   
-  function setActiveSection(section) {
+function setActiveSection(section) {
     console.log('Setting active section:', section);
     
-    // Hide all sections
+    // Hide all sections first
     document.querySelectorAll('[data-section]').forEach(el => {
       el.style.display = 'none';
     });
@@ -270,6 +270,27 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sectionEl) {
       sectionEl.style.display = 'block';
       console.log('Section found and displayed:', section);
+      
+      // Section-specific initialization
+      switch (section) {
+        case 'dashboard':
+          // Dashboard is already visible, just update stats if needed
+          break;
+        case 'inspections':
+          if (!state.currentCategory) {
+            showInspectionOverview();
+          }
+          break;
+        case 'reports':
+          renderReports();
+          break;
+        case 'analytics':
+          renderAnalytics();
+          break;
+        case 'settings':
+          renderSettings();
+          break;
+      }
     } else {
       console.error('Section not found:', section);
     }
@@ -291,27 +312,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Close mobile menu after navigation
     if (window.innerWidth <= 1024) {
       closeMobileMenu();
-    }
-    
-    // Section-specific initialization
-    switch (section) {
-      case 'dashboard':
-        // Dashboard is already visible, just update stats if needed
-        break;
-      case 'inspections':
-        if (!state.currentCategory) {
-          showInspectionOverview();
-        }
-        break;
-      case 'reports':
-        renderReports();
-        break;
-      case 'analytics':
-        renderAnalytics();
-        break;
-      case 'settings':
-        renderSettings();
-        break;
     }
     
     // Reset current category when switching main sections
@@ -2441,11 +2441,17 @@ document.addEventListener('DOMContentLoaded', () => {
   /*                      Settings Management                           */
   /* ------------------------------------------------------------------ */
   
-  function renderSettings() {
+ function renderSettings() {
     const container = document.querySelector('[data-section="settings"]');
-    if (!container) return;
+    if (!container) {
+      console.error('Settings container not found');
+      return;
+    }
     
-    container.innerHTML = `
+    // Clear existing content
+    container.innerHTML = '';
+    
+    const settingsHTML = `
       <div class="content-card">
         <div class="content-header">
           <h2 class="content-title">
@@ -2566,6 +2572,8 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
     `;
+    
+   container.innerHTML = settingsHTML;
     
     // Attach event listeners
     attachSettingsListeners();
@@ -3233,7 +3241,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Set default date to today
   elements.inspectionDateInput.valueAsDate = new Date();
   
-  // Initialize view
+  // Initialize view - ensure only dashboard is visible at start
+  document.querySelectorAll('[data-section]').forEach(section => {
+    section.style.display = section.dataset.section === 'dashboard' ? 'block' : 'none';
+  });
   setActiveSection('dashboard');
   
   // Setup mobile menu
