@@ -6,6 +6,8 @@
     <title>Aurora Audit Platform</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#6366f1">
     <style>
         /* Modern Design System */
         :root {
@@ -263,6 +265,7 @@
             transition: var(--transition-base);
             position: relative;
             overflow: hidden;
+            cursor: pointer;
         }
 
         .nav-item:hover {
@@ -675,7 +678,7 @@
 
         .content-header {
             display: flex;
-            justify-content: between;
+            justify-content: space-between;
             align-items: center;
             margin-bottom: var(--space-xl);
             padding-bottom: var(--space-lg);
@@ -1132,6 +1135,17 @@
         .absolute { position: absolute; }
         .z-10 { z-index: 10; }
         .z-50 { z-index: 50; }
+
+        /* Force dashboard visibility on load */
+        [data-section="dashboard"] {
+            display: block !important;
+        }
+        
+        /* Analytics canvas styling */
+        #analytics-chart {
+            max-width: 100%;
+            height: auto;
+        }
     </style>
 </head>
 <body>
@@ -1146,10 +1160,10 @@
                 <span>Aurora Audit</span>
             </div>
             <nav class="header-nav">
-                <a href="#" class="nav-item active" id="nav-dashboard" data-section="dashboard">Dashboard</a>
-                <a href="#" class="nav-item" id="nav-inspections" data-section="inspections">Inspections</a>
-                <a href="#" class="nav-item" id="nav-reports" data-section="reports">Reports</a>
-                <a href="#" class="nav-item" id="nav-analytics" data-section="analytics">Analytics</a>
+                <a class="nav-item active" id="nav-dashboard">Dashboard</a>
+                <a class="nav-item" id="nav-inspections">Inspections</a>
+                <a class="nav-item" id="nav-reports">Reports</a>
+                <a class="nav-item" id="nav-analytics">Analytics</a>
             </nav>
         </div>
         <div class="header-right">
@@ -1207,28 +1221,28 @@
                 </button>
 
                 <!-- Quick Actions -->
-                    <div class="section">
-                        <div class="section-header">
-                            <h3 class="section-title">Quick Actions</h3>
-                        </div>
-                        <div class="flex flex-col gap-sm">
-                            <button class="btn btn-secondary btn-full" id="import-questions-btn">
-                                <i class="fas fa-upload"></i> Import Questions
-                            </button>
-                            <button class="btn btn-secondary btn-full" id="export-questions-btn">
-                                <i class="fas fa-download"></i> Export Questions
-                            </button>
-                            <button class="btn btn-secondary btn-full" id="export-reports-btn">
-                                <i class="fas fa-file-export"></i> Export Reports
-                            </button>
-                            <button class="btn btn-secondary btn-full" id="sync-data-btn">
-                                <i class="fas fa-sync-alt"></i> Sync Data
-                            </button>
-                            <button class="btn btn-secondary btn-full" id="settings-btn">
-                                <i class="fas fa-cog"></i> Settings
-                            </button>
-                        </div>
+                <div class="section">
+                    <div class="section-header">
+                        <h3 class="section-title">Quick Actions</h3>
                     </div>
+                    <div class="flex flex-col gap-sm">
+                        <button class="btn btn-secondary btn-full" id="import-questions-btn">
+                            <i class="fas fa-upload"></i> Import Questions
+                        </button>
+                        <button class="btn btn-secondary btn-full" id="export-questions-btn">
+                            <i class="fas fa-download"></i> Export Questions
+                        </button>
+                        <button class="btn btn-secondary btn-full" id="export-reports-btn">
+                            <i class="fas fa-file-export"></i> Export Reports
+                        </button>
+                        <button class="btn btn-secondary btn-full" id="sync-data-btn">
+                            <i class="fas fa-sync-alt"></i> Sync Data
+                        </button>
+                        <button class="btn btn-secondary btn-full" id="settings-btn">
+                            <i class="fas fa-cog"></i> Settings
+                        </button>
+                    </div>
+                </div>
 
                 <!-- Pending Inspections -->
                 <div class="section">
@@ -1260,232 +1274,244 @@
 
         <!-- Main Content Area -->
         <main class="main-content fade-in">
-            <!-- Dashboard Statistics -->
-            <div class="dashboard-grid" data-section="dashboard">
-                <div class="stat-card bounce-in">
-                    <div class="stat-value">247</div>
-                    <div class="stat-label">Total Inspections</div>
-                    <div class="stat-change positive">
-                        <i class="fas fa-arrow-up"></i>
-                        <span>+12% this month</span>
+            <!-- Dashboard Section -->
+            <div data-section="dashboard">
+                <!-- Dashboard Statistics -->
+                <div class="dashboard-grid">
+                    <div class="stat-card bounce-in">
+                        <div class="stat-value">247</div>
+                        <div class="stat-label">Total Inspections</div>
+                        <div class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>+12% this month</span>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-clipboard-list"></i>
+                        </div>
                     </div>
-                    <div class="stat-icon">
-                        <i class="fas fa-clipboard-list"></i>
+                    
+                    <div class="stat-card bounce-in" style="animation-delay: 0.1s;">
+                        <div class="stat-value">28</div>
+                        <div class="stat-label">This Month</div>
+                        <div class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>+8 from last month</span>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card bounce-in" style="animation-delay: 0.2s;">
+                        <div class="stat-value">5</div>
+                        <div class="stat-label">Pending Sync</div>
+                        <div class="stat-change">
+                            <i class="fas fa-sync-alt"></i>
+                            <span>Ready to upload</span>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card bounce-in" style="animation-delay: 0.3s;">
+                        <div class="stat-value">94%</div>
+                        <div class="stat-label">Completion Rate</div>
+                        <div class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>+2% improvement</span>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
                     </div>
                 </div>
-                
-                <div class="stat-card bounce-in" style="animation-delay: 0.1s;">
-                    <div class="stat-value">28</div>
-                    <div class="stat-label">This Month</div>
-                    <div class="stat-change positive">
-                        <i class="fas fa-arrow-up"></i>
-                        <span>+8 from last month</span>
+
+                <!-- Recent Activity -->
+                <div class="content-card slide-up" style="animation-delay: 0.2s;">
+                    <div class="content-header">
+                        <h2 class="content-title">
+                            <i class="fas fa-history"></i>
+                            Recent Activity
+                        </h2>
+                        <button class="btn btn-secondary">
+                            <i class="fas fa-external-link-alt"></i>
+                            View All
+                        </button>
                     </div>
-                    <div class="stat-icon">
-                        <i class="fas fa-calendar-alt"></i>
-                    </div>
-                </div>
-                
-                <div class="stat-card bounce-in" style="animation-delay: 0.2s;">
-                    <div class="stat-value">5</div>
-                    <div class="stat-label">Pending Sync</div>
-                    <div class="stat-change">
-                        <i class="fas fa-sync-alt"></i>
-                        <span>Ready to upload</span>
-                    </div>
-                    <div class="stat-icon">
-                        <i class="fas fa-cloud-upload-alt"></i>
-                    </div>
-                </div>
-                
-                <div class="stat-card bounce-in" style="animation-delay: 0.3s;">
-                    <div class="stat-value">94%</div>
-                    <div class="stat-label">Completion Rate</div>
-                    <div class="stat-change positive">
-                        <i class="fas fa-arrow-up"></i>
-                        <span>+2% improvement</span>
-                    </div>
-                    <div class="stat-icon">
-                        <i class="fas fa-chart-line"></i>
+
+                    <div class="list">
+                        <div class="list-item">
+                            <div class="list-item-header">
+                                <div class="list-item-title">DVI2 - Equipment Safety Inspection Completed</div>
+                                <div class="status-indicator status-completed">
+                                    <i class="fas fa-check"></i>
+                                    Completed
+                                </div>
+                            </div>
+                            <div class="list-item-content">
+                                All conveyor belt safety guards verified and functional. No issues found.
+                            </div>
+                            <div class="list-item-meta">
+                                <i class="fas fa-user"></i> Sarah Wilson • <i class="fas fa-clock"></i> 2 hours ago
+                            </div>
+                        </div>
+
+                        <div class="list-item">
+                            <div class="list-item-header">
+                                <div class="list-item-title">DAP5 - Fire Safety Audit</div>
+                                <div class="status-indicator status-pending">
+                                    <i class="fas fa-clock"></i>
+                                    In Progress
+                                </div>
+                            </div>
+                            <div class="list-item-content">
+                                Emergency lighting system testing in progress. 3 of 8 sections completed.
+                            </div>
+                            <div class="list-item-meta">
+                                <i class="fas fa-user"></i> Mike Johnson • <i class="fas fa-clock"></i> 1 day ago
+                            </div>
+                        </div>
+
+                        <div class="list-item">
+                            <div class="list-item-header">
+                                <div class="list-item-title">DVI3 - Environmental Compliance Check</div>
+                                <div class="status-indicator status-error">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    Issues Found
+                                </div>
+                            </div>
+                            <div class="list-item-content">
+                                Waste segregation protocols need improvement. Training scheduled for next week.
+                            </div>
+                            <div class="list-item-meta">
+                                <i class="fas fa-user"></i> Lisa Chen • <i class="fas fa-clock"></i> 2 days ago
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Inspection Form -->
-            <div class="content-card slide-up" data-section="inspections" style="display:none;">
-                <div class="content-header">
-                    <h2 class="content-title" id="inspection-title">
-                        <i class="fas fa-shield-check"></i>
-                        Inspection
-                    </h2>
-                    <div class="content-actions">
-                        <button class="btn btn-secondary" id="preview-mode-btn">
-                            <i class="fas fa-eye"></i> Preview Mode
-                        </button>
-                        <button class="btn btn-secondary" id="save-draft-btn">
-                            <i class="fas fa-save"></i> Save Draft
-                        </button>
-                        <button class="btn btn-warning" id="export-pdf-btn">
-                            <i class="fas fa-file-pdf"></i> Export PDF
-                        </button>
-                        <button class="btn btn-success" id="submit-inspection-btn">
-                            <i class="fas fa-check-circle"></i> Submit Inspection
-                        </button>
-                    </div>
-                </div>
-
-                <form class="audit-form">
-                    <!-- Auditor Information -->
-                    <div class="form-section">
-                        <h3 class="form-section-title">
-                            <i class="fas fa-user-check"></i>
-                            Auditor Information
-                        </h3>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg);">
-                            <div class="form-group">
-                                <label class="form-label">Auditor Name(s) *</label>
-                                <input type="text" id="auditor-names" class="form-control" placeholder="John Doe, Jane Smith">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Inspection Date *</label>
-                                <input type="date" id="inspection-date" class="form-control">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Progress Indicator -->
-                    <div class="form-section">
-                        <div class="flex items-center justify-between">
-                            <span class="form-label">Progress</span>
-                            <span id="progress-status" style="color: var(--text-secondary); font-size: 0.875rem;">0 of 0 completed</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="progress-fill"></div>
-                        </div>
-                    </div>
-
-                    <!-- Questions Section -->
-                    <div class="form-section">
-                        <h3 class="form-section-title">
-                            <i class="fas fa-clipboard-question"></i>
-                            Safety Checklist
-                        </h3>
-                        <!-- Dynamically generated questions will be inserted here -->
-                        <div id="questions-section"></div>
-                    </div>
-
-                    <!-- Form Actions -->
-                    <div class="flex justify-between items-center" style="margin-top: var(--space-2xl);">
-                        <div class="flex items-center gap-md">
-                            <div class="status-indicator status-pending">
-                                <i class="fas fa-clock"></i>
-                                Auto-saving...
-                            </div>
-                            <span style="color: var(--text-muted); font-size: 0.875rem;">
-                                Last saved 2 minutes ago
-                            </span>
-                        </div>
-                        <div class="flex gap-md">
-                            <button type="button" class="btn btn-secondary">
-                                <i class="fas fa-arrow-left"></i>
-                                Previous
+            <!-- Inspection Form Section -->
+            <div data-section="inspections" style="display:none;">
+                <div class="content-card slide-up">
+                    <div class="content-header">
+                        <h2 class="content-title" id="inspection-title">
+                            <i class="fas fa-shield-check"></i>
+                            Inspection
+                        </h2>
+                        <div class="content-actions">
+                            <button class="btn btn-secondary" id="preview-mode-btn">
+                                <i class="fas fa-eye"></i> Preview Mode
                             </button>
-                            <button type="button" class="btn btn-primary">
-                                Next Section
-                                <i class="fas fa-arrow-right"></i>
+                            <button class="btn btn-secondary" id="save-draft-btn">
+                                <i class="fas fa-save"></i> Save Draft
+                            </button>
+                            <button class="btn btn-warning" id="export-pdf-btn">
+                                <i class="fas fa-file-pdf"></i> Export PDF
+                            </button>
+                            <button class="btn btn-success" id="submit-inspection-btn">
+                                <i class="fas fa-check-circle"></i> Submit Inspection
                             </button>
                         </div>
                     </div>
-                </form>
-            </div>
 
-            <!-- Recent Activity -->
-            <div class="content-card slide-up" data-section="dashboard" style="animation-delay: 0.2s;">
-                <div class="content-header">
-                    <h2 class="content-title">
-                        <i class="fas fa-history"></i>
-                        Recent Activity
-                    </h2>
-                    <button class="btn btn-secondary">
-                        <i class="fas fa-external-link-alt"></i>
-                        View All
-                    </button>
-                </div>
-
-                <div class="list">
-                    <div class="list-item">
-                        <div class="list-item-header">
-                            <div class="list-item-title">DVI2 - Equipment Safety Inspection Completed</div>
-                            <div class="status-indicator status-completed">
-                                <i class="fas fa-check"></i>
-                                Completed
+                    <form class="audit-form">
+                        <!-- Auditor Information -->
+                        <div class="form-section">
+                            <h3 class="form-section-title">
+                                <i class="fas fa-user-check"></i>
+                                Auditor Information
+                            </h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg);">
+                                <div class="form-group">
+                                    <label class="form-label">Auditor Name(s) *</label>
+                                    <input type="text" id="auditor-names" class="form-control" placeholder="John Doe, Jane Smith">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Inspection Date *</label>
+                                    <input type="date" id="inspection-date" class="form-control">
+                                </div>
                             </div>
                         </div>
-                        <div class="list-item-content">
-                            All conveyor belt safety guards verified and functional. No issues found.
-                        </div>
-                        <div class="list-item-meta">
-                            <i class="fas fa-user"></i> Sarah Wilson • <i class="fas fa-clock"></i> 2 hours ago
-                        </div>
-                    </div>
 
-                    <div class="list-item">
-                        <div class="list-item-header">
-                            <div class="list-item-title">DAP5 - Fire Safety Audit</div>
-                            <div class="status-indicator status-pending">
-                                <i class="fas fa-clock"></i>
-                                In Progress
+                        <!-- Progress Indicator -->
+                        <div class="form-section">
+                            <div class="flex items-center justify-between">
+                                <span class="form-label">Progress</span>
+                                <span id="progress-status" style="color: var(--text-secondary); font-size: 0.875rem;">0 of 0 completed</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill"></div>
                             </div>
                         </div>
-                        <div class="list-item-content">
-                            Emergency lighting system testing in progress. 3 of 8 sections completed.
-                        </div>
-                        <div class="list-item-meta">
-                            <i class="fas fa-user"></i> Mike Johnson • <i class="fas fa-clock"></i> 1 day ago
-                        </div>
-                    </div>
 
-                    <div class="list-item">
-                        <div class="list-item-header">
-                            <div class="list-item-title">DVI3 - Environmental Compliance Check</div>
-                            <div class="status-indicator status-error">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                Issues Found
+                        <!-- Questions Section -->
+                        <div class="form-section">
+                            <h3 class="form-section-title">
+                                <i class="fas fa-clipboard-question"></i>
+                                Safety Checklist
+                            </h3>
+                            <!-- Dynamically generated questions will be inserted here -->
+                            <div id="questions-section"></div>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="flex justify-between items-center" style="margin-top: var(--space-2xl);">
+                            <div class="flex items-center gap-md">
+                                <div class="status-indicator status-pending">
+                                    <i class="fas fa-clock"></i>
+                                    Auto-saving...
+                                </div>
+                                <span style="color: var(--text-muted); font-size: 0.875rem;">
+                                    Last saved 2 minutes ago
+                                </span>
+                            </div>
+                            <div class="flex gap-md">
+                                <button type="button" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left"></i>
+                                    Previous
+                                </button>
+                                <button type="button" class="btn btn-primary">
+                                    Next Section
+                                    <i class="fas fa-arrow-right"></i>
+                                </button>
                             </div>
                         </div>
-                        <div class="list-item-content">
-                            Waste segregation protocols need improvement. Training scheduled for next week.
-                        </div>
-                        <div class="list-item-meta">
-                            <i class="fas fa-user"></i> Lisa Chen • <i class="fas fa-clock"></i> 2 days ago
-                        </div>
-                    </div>
+                    </form>
                 </div>
             </div>
 
             <!-- Reports Section -->
-            <div class="content-card" data-section="reports" style="display:none;">
-                <div class="content-header">
-                    <h2 class="content-title">
-                        <i class="fas fa-file-alt"></i>
-                        Reports
-                    </h2>
+            <div data-section="reports" style="display:none;">
+                <div class="content-card">
+                    <div class="content-header">
+                        <h2 class="content-title">
+                            <i class="fas fa-file-alt"></i>
+                            Reports
+                        </h2>
+                    </div>
+                    <!-- Container for generated reports list -->
+                    <div id="reports-container" class="reports-list" style="margin-top: 1rem;"></div>
                 </div>
-                <!-- Container for generated reports list -->
-                <div id="reports-container" class="reports-list" style="margin-top: 1rem;"></div>
             </div>
 
             <!-- Analytics Section -->
-            <div class="content-card" data-section="analytics" style="display:none;">
-                <div class="content-header">
-                    <h2 class="content-title">
-                        <i class="fas fa-chart-pie"></i>
-                        Analytics
-                    </h2>
+            <div data-section="analytics" style="display:none;">
+                <div class="content-card">
+                    <div class="content-header">
+                        <h2 class="content-title">
+                            <i class="fas fa-chart-pie"></i>
+                            Analytics
+                        </h2>
+                    </div>
+                    <!-- Chart container for analytics -->
+                    <canvas id="analytics-chart" width="400" height="200" style="margin-top:1rem;"></canvas>
                 </div>
-                <!-- Chart container for analytics -->
-                <canvas id="analytics-chart" width="400" height="200" style="margin-top:1rem;"></canvas>
             </div>
+
+            <!-- Settings Section (dynamically created) -->
+            <div data-section="settings" style="display:none;"></div>
         </main>
     </div>
 
@@ -1493,6 +1519,7 @@
     <button class="fab" title="Quick Actions">
         <i class="fas fa-plus"></i>
     </button>
+
     <!-- Third-party and Application Scripts -->
     <!-- Load Chart.js for analytics visualisation -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
