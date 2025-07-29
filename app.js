@@ -5015,6 +5015,182 @@ javascript  async function saveQuestions() {
       console.error('Failed to save questions', err);
     }
   }
-  
+
+
+// Mobile-specific functionality
+document.addEventListener('DOMContentLoaded', () => {
+    // Mobile menu toggle
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+    const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+    
+    if (mobileMenuBtn) {
+        mobileMenuBtn.addEventListener('click', () => {
+            sidebar.classList.add('open');
+            sidebarOverlay.classList.add('active');
+            sidebarOverlay.style.display = 'block';
+            mobileMenuBtn.classList.add('active');
+        });
+    }
+    
+    if (closeSidebarBtn) {
+        closeSidebarBtn.addEventListener('click', closeMobileSidebar);
+    }
+    
+    if (sidebarOverlay) {
+        sidebarOverlay.addEventListener('click', closeMobileSidebar);
+    }
+    
+    function closeMobileSidebar() {
+        sidebar.classList.remove('open');
+        sidebarOverlay.classList.remove('active');
+        setTimeout(() => {
+            sidebarOverlay.style.display = 'none';
+        }, 300);
+        mobileMenuBtn?.classList.remove('active');
+    }
+    
+    // Mobile bottom navigation
+    const mobileNavItems = document.querySelectorAll('.mobile-nav-item[data-section]');
+    mobileNavItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const section = item.dataset.section;
+            setActiveSection(section);
+            
+            // Update active state
+            mobileNavItems.forEach(nav => nav.classList.remove('active'));
+            item.classList.add('active');
+        });
+    });
+    
+    // Mobile FAB
+    const mobileFab = document.getElementById('mobile-new-inspection');
+    const actionSheet = document.getElementById('mobile-action-sheet');
+    
+    if (mobileFab) {
+        mobileFab.addEventListener('click', () => {
+            actionSheet.classList.add('active');
+            actionSheet.style.display = 'block';
+        });
+    }
+    
+    // Action sheet
+    const actionSheetOptions = document.querySelectorAll('.action-sheet-option');
+    const actionSheetCancel = document.querySelector('.action-sheet-cancel');
+    const actionSheetBackdrop = document.querySelector('.action-sheet-backdrop');
+    
+    actionSheetOptions.forEach(option => {
+        option.addEventListener('click', () => {
+            const action = option.dataset.action;
+            handleActionSheetOption(action);
+            closeActionSheet();
+        });
+    });
+    
+    [actionSheetCancel, actionSheetBackdrop].forEach(el => {
+        el?.addEventListener('click', closeActionSheet);
+    });
+    
+    function closeActionSheet() {
+        actionSheet.classList.remove('active');
+        setTimeout(() => {
+            actionSheet.style.display = 'none';
+        }, 300);
+    }
+    
+    function handleActionSheetOption(action) {
+        switch (action) {
+            case 'new-inspection':
+                setActiveSection('inspections');
+                resetForm();
+                startInspectionTimer();
+                break;
+            case 'import':
+                importQuestions();
+                break;
+            case 'export':
+                exportQuestions();
+                break;
+            case 'sync':
+                syncOfflineData();
+                break;
+        }
+    }
+    
+    // Pull to refresh
+    let pullStartY = 0;
+    let pullMoveY = 0;
+    const pullThreshold = 80;
+    const mainContent = document.querySelector('.main-content');
+    const ptr = document.querySelector('.ptr-preloader');
+    
+    if (mainContent && ptr) {
+        mainContent.addEventListener('touchstart', (e) => {
+            if (mainContent.scrollTop === 0) {
+                pullStartY = e.touches[0].pageY;
+            }
+        });
+        
+        mainContent.addEventListener('touchmove', (e) => {
+            if (pullStartY > 0) {
+                pullMoveY = e.touches[0].pageY;
+                const pullDistance = pullMoveY - pullStartY;
+                
+                if (pullDistance > 0 && mainContent.scrollTop === 0) {
+                    e.preventDefault();
+                    const opacity = Math.min(pullDistance / pullThreshold, 1);
+                    ptr.style.opacity = opacity;
+                    ptr.style.transform = `scale(${0.7 + opacity * 0.3})`;
+                    
+                    if (pullDistance > pullThreshold) {
+                        ptr.classList.add('active');
+                    } else {
+                        ptr.classList.remove('active');
+                    }
+                }
+            }
+        });
+        
+        mainContent.addEventListener('touchend', () => {
+            if (pullMoveY - pullStartY > pullThreshold && ptr.classList.contains('active')) {
+                // Trigger refresh
+                refreshData();
+            }
+            
+            pullStartY = 0;
+            pullMoveY = 0;
+            ptr.style.opacity = 0;
+            ptr.style.transform = 'scale(0.7)';
+            ptr.classList.remove('active');
+        });
+    }
+    
+    async function refreshData() {
+        showNotification('Refreshing...', 'info');
+        await loadInspections();
+        showNotification('Data refreshed', 'success');
+    }
+    
+    // Prevent overscroll on iOS
+    document.body.addEventListener('touchmove', (e) => {
+        if (!e.target.closest('.main-content') && !e.target.closest('.sidebar')) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+    
+    // Add touch feedback
+    document.querySelectorAll('.touchable, .btn, .mobile-nav-item').forEach(el => {
+        el.addEventListener('touchstart', () => {
+            el.style.opacity = '0.7';
+        });
+        
+        el.addEventListener('touchend', () => {
+            setTimeout(() => {
+                el.style.opacity = '1';
+            }, 100);
+        });
+    });
+});
   // Close the DOMContentLoaded event listener
 });
