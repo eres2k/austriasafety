@@ -255,24 +255,26 @@ document.addEventListener('DOMContentLoaded', () => {
 function setActiveSection(section) {
     console.log('Setting active section:', section);
     
-    // Remove active class from all sections
+    // Hide all sections first
     document.querySelectorAll('[data-section]').forEach(el => {
-      el.classList.remove('active');
+        el.style.display = 'none';
+        el.classList.remove('active');
     });
     
     // Hide all category sections
     document.querySelectorAll('[data-category-section]').forEach(el => {
-      el.style.display = 'none';
+        el.style.display = 'none';
     });
     
-    // Add active class to selected section
+    // Show the selected section
     const sectionEl = document.querySelector(`[data-section="${section}"]`);
     if (sectionEl) {
-      sectionEl.classList.add('active');
-      console.log('Section found and activated:', section);
-      
-      // Section-specific initialization
-      switch (section) {
+        sectionEl.style.display = 'block';
+        sectionEl.classList.add('active');
+        console.log('Section found and activated:', section);
+        
+        // Section-specific initialization
+        switch (section) {
         case 'dashboard':
           // Dashboard is already visible, just update stats if needed
           break;
