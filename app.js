@@ -2069,9 +2069,134 @@ document.addEventListener('DOMContentLoaded', () => {
               body: file
             });
           } catch (err) {
-      console.error('Failed to save questions', err);
+            console.warn('File upload failed, continuing...', err);
+          }
+        }
+      }
+      
+      // Save inspection data
+      const saveResponse = await fetch(`/.netlify/functions/blob?path=${encodeURIComponent(basePath + '/record.json')}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      });
+      
+      hideLoadingIndicator();
+      
+      if (!saveResponse.ok) {
+        throw new Error('Failed to save to blob storage');
+      }
+      
+      // Stop timer if submitting
+      if (status === 'completed') {
+        stopInspectionTimer();
+      }
+      
+      showNotification(
+        status === 'completed' 
+          ? 'Inspection submitted successfully!' 
+          : 'Draft saved successfully!',
+        'success'
+      );
+      
+      // Reload inspections list
+      await loadInspections();
+      
+      // Reset form if completed
+      if (status === 'completed') {
+        resetForm();
+      }
+      
+    } catch (error) {
+      console.error('Save error:', error);
+      hideLoadingIndicator();
+      
+      // Fallback to local storage
+      const localInspections = JSON.parse(localStorage.getItem('local-inspections') || '[]');
+      const existingIndex = localInspections.findIndex(ins => ins.id === data.id);
+      if (existingIndex >= 0) {
+        localInspections[existingIndex] = data;
+      } else {
+        localInspections.push(data);
+      }
+      localStorage.setItem('local-inspections', JSON.stringify(localInspections));
+      
+      // Add to offline queue
+      offlineQueue.push(data);
+      localStorage.setItem('offline-queue', JSON.stringify(offlineQueue));
+      
+      showNotification('Saved locally. Will sync to cloud when possible.', 'warning');
+      
+      // Reload to show in lists
+      await loadInspections();
+      if (status === 'completed') {
+        resetForm();
+      }
     }
   }
+
+  async function syncOfflineData() {
+    if (offlineQueue.length === 0) {
+      showNotification('No offline data to sync', 'info');
+      return;
+    }
+    
+    if (!navigator.onLine) {
+      showNotification('No internet connection', 'error');
+      return;
+    }
+    
+    const user = window.netlifyIdentity?.currentUser();
+    if (!user) {
+      showNotification('Please log in to sync data', 'warning');
+      return;
+    }
+    
+    showLoadingIndicator(`Syncing ${offlineQueue.length} inspections...`);
+    
+    try {
+      const token = await user.jwt();
+      let synced = 0;
+      
+      for (const inspection of offlineQueue) {
+        const basePath = `inspections/${user.id}/${inspection.id}`;
+        
+        // Fixed: Use query parameter for path
+        await fetch(`/.netlify/functions/blob?path=${encodeURIComponent(basePath + '/record.json')}`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(inspection)
+        });
+        
+        synced++;
+      }
+      
+      // Clear offline queue
+      offlineQueue = [];
+      localStorage.setItem('offline-queue', '[]');
+      
+      hideLoadingIndicator();
+      showNotification(`Successfully synced ${synced} inspections`, 'success');
+      
+      // Reload inspections
+      await loadInspections();
+      
+    } catch (error) {
+      console.error('Sync error:', error);
+      hideLoadingIndicator();
+      showNotification('Failed to sync some inspections', 'error');
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*                      Import/Export Functions                       */
+  /* ------------------------------------------------------------------ */
   
   async function importQuestions() {
     const input = document.createElement('input');
@@ -2289,1417 +2414,6 @@ document.addEventListener('DOMContentLoaded', () => {
     modal.querySelector('.close-btn').onclick = () => {
       modal.remove();
     };
-  }
-  
-  // Additional CSS for new features
-  const additionalStyles = document.createElement('style');
-  additionalStyles.textContent = `
-    /* Enhanced styles for new features */
-    .notification {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      padding: 1rem 1.5rem;
-      background: var(--glass-bg);
-      backdrop-filter: blur(20px);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-lg);
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      transform: translateX(400px);
-      transition: transform 0.3s ease;
-      z-index: 1000;
-      max-width: 90vw;
-    }
-    
-    .notification.show {
-      transform: translateX(0);
-    }
-    
-    .notification-success {
-      border-color: var(--success);
-      color: var(--success);
-    }
-    
-    .notification-error {
-      border-color: var(--error);
-      color: var(--error);
-    }
-    
-    .notification-warning {
-      border-color: var(--warning);
-      color: var(--warning);
-    }
-    
-    .notification-info {
-      border-color: var(--primary);
-      color: var(--primary);
-    }
-    
-    .loading-indicator {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: var(--glass-elevated);
-      padding: 2rem;
-      border-radius: var(--radius-xl);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 1rem;
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.3s ease;
-      z-index: 9999;
-    }
-    
-    .loading-indicator.show {
-      opacity: 1;
-      visibility: visible;
-    }
-    
-    .loading-spinner {
-      width: 40px;
-      height: 40px;
-      border: 3px solid var(--glass-border);
-      border-top-color: var(--primary);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-    
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    
-    .camera-modal,
-    .guidance-modal,
-    .signature-modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.8);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
-      padding: 1rem;
-    }
-    
-    .camera-container,
-    .guidance-content,
-    .signature-container {
-      background: var(--bg-secondary);
-      border-radius: var(--radius-xl);
-      overflow: hidden;
-      max-width: 90vw;
-      max-height: 90vh;
-      width: 100%;
-      max-width: 600px;
-    }
-    
-    .camera-header,
-    .guidance-header,
-    .signature-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem;
-      border-bottom: 1px solid var(--glass-border);
-    }
-    
-    .camera-container video {
-      display: block;
-      width: 100%;
-      max-height: 60vh;
-    }
-    
-    .camera-controls {
-      display: flex;
-      justify-content: center;
-      padding: 1rem;
-    }
-    
-    .capture-btn {
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      background: var(--error);
-      border: 3px solid white;
-      color: white;
-      font-size: 1.5rem;
-      cursor: pointer;
-      transition: transform 0.2s;
-    }
-    
-    .capture-btn:active {
-      transform: scale(0.9);
-    }
-    
-    .risk-indicator {
-      margin-top: 1rem;
-      padding: 1rem;
-      border-radius: var(--radius-lg);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-    
-    .risk-low {
-      background: rgba(16, 185, 129, 0.1);
-      color: var(--success);
-    }
-    
-    .risk-medium {
-      background: rgba(245, 158, 11, 0.1);
-      color: var(--warning);
-    }
-    
-    .risk-high {
-      background: rgba(239, 68, 68, 0.1);
-      color: var(--error);
-    }
-    
-    .inspection-timer {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 1rem;
-      background: var(--surface);
-      border-radius: var(--radius-lg);
-      font-weight: 600;
-    }
-    
-    .high-risk {
-      border-color: var(--error) !important;
-    }
-    
-    .risk-answer:hover {
-      border-color: var(--error) !important;
-    }
-    
-    .preview-mode input:disabled,
-    .preview-mode textarea:disabled,
-    .preview-mode select:disabled {
-      opacity: 0.7;
-      cursor: not-allowed;
-    }
-    
-    .comment-field {
-      margin-top: 1rem;
-    }
-    
-    .comment-toggle {
-      background: var(--surface);
-      border: 1px solid var(--glass-border);
-      padding: 0.5rem 1rem;
-      border-radius: var(--radius-md);
-      color: var(--text-secondary);
-      cursor: pointer;
-      transition: var(--transition-base);
-    }
-    
-    .comment-toggle:hover {
-      background: var(--surface-hover);
-      color: var(--text-primary);
-    }
-    
-    .comment-input {
-      width: 100%;
-      margin-top: 0.5rem;
-      padding: 0.75rem;
-      background: var(--surface);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-lg);
-      color: var(--text-primary);
-      resize: vertical;
-      min-height: 80px;
-    }
-    
-    .number-input-wrapper {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    
-    .number-btn {
-      width: 36px;
-      height: 36px;
-      border-radius: var(--radius-md);
-      background: var(--surface);
-      border: 1px solid var(--glass-border);
-      color: var(--text-secondary);
-      cursor: pointer;
-      transition: var(--transition-base);
-    }
-    
-    .number-btn:hover {
-      background: var(--surface-hover);
-      color: var(--text-primary);
-    }
-    
-    .range-control {
-      padding: 1rem 0;
-    }
-    
-    .range-display {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
-    
-    .range-input {
-      flex: 1;
-      appearance: none;
-      height: 6px;
-      background: var(--surface);
-      border-radius: 3px;
-      outline: none;
-    }
-    
-    .range-input::-webkit-slider-thumb {
-      appearance: none;
-      width: 20px;
-      height: 20px;
-      background: var(--primary);
-      border-radius: 50%;
-      cursor: pointer;
-    }
-    
-    .range-value {
-      font-weight: 600;
-      min-width: 60px;
-      text-align: right;
-    }
-    
-    .range-value.optimal {
-      color: var(--success);
-    }
-    
-    .range-value.warning {
-      color: var(--warning);
-    }
-    
-    .optimal-range {
-      font-size: 0.875rem;
-      color: var(--text-muted);
-      margin-top: 0.5rem;
-    }
-    
-    .checklist-control {
-      padding: 1rem 0;
-    }
-    
-    .checked-count {
-      font-weight: 600;
-      margin-bottom: 0.75rem;
-      color: var(--text-secondary);
-    }
-    
-    .checklist-items {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 0.5rem;
-    }
-    
-    .checklist-item {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem;
-      background: var(--surface);
-      border-radius: var(--radius-md);
-    }
-    
-    .checklist-item:hover {
-      background: var(--surface-hover);
-    }
-    
-    .photo-control {
-      padding: 1rem 0;
-    }
-    
-    .photo-gallery {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-      gap: 0.75rem;
-      margin-bottom: 1rem;
-      min-height: 140px;
-      background: var(--surface);
-      border-radius: var(--radius-lg);
-      padding: 1rem;
-    }
-    
-    .photo-thumbnail {
-      width: 100%;
-      height: 120px;
-      object-fit: cover;
-      border-radius: var(--radius-md);
-      cursor: pointer;
-      transition: transform 0.2s;
-    }
-    
-    .photo-thumbnail:hover {
-      transform: scale(1.05);
-    }
-    
-    .photo-controls {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-    
-    .file-drop-zone {
-      padding: 2rem;
-      text-align: center;
-      cursor: pointer;
-      transition: var(--transition-base);
-    }
-    
-    .file-drop-zone.drag-over {
-      background: var(--surface-hover);
-      border-color: var(--primary);
-    }
-    
-    .file-list {
-      margin-top: 1rem;
-    }
-    
-    .file-item {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem;
-      background: var(--surface);
-      border-radius: var(--radius-md);
-      margin-bottom: 0.5rem;
-    }
-    
-    .file-name {
-      flex: 1;
-      font-size: 0.875rem;
-      color: var(--text-secondary);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    
-    .file-size {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-    }
-    
-    .file-remove {
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      cursor: pointer;
-      padding: 0.25rem;
-      transition: color 0.2s;
-    }
-    
-    .file-remove:hover {
-      color: var(--error);
-    }
-    
-    .report-filters {
-      display: flex;
-      gap: 1rem;
-      align-items: end;
-      margin-bottom: 2rem;
-      flex-wrap: wrap;
-    }
-    
-    .filter-group {
-      flex: 1;
-      min-width: 150px;
-    }
-    
-    .filter-group label {
-      display: block;
-      margin-bottom: 0.5rem;
-      font-weight: 600;
-      color: var(--text-secondary);
-      font-size: 0.875rem;
-    }
-    
-    .report-summary {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
-      margin-bottom: 2rem;
-    }
-    
-    .summary-stat {
-      background: var(--surface);
-      padding: 1.5rem;
-      border-radius: var(--radius-lg);
-      text-align: center;
-    }
-    
-    .summary-stat .stat-value {
-      font-size: 2rem;
-      font-weight: 700;
-      color: var(--primary);
-    }
-    
-    .summary-stat .stat-label {
-      font-size: 0.875rem;
-      color: var(--text-secondary);
-    }
-    
-    .report-item {
-      background: var(--surface);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-lg);
-      padding: 1.5rem;
-      margin-bottom: 1rem;
-      transition: var(--transition-base);
-    }
-    
-    .report-item:hover {
-      border-color: var(--primary);
-      transform: translateY(-2px);
-    }
-    
-    .report-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1rem;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-    
-    .report-title {
-      font-weight: 600;
-      color: var(--text-primary);
-    }
-    
-    .report-meta {
-      display: flex;
-      gap: 1.5rem;
-      margin-bottom: 1rem;
-      font-size: 0.875rem;
-      color: var(--text-secondary);
-      flex-wrap: wrap;
-    }
-    
-    .report-actions {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-    
-    .analytics-tabs {
-      display: flex;
-      gap: 0.5rem;
-      margin-bottom: 2rem;
-      border-bottom: 1px solid var(--glass-border);
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    
-    .tab-btn {
-      background: none;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      color: var(--text-secondary);
-      font-weight: 600;
-      cursor: pointer;
-      position: relative;
-      transition: color 0.2s;
-      white-space: nowrap;
-    }
-    
-    .tab-btn:hover {
-      color: var(--text-primary);
-    }
-    
-    .tab-btn.active {
-      color: var(--primary);
-    }
-    
-    .tab-btn.active::after {
-      content: '';
-      position: absolute;
-      bottom: -1px;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: var(--primary);
-    }
-    
-    .settings-content {
-      max-width: 800px;
-    }
-    
-    .settings-section {
-      margin-bottom: 2rem;
-    }
-    
-    .settings-section-title {
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: var(--text-primary);
-      margin-bottom: 1rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 1px solid var(--glass-border);
-    }
-    
-    .setting-item {
-      margin-bottom: 1rem;
-    }
-    
-    .setting-item label {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      color: var(--text-secondary);
-      cursor: pointer;
-    }
-    
-    .setting-item input[type="checkbox"] {
-      width: 20px;
-      height: 20px;
-      cursor: pointer;
-    }
-    
-    .setting-item .form-control {
-      margin-top: 0.5rem;
-    }
-    
-    .settings-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 1rem;
-      margin-top: 2rem;
-      padding-top: 2rem;
-      border-top: 1px solid var(--glass-border);
-    }
-    
-    .risk-badge {
-      display: inline-block;
-      padding: 0.25rem 0.5rem;
-      border-radius: var(--radius-sm);
-      font-size: 0.7rem;
-      font-weight: 700;
-      margin-left: 0.5rem;
-    }
-    
-    .risk-badge.risk-low {
-      background: rgba(16, 185, 129, 0.2);
-      color: var(--success);
-    }
-    
-    .risk-badge.risk-medium {
-      background: rgba(245, 158, 11, 0.2);
-      color: var(--warning);
-    }
-    
-    .risk-badge.risk-high {
-      background: rgba(239, 68, 68, 0.2);
-      color: var(--error);
-    }
-    
-    .signature-canvas {
-      border: 2px solid var(--glass-border);
-      border-radius: var(--radius-md);
-      background: white;
-      cursor: crosshair;
-    }
-    
-    .signature-body {
-      padding: 1.5rem;
-    }
-    
-    .signature-actions {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 1rem;
-    }
-    
-    .guidance-body {
-      padding: 1.5rem;
-      max-width: 600px;
-      color: var(--text-secondary);
-      line-height: 1.6;
-    }
-    
-    .close-btn {
-      background: none;
-      border: none;
-      color: var(--text-secondary);
-      font-size: 1.5rem;
-      cursor: pointer;
-      padding: 0.5rem;
-      transition: color 0.2s;
-    }
-    
-    .close-btn:hover {
-      color: var(--text-primary);
-    }
-    
-    .empty-state {
-      text-align: center;
-      padding: 3rem;
-      color: var(--text-muted);
-    }
-    
-    .info-btn {
-      background: none;
-      border: none;
-      color: var(--primary);
-      font-size: 1.2rem;
-      cursor: pointer;
-      padding: 0.5rem;
-      transition: transform 0.2s;
-    }
-    
-    .info-btn:hover {
-      transform: scale(1.1);
-    }
-    
-    .risk-score {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      margin-top: 0.5rem;
-    }
-    
-    /* Category Navigation */
-    .category-navigation-bar {
-      margin-bottom: 2rem;
-    }
-    
-    .category-nav-header {
-      margin-bottom: 1rem;
-    }
-    
-    .category-nav-items {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-    
-    .category-nav-item {
-      padding: 0.75rem 1.5rem;
-      background: var(--surface);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-lg);
-      color: var(--text-secondary);
-      cursor: pointer;
-      transition: var(--transition-base);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-weight: 500;
-    }
-    
-    .category-nav-item:hover {
-      background: var(--surface-hover);
-      color: var(--text-primary);
-      border-color: var(--primary);
-    }
-    
-    .category-nav-item.active {
-      background: rgba(99, 102, 241, 0.1);
-      color: var(--primary);
-      border-color: var(--primary);
-    }
-    
-    /* Inspection Overview */
-    #inspection-overview {
-      margin-bottom: 2rem;
-    }
-    
-    .inspection-meta {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
-      margin-bottom: 2rem;
-      padding: 1.5rem;
-      background: var(--surface);
-      border-radius: var(--radius-lg);
-    }
-    
-    .meta-item {
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-    }
-    
-    .meta-label {
-      font-size: 0.875rem;
-      color: var(--text-muted);
-    }
-    
-    .meta-value {
-      font-weight: 600;
-      color: var(--text-primary);
-    }
-    
-    .category-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 1.5rem;
-      margin-bottom: 2rem;
-    }
-    
-    .category-card {
-      background: var(--surface);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-xl);
-      padding: 1.5rem;
-      cursor: pointer;
-      transition: var(--transition-base);
-      position: relative;
-      overflow: hidden;
-    }
-    
-    .category-card:hover {
-      border-color: var(--primary);
-      transform: translateY(-4px);
-      box-shadow: var(--shadow-lg);
-    }
-    
-    .category-icon {
-      width: 48px;
-      height: 48px;
-      background: linear-gradient(135deg, var(--primary), var(--secondary));
-      border-radius: var(--radius-lg);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: 1.5rem;
-      margin-bottom: 1rem;
-    }
-    
-    .category-title {
-      font-size: 1.125rem;
-      font-weight: 600;
-      color: var(--text-primary);
-      margin-bottom: 0.5rem;
-    }
-    
-    .category-stats {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.875rem;
-      color: var(--text-secondary);
-      margin-bottom: 1rem;
-    }
-    
-    .category-progress {
-      color: var(--primary);
-      font-weight: 600;
-    }
-    
-    .inspection-actions {
-      display: flex;
-      gap: 1rem;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-    
-    .category-progress {
-      margin-bottom: 2rem;
-      padding: 1.5rem;
-      background: var(--surface);
-      border-radius: var(--radius-lg);
-    }
-    
-    .category-questions {
-      margin-bottom: 2rem;
-    }
-    
-    .category-navigation {
-      margin-top: 2rem;
-      padding-top: 2rem;
-      border-top: 1px solid var(--glass-border);
-    }
-    
-    .category-indicator {
-      font-size: 0.875rem;
-      color: var(--text-muted);
-    }
-    
-    /* Mobile Menu Toggle */
-    .mobile-menu-toggle {
-      display: none;
-      background: none;
-      border: none;
-      color: var(--text-primary);
-      font-size: 1.5rem;
-      cursor: pointer;
-      padding: 0.5rem;
-      margin-right: 1rem;
-    }
-    
-    /* Dark mode adjustments */
-    body.dark-mode {
-      --bg-primary: #000000;
-      --bg-secondary: #0a0a0a;
-      --bg-tertiary: #141414;
-      --text-primary: #ffffff;
-      --text-secondary: #a0a0a0;
-      --text-muted: #666666;
-    }
-    
-    body.dark-mode .signature-canvas {
-      background: #f0f0f0;
-    }
-    
-    /* Mobile responsiveness for new features */
-    @media (max-width: 1024px) {
-      .mobile-menu-toggle {
-        display: block;
-      }
-      
-      body.menu-open {
-        overflow: hidden;
-      }
-      
-      .user-text {
-        display: none;
-      }
-      
-      .category-grid {
-        grid-template-columns: 1fr;
-      }
-      
-      .header-nav {
-        display: none;
-      }
-    }
-    
-    @media (max-width: 768px) {
-      .notification {
-        right: 10px;
-        left: 10px;
-        max-width: calc(100vw - 20px);
-      }
-      
-      .report-filters {
-        flex-direction: column;
-      }
-      
-      .filter-group {
-        width: 100%;
-      }
-      
-      .camera-container,
-      .guidance-content,
-      .signature-container {
-        margin: 1rem;
-        max-width: calc(100vw - 2rem);
-      }
-      
-      .checklist-items {
-        grid-template-columns: 1fr;
-      }
-      
-      .photo-gallery {
-        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-      }
-      
-      .analytics-tabs {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-      }
-      
-      .tab-btn {
-        white-space: nowrap;
-      }
-      
-      .category-nav-items {
-        flex-direction: column;
-      }
-      
-      .category-nav-item {
-        width: 100%;
-        justify-content: center;
-      }
-      
-      .inspection-meta {
-        grid-template-columns: 1fr;
-      }
-      
-      .report-summary {
-        grid-template-columns: 1fr;
-      }
-    }
-    
-    /* Print styles for PDF export */
-    @media print {
-      .header-bar,
-      .sidebar,
-      .content-actions,
-      .btn,
-      .voice-btn,
-      .camera-btn,
-      .info-btn,
-      .comment-toggle,
-      .file-upload,
-      .photo-controls {
-        display: none !important;
-      }
-      
-      .main-content {
-        margin: 0;
-        padding: 20px;
-      }
-      
-      .question-card {
-        page-break-inside: avoid;
-        border: 1px solid #ddd;
-        margin-bottom: 10px;
-      }
-      
-      .question-text {
-        font-weight: bold;
-        color: #000;
-      }
-      
-      .comment-input {
-        display: block !important;
-        border: 1px solid #ddd;
-      }
-    }
-  `;
-  
-  document.head.appendChild(additionalStyles);
-
-  // Global function exports for inline handlers
-  window.applyReportFilters = applyReportFilters;
-  window.exportFilteredReports = exportFilteredReports;
-  window.saveSettingsChanges = saveSettingsChanges;
-  window.exportAllData = exportAllData;
-  window.clearOfflineData = clearOfflineData;
-  window.resetApplication = resetApplication;
-  window.viewInspectionDetails = viewInspectionDetails;
-  window.exportSingleReport = exportSingleReport;
-  window.setCategorySection = setCategorySection;
-  window.showInspectionOverview = showInspectionOverview;
-  window.startFullInspection = startFullInspection;
-  window.continueLastInspection = continueLastInspection;
-  window.submitInspection = submitInspection;
-  
-  // Performance optimization: Debounce progress updates
-  const debouncedUpdateProgress = debounce(updateProgress, 100);
-  
-  function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-      const later = () => {
-        clearTimeout(timeout);
-        func(...args);
-      };
-      clearTimeout(timeout);
-      timeout = setTimeout(later, wait);
-    };
-  }
-
-  // Initialize PWA features
-  if ('serviceWorker' in navigator && 'PushManager' in window) {
-    navigator.serviceWorker.ready.then(registration => {
-      console.log('Service Worker ready');
-      
-      // Check for updates periodically
-      setInterval(() => {
-        registration.update();
-      }, 60000); // Check every minute
-    });
-  }
-
-  // Handle app updates
-  let newWorker;
-  
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (newWorker) {
-        showNotification('App updated! Refresh to see changes.', 'info');
-      }
-    });
-    
-    navigator.serviceWorker.register('/service-worker.js').then(reg => {
-      reg.addEventListener('updatefound', () => {
-        newWorker = reg.installing;
-        
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            showNotification('New version available! Click to update.', 'info');
-          }
-        });
-      });
-    });
-  }
-
-  // Keyboard shortcuts
-  document.addEventListener('keydown', (e) => {
-    // Ctrl/Cmd + S to save
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-      e.preventDefault();
-      if (state.currentInspectionId) {
-        saveInspection('draft');
-      }
-    }
-    
-    // Ctrl/Cmd + P to toggle preview
-    if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
-      e.preventDefault();
-      togglePreviewMode();
-    }
-    
-    // Ctrl/Cmd + E to export PDF
-    if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
-      e.preventDefault();
-      exportToPDF();
-    }
-    
-    // Esc to close modals
-    if (e.key === 'Escape') {
-      document.querySelectorAll('.camera-modal, .guidance-modal, .signature-modal').forEach(modal => {
-        modal.remove();
-      });
-    }
-  });
-
-  // Accessibility improvements
-  function announceToScreenReader(message) {
-    const announcement = document.createElement('div');
-    announcement.setAttribute('role', 'status');
-    announcement.setAttribute('aria-live', 'polite');
-    announcement.className = 'sr-only';
-    announcement.textContent = message;
-    
-    document.body.appendChild(announcement);
-    setTimeout(() => announcement.remove(), 1000);
-  }
-
-  // Add screen reader support
-  const srOnlyStyles = document.createElement('style');
-  srOnlyStyles.textContent = `
-    .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      border-width: 0;
-    }
-  `;
-  document.head.appendChild(srOnlyStyles);
-
-  // Performance monitoring
-  if ('PerformanceObserver' in window) {
-    const perfObserver = new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) {
-        if (entry.duration > 1000) {
-          console.warn('Slow operation detected:', entry.name, entry.duration);
-        }
-      }
-    });
-    
-    perfObserver.observe({ entryTypes: ['measure'] });
-  }
-
-  // Error boundary
-  window.addEventListener('unhandledrejection', event => {
-    console.error('Unhandled promise rejection:', event.reason);
-    showNotification('An error occurred. Please try again.', 'error');
-  });
-
-  // Batch updates for better performance
-  let updateQueue = [];
-  let updateScheduled = false;
-  
-  function scheduleUpdate(fn) {
-    updateQueue.push(fn);
-    
-    if (!updateScheduled) {
-      updateScheduled = true;
-      requestAnimationFrame(() => {
-        updateQueue.forEach(fn => fn());
-        updateQueue = [];
-        updateScheduled = false;
-      });
-    }
-  }
-
-  // Network status monitoring
-  let wasOffline = false;
-  
-  function updateNetworkStatus() {
-    if (!navigator.onLine && !wasOffline) {
-      wasOffline = true;
-      showNotification('You are offline. Changes will be saved locally.', 'warning');
-    } else if (navigator.onLine && wasOffline) {
-      wasOffline = false;
-      showNotification('Back online! Syncing data...', 'success');
-      syncOfflineData();
-    }
-  }
-  
-  window.addEventListener('online', updateNetworkStatus);
-  window.addEventListener('offline', updateNetworkStatus);
-
-  // Battery status monitoring for mobile devices
-  if ('getBattery' in navigator) {
-    navigator.getBattery().then(battery => {
-      battery.addEventListener('levelchange', () => {
-        if (battery.level < 0.15 && !battery.charging) {
-          showNotification('Low battery! Consider saving your work.', 'warning');
-        }
-      });
-    });
-  }
-
-  // Visibility change handling - pause timers when tab is hidden
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      // Pause any active timers
-      if (state.inspectionTimer) {
-        clearInterval(state.inspectionTimer);
-      }
-    } else {
-      // Resume timers
-      if (state.startTime && !state.inspectionTimer) {
-        state.inspectionTimer = setInterval(updateTimer, 1000);
-      }
-    }
-  });
-
-  // Touch gesture support for mobile
-  let touchStartX = 0;
-  let touchEndX = 0;
-  
-  document.addEventListener('touchstart', (e) => {
-    touchStartX = e.changedTouches[0].screenX;
-  }, { passive: true });
-  
-  document.addEventListener('touchend', (e) => {
-    touchEndX = e.changedTouches[0].screenX;
-    handleSwipe();
-  }, { passive: true });
-  
-  function handleSwipe() {
-    const swipeThreshold = 100;
-    const diff = touchEndX - touchStartX;
-    
-    if (Math.abs(diff) > swipeThreshold) {
-      if (diff > 0) {
-        // Swipe right - could open sidebar on mobile
-        const sidebar = document.querySelector('.sidebar');
-        if (sidebar && window.innerWidth <= 1024) {
-          sidebar.classList.add('open');
-        }
-      } else {
-        // Swipe left - could close sidebar on mobile
-        const sidebar = document.querySelector('.sidebar');
-        if (sidebar && window.innerWidth <= 1024) {
-          sidebar.classList.remove('open');
-        }
-      }
-    }
-  }
-
-  // Initialize tooltips for better UX
-  function initTooltips() {
-    const tooltipElements = document.querySelectorAll('[title]');
-    
-    tooltipElements.forEach(el => {
-      el.addEventListener('mouseenter', (e) => {
-        const tooltip = document.createElement('div');
-        tooltip.className = 'tooltip';
-        tooltip.textContent = el.getAttribute('title');
-        tooltip.style.position = 'absolute';
-        tooltip.style.zIndex = '9999';
-        
-        document.body.appendChild(tooltip);
-        
-        const rect = el.getBoundingClientRect();
-        tooltip.style.top = `${rect.top - tooltip.offsetHeight - 5}px`;
-        tooltip.style.left = `${rect.left + (rect.width - tooltip.offsetWidth) / 2}px`;
-        
-        el._tooltip = tooltip;
-      });
-      
-      el.addEventListener('mouseleave', () => {
-        if (el._tooltip) {
-          el._tooltip.remove();
-          delete el._tooltip;
-        }
-      });
-    });
-  }
-
-  // Add tooltip styles
-  const tooltipStyles = document.createElement('style');
-  tooltipStyles.textContent = `
-    .tooltip {
-      background: var(--bg-tertiary);
-      color: var(--text-primary);
-      padding: 0.5rem 0.75rem;
-      border-radius: var(--radius-md);
-      font-size: 0.875rem;
-      box-shadow: var(--shadow-lg);
-      pointer-events: none;
-      opacity: 0;
-      animation: tooltip-appear 0.2s forwards;
-    }
-    
-    @keyframes tooltip-appear {
-      to {
-        opacity: 1;
-        transform: translateY(-2px);
-      }
-    }
-  `;
-  document.head.appendChild(tooltipStyles);
-
-  // Initialize tooltips after DOM is ready
-  setTimeout(initTooltips, 100);
-
-  // Final initialization message
-  console.log('Aurora Audit Platform initialized successfully');
-  
-  // Check for pending updates on load
-  if (offlineQueue.length > 0) {
-    showNotification(`${offlineQueue.length} inspections pending sync`, 'info');
-  }
-}; 
-            console.warn('File upload failed, continuing...', err);
-          }
-        }
-      }
-      
-      // Save inspection data
-      const saveResponse = await fetch(`/.netlify/functions/blob?path=${encodeURIComponent(basePath + '/record.json')}`, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-      });
-      
-      hideLoadingIndicator();
-      
-      if (!saveResponse.ok) {
-        throw new Error('Failed to save to blob storage');
-      }
-      
-      // Stop timer if submitting
-      if (status === 'completed') {
-        stopInspectionTimer();
-      }
-      
-      showNotification(
-        status === 'completed' 
-          ? 'Inspection submitted successfully!' 
-          : 'Draft saved successfully!',
-        'success'
-      );
-      
-      // Reload inspections list
-      await loadInspections();
-      
-      // Reset form if completed
-      if (status === 'completed') {
-        resetForm();
-      }
-      
-    } catch (error) {
-      console.error('Save error:', error);
-      hideLoadingIndicator();
-      
-      // Fallback to local storage
-      const localInspections = JSON.parse(localStorage.getItem('local-inspections') || '[]');
-      const existingIndex = localInspections.findIndex(ins => ins.id === data.id);
-      if (existingIndex >= 0) {
-        localInspections[existingIndex] = data;
-      } else {
-        localInspections.push(data);
-      }
-      localStorage.setItem('local-inspections', JSON.stringify(localInspections));
-      
-      // Add to offline queue
-      offlineQueue.push(data);
-      localStorage.setItem('offline-queue', JSON.stringify(offlineQueue));
-      
-      showNotification('Saved locally. Will sync to cloud when possible.', 'warning');
-      
-      // Reload to show in lists
-      await loadInspections();
-      if (status === 'completed') {
-        resetForm();
-      }
-    }
-  }
-
-  async function syncOfflineData() {
-    if (offlineQueue.length === 0) {
-      showNotification('No offline data to sync', 'info');
-      return;
-    }
-    
-    if (!navigator.onLine) {
-      showNotification('No internet connection', 'error');
-      return;
-    }
-    
-    const user = window.netlifyIdentity?.currentUser();
-    if (!user) {
-      showNotification('Please log in to sync data', 'warning');
-      return;
-    }
-    
-    showLoadingIndicator(`Syncing ${offlineQueue.length} inspections...`);
-    
-    try {
-      const token = await user.jwt();
-      let synced = 0;
-      
-      for (const inspection of offlineQueue) {
-        const basePath = `inspections/${user.id}/${inspection.id}`;
-        
-        // Fixed: Use query parameter for path
-        await fetch(`/.netlify/functions/blob?path=${encodeURIComponent(basePath + '/record.json')}`, {
-          method: 'PUT',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(inspection)
-        });
-        
-        synced++;
-      }
-      
-      // Clear offline queue
-      offlineQueue = [];
-      localStorage.setItem('offline-queue', '[]');
-      
-      hideLoadingIndicator();
-      showNotification(`Successfully synced ${synced} inspections`, 'success');
-      
-      // Reload inspections
-      await loadInspections();
-      
-    } catch (error) {
-      console.error('Sync error:', error);
-      hideLoadingIndicator();
-      showNotification('Failed to sync some inspections', 'error');
-    }
   }
 
   /* ------------------------------------------------------------------ */
@@ -4992,7 +3706,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderQuestions();
   }
 
-javascript  async function saveQuestions() {
+  async function saveQuestions() {
     if (!window.netlifyIdentity) return;
     
     const user = window.netlifyIdentity.currentUser();
@@ -5016,9 +3730,1294 @@ javascript  async function saveQuestions() {
     }
   }
 
+  // Additional CSS for new features
+  const additionalStyles = document.createElement('style');
+  additionalStyles.textContent = `
+    /* Enhanced styles for new features */
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 1rem 1.5rem;
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      transform: translateX(400px);
+      transition: transform 0.3s ease;
+      z-index: 1000;
+      max-width: 90vw;
+    }
+    
+    .notification.show {
+      transform: translateX(0);
+    }
+    
+    .notification-success {
+      border-color: var(--success);
+      color: var(--success);
+    }
+    
+    .notification-error {
+      border-color: var(--error);
+      color: var(--error);
+    }
+    
+    .notification-warning {
+      border-color: var(--warning);
+      color: var(--warning);
+    }
+    
+    .notification-info {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+    
+    .loading-indicator {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--glass-elevated);
+      padding: 2rem;
+      border-radius: var(--radius-xl);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease;
+      z-index: 9999;
+    }
+    
+    .loading-indicator.show {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--glass-border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .camera-modal,
+    .guidance-modal,
+    .signature-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 1rem;
+    }
+    
+    .camera-container,
+    .guidance-content,
+    .signature-container {
+      background: var(--bg-secondary);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      max-width: 90vw;
+      max-height: 90vh;
+      width: 100%;
+      max-width: 600px;
+    }
+    
+    .camera-header,
+    .guidance-header,
+    .signature-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem;
+      border-bottom: 1px solid var(--glass-border);
+    }
+    
+    .camera-container video {
+      display: block;
+      width: 100%;
+      max-height: 60vh;
+    }
+    
+    .camera-controls {
+      display: flex;
+      justify-content: center;
+      padding: 1rem;
+    }
+    
+    .capture-btn {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: var(--error);
+      border: 3px solid white;
+      color: white;
+      font-size: 1.5rem;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    
+    .capture-btn:active {
+      transform: scale(0.9);
+    }
+    
+    .risk-indicator {
+      margin-top: 1rem;
+      padding: 1rem;
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    
+    .risk-low {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--success);
+    }
+    
+    .risk-medium {
+      background: rgba(245, 158, 11, 0.1);
+      color: var(--warning);
+    }
+    
+    .risk-high {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--error);
+    }
+    
+    .inspection-timer {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      font-weight: 600;
+    }
+    
+    .high-risk {
+      border-color: var(--error) !important;
+    }
+    
+    .risk-answer:hover {
+      border-color: var(--error) !important;
+    }
+    
+    .preview-mode input:disabled,
+    .preview-mode textarea:disabled,
+    .preview-mode select:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+    
+    .comment-field {
+      margin-top: 1rem;
+    }
+    
+    .comment-toggle {
+      background: var(--surface);
+      border: 1px solid var(--glass-border);
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-md);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: var(--transition-base);
+    }
+    
+    .comment-toggle:hover {
+      background: var(--surface-hover);
+      color: var(--text-primary);
+    }
+    
+    .comment-input {
+      width: 100%;
+      margin-top: 0.5rem;
+      padding: 0.75rem;
+      background: var(--surface);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      color: var(--text-primary);
+      resize: vertical;
+      min-height: 80px;
+    }
+    
+    .number-input-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .number-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      border: 1px solid var(--glass-border);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: var(--transition-base);
+    }
+    
+    .number-btn:hover {
+      background: var(--surface-hover);
+      color: var(--text-primary);
+    }
+    
+    .range-control {
+      padding: 1rem 0;
+    }
+    
+    .range-display {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    
+    .range-input {
+      flex: 1;
+      appearance: none;
+      height: 6px;
+      background: var(--surface);
+      border-radius: 3px;
+      outline: none;
+    }
+    
+    .range-input::-webkit-slider-thumb {
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      background: var(--primary);
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    
+    .range-value {
+      font-weight: 600;
+      min-width: 60px;
+      text-align: right;
+    }
+    
+    .range-value.optimal {
+      color: var(--success);
+    }
+    
+    .range-value.warning {
+      color: var(--warning);
+    }
+    
+    .optimal-range {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+    
+    .checklist-control {
+      padding: 1rem 0;
+    }
+    
+    .checked-count {
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: var(--text-secondary);
+    }
+    
+    .checklist-items {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.5rem;
+    }
+    
+    .checklist-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem;
+      background: var(--surface);
+      border-radius: var(--radius-md);
+    }
+    
+    .checklist-item:hover {
+      background: var(--surface-hover);
+    }
+    
+    .photo-control {
+      padding: 1rem 0;
+    }
+    
+    .photo-gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      min-height: 140px;
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      padding: 1rem;
+    }
+    
+    .photo-thumbnail {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    
+    .photo-thumbnail:hover {
+      transform: scale(1.05);
+    }
+    
+    .photo-controls {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    
+    .file-drop-zone {
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: var(--transition-base);
+    }
+    
+    .file-drop-zone.drag-over {
+      background: var(--surface-hover);
+      border-color: var(--primary);
+    }
+    
+    .file-list {
+      margin-top: 1rem;
+    }
+    
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem;
+      background: var(--surface);
+      border-radius: var(--radius-md);
+      margin-bottom: 0.5rem;
+    }
+    
+    .file-name {
+      flex: 1;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .file-size {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    
+    .file-remove {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0.25rem;
+      transition: color 0.2s;
+    }
+    
+    .file-remove:hover {
+      color: var(--error);
+    }
+    
+    .report-filters {
+      display: flex;
+      gap: 1rem;
+      align-items: end;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+    
+    .filter-group {
+      flex: 1;
+      min-width: 150px;
+    }
+    
+    .filter-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+    }
+    
+    .report-summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    
+    .summary-stat {
+      background: var(--surface);
+      padding: 1.5rem;
+      border-radius: var(--radius-lg);
+      text-align: center;
+    }
+    
+    .summary-stat .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    
+    .summary-stat .stat-label {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+    
+    .report-item {
+      background: var(--surface);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      transition: var(--transition-base);
+    }
+    
+    .report-item:hover {
+      border-color: var(--primary);
+      transform: translateY(-2px);
+    }
+    
+    .report-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    
+    .report-title {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    
+    .report-meta {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 1rem;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      flex-wrap: wrap;
+    }
+    
+    .report-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    
+    .analytics-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--glass-border);
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    .tab-btn {
+      background: none;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      color: var(--text-secondary);
+      font-weight: 600;
+      cursor: pointer;
+      position: relative;
+      transition: color 0.2s;
+      white-space: nowrap;
+    }
+    
+    .tab-btn:hover {
+      color: var(--text-primary);
+    }
+    
+    .tab-btn.active {
+      color: var(--primary);
+    }
+    
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--primary);
+    }
+    
+    .settings-content {
+      max-width: 800px;
+    }
+    
+    .settings-section {
+      margin-bottom: 2rem;
+    }
+    
+    .settings-section-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--glass-border);
+    }
+    
+    .setting-item {
+      margin-bottom: 1rem;
+    }
+    
+    .setting-item label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+    
+    .setting-item input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+    
+    .setting-item .form-control {
+      margin-top: 0.5rem;
+    }
+    
+    .settings-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 1rem;
+      margin-top: 2rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--glass-border);
+    }
+    
+    .risk-badge {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.7rem;
+      font-weight: 700;
+      margin-left: 0.5rem;
+    }
+    
+    .risk-badge.risk-low {
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--success);
+    }
+    
+    .risk-badge.risk-medium {
+      background: rgba(245, 158, 11, 0.2);
+      color: var(--warning);
+    }
+    
+    .risk-badge.risk-high {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--error);
+    }
+    
+    .signature-canvas {
+      border: 2px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      background: white;
+      cursor: crosshair;
+    }
+    
+    .signature-body {
+      padding: 1.5rem;
+    }
+    
+    .signature-actions {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 1rem;
+    }
+    
+    .guidance-body {
+      padding: 1.5rem;
+      max-width: 600px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+    
+    .close-btn {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 0.5rem;
+      transition: color 0.2s;
+    }
+    
+    .close-btn:hover {
+      color: var(--text-primary);
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-muted);
+    }
+    
+    .info-btn {
+      background: none;
+      border: none;
+      color: var(--primary);
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 0.5rem;
+      transition: transform 0.2s;
+    }
+    
+    .info-btn:hover {
+      transform: scale(1.1);
+    }
+    
+    .risk-score {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+    
+    /* Category Navigation */
+    .category-navigation-bar {
+      margin-bottom: 2rem;
+    }
+    
+    .category-nav-header {
+      margin-bottom: 1rem;
+    }
+    
+    .category-nav-items {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    
+    .category-nav-item {
+      padding: 0.75rem 1.5rem;
+      background: var(--surface);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: var(--transition-base);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 500;
+    }
+    
+    .category-nav-item:hover {
+      background: var(--surface-hover);
+      color: var(--text-primary);
+      border-color: var(--primary);
+    }
+    
+    .category-nav-item.active {
+      background: rgba(99, 102, 241, 0.1);
+      color: var(--primary);
+      border-color: var(--primary);
+    }
+    
+    /* Inspection Overview */
+    #inspection-overview {
+      margin-bottom: 2rem;
+    }
+    
+    .inspection-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+      padding: 1.5rem;
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+    }
+    
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    
+    .meta-label {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+    
+    .meta-value {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    
+    .category-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    
+    .category-card {
+      background: var(--surface);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-xl);
+      padding: 1.5rem;
+      cursor: pointer;
+      transition: var(--transition-base);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .category-card:hover {
+      border-color: var(--primary);
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+    }
+    
+    .category-icon {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    
+    .category-title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+    }
+    
+    .category-stats {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      margin-bottom: 1rem;
+    }
+    
+    .category-progress {
+      color: var(--primary);
+      font-weight: 600;
+    }
+    
+    .inspection-actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    
+    .category-progress {
+      margin-bottom: 2rem;
+      padding: 1.5rem;
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+    }
+    
+    .category-questions {
+      margin-bottom: 2rem;
+    }
+    
+    .category-navigation {
+      margin-top: 2rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--glass-border);
+    }
+    
+    .category-indicator {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+    
+    /* Mobile Menu Toggle */
+    .mobile-menu-toggle {
+      display: none;
+      background: none;
+      border: none;
+      color: var(--text-primary);
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 0.5rem;
+      margin-right: 1rem;
+    }
+    
+    /* Dark mode adjustments */
+    body.dark-mode {
+      --bg-primary: #000000;
+      --bg-secondary: #0a0a0a;
+      --bg-tertiary: #141414;
+      --text-primary: #ffffff;
+      --text-secondary: #a0a0a0;
+      --text-muted: #666666;
+    }
+    
+    body.dark-mode .signature-canvas {
+      background: #f0f0f0;
+    }
+    
+    /* Mobile responsiveness for new features */
+    @media (max-width: 1024px) {
+      .mobile-menu-toggle {
+        display: block;
+      }
+      
+      body.menu-open {
+        overflow: hidden;
+      }
+      
+      .user-text {
+        display: none;
+      }
+      
+      .category-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .header-nav {
+        display: none;
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .notification {
+        right: 10px;
+        left: 10px;
+        max-width: calc(100vw - 20px);
+      }
+      
+      .report-filters {
+        flex-direction: column;
+      }
+      
+      .filter-group {
+        width: 100%;
+      }
+      
+      .camera-container,
+      .guidance-content,
+      .signature-container {
+        margin: 1rem;
+        max-width: calc(100vw - 2rem);
+      }
+      
+      .checklist-items {
+        grid-template-columns: 1fr;
+      }
+      
+      .photo-gallery {
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+      }
+      
+      .analytics-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      .tab-btn {
+        white-space: nowrap;
+      }
+      
+      .category-nav-items {
+        flex-direction: column;
+      }
+      
+      .category-nav-item {
+        width: 100%;
+        justify-content: center;
+      }
+      
+      .inspection-meta {
+        grid-template-columns: 1fr;
+      }
+      
+      .report-summary {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    /* Print styles for PDF export */
+    @media print {
+      .header-bar,
+      .sidebar,
+      .content-actions,
+      .btn,
+      .voice-btn,
+      .camera-btn,
+      .info-btn,
+      .comment-toggle,
+      .file-upload,
+      .photo-controls {
+        display: none !important;
+      }
+      
+      .main-content {
+        margin: 0;
+        padding: 20px;
+      }
+      
+      .question-card {
+        page-break-inside: avoid;
+        border: 1px solid #ddd;
+        margin-bottom: 10px;
+      }
+      
+      .question-text {
+        font-weight: bold;
+        color: #000;
+      }
+      
+      .comment-input {
+        display: block !important;
+        border: 1px solid #ddd;
+      }
+    }
+  `;
+  
+  document.head.appendChild(additionalStyles);
 
-// Mobile-specific functionality
-document.addEventListener('DOMContentLoaded', () => {
+  // Global function exports for inline handlers
+  window.applyReportFilters = applyReportFilters;
+  window.exportFilteredReports = exportFilteredReports;
+  window.saveSettingsChanges = saveSettingsChanges;
+  window.exportAllData = exportAllData;
+  window.clearOfflineData = clearOfflineData;
+  window.resetApplication = resetApplication;
+  window.viewInspectionDetails = viewInspectionDetails;
+  window.exportSingleReport = exportSingleReport;
+  window.setCategorySection = setCategorySection;
+  window.showInspectionOverview = showInspectionOverview;
+  window.startFullInspection = startFullInspection;
+  window.continueLastInspection = continueLastInspection;
+  window.submitInspection = submitInspection;
+  
+  // Performance optimization: Debounce progress updates
+  const debouncedUpdateProgress = debounce(updateProgress, 100);
+  
+  function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+
+  // Initialize PWA features
+  if ('serviceWorker' in navigator && 'PushManager' in window) {
+    navigator.serviceWorker.ready.then(registration => {
+      console.log('Service Worker ready');
+      
+      // Check for updates periodically
+      setInterval(() => {
+        registration.update();
+      }, 60000); // Check every minute
+    });
+  }
+
+  // Handle app updates
+  let newWorker;
+  
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (newWorker) {
+        showNotification('App updated! Refresh to see changes.', 'info');
+      }
+    });
+    
+    navigator.serviceWorker.register('/service-worker.js').then(reg => {
+      reg.addEventListener('updatefound', () => {
+        newWorker = reg.installing;
+        
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            showNotification('New version available! Click to update.', 'info');
+          }
+        });
+      });
+    });
+  }
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    // Ctrl/Cmd + S to save
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      if (state.currentInspectionId) {
+        saveInspection('draft');
+      }
+    }
+    
+    // Ctrl/Cmd + P to toggle preview
+    if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+      e.preventDefault();
+      togglePreviewMode();
+    }
+    
+    // Ctrl/Cmd + E to export PDF
+    if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+      e.preventDefault();
+      exportToPDF();
+    }
+    
+    // Esc to close modals
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.camera-modal, .guidance-modal, .signature-modal').forEach(modal => {
+        modal.remove();
+      });
+    }
+  });
+
+  // Accessibility improvements
+  function announceToScreenReader(message) {
+    const announcement = document.createElement('div');
+    announcement.setAttribute('role', 'status');
+    announcement.setAttribute('aria-live', 'polite');
+    announcement.className = 'sr-only';
+    announcement.textContent = message;
+    
+    document.body.appendChild(announcement);
+    setTimeout(() => announcement.remove(), 1000);
+  }
+
+  // Add screen reader support
+  const srOnlyStyles = document.createElement('style');
+  srOnlyStyles.textContent = `
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border-width: 0;
+    }
+  `;
+  document.head.appendChild(srOnlyStyles);
+
+  // Performance monitoring
+  if ('PerformanceObserver' in window) {
+    const perfObserver = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        if (entry.duration > 1000) {
+          console.warn('Slow operation detected:', entry.name, entry.duration);
+        }
+      }
+    });
+    
+    perfObserver.observe({ entryTypes: ['measure'] });
+  }
+
+  // Error boundary
+  window.addEventListener('unhandledrejection', event => {
+    console.error('Unhandled promise rejection:', event.reason);
+    showNotification('An error occurred. Please try again.', 'error');
+  });
+
+  // Batch updates for better performance
+  let updateQueue = [];
+  let updateScheduled = false;
+  
+  function scheduleUpdate(fn) {
+    updateQueue.push(fn);
+    
+    if (!updateScheduled) {
+      updateScheduled = true;
+      requestAnimationFrame(() => {
+        updateQueue.forEach(fn => fn());
+        updateQueue = [];
+        updateScheduled = false;
+      });
+    }
+  }
+
+  // Network status monitoring
+  let wasOffline = false;
+  
+  function updateNetworkStatus() {
+    if (!navigator.onLine && !wasOffline) {
+      wasOffline = true;
+      showNotification('You are offline. Changes will be saved locally.', 'warning');
+    } else if (navigator.onLine && wasOffline) {
+      wasOffline = false;
+      showNotification('Back online! Syncing data...', 'success');
+      syncOfflineData();
+    }
+  }
+  
+  window.addEventListener('online', updateNetworkStatus);
+  window.addEventListener('offline', updateNetworkStatus);
+
+  // Battery status monitoring for mobile devices
+  if ('getBattery' in navigator) {
+    navigator.getBattery().then(battery => {
+      battery.addEventListener('levelchange', () => {
+        if (battery.level < 0.15 && !battery.charging) {
+          showNotification('Low battery! Consider saving your work.', 'warning');
+        }
+      });
+    });
+  }
+
+  // Visibility change handling - pause timers when tab is hidden
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      // Pause any active timers
+      if (state.inspectionTimer) {
+        clearInterval(state.inspectionTimer);
+      }
+    } else {
+      // Resume timers
+      if (state.startTime && !state.inspectionTimer) {
+        state.inspectionTimer = setInterval(updateTimer, 1000);
+      }
+    }
+  });
+
+  // Touch gesture support for mobile
+  let touchStartX = 0;
+  let touchEndX = 0;
+  
+  document.addEventListener('touchstart', (e) => {
+    touchStartX = e.changedTouches[0].screenX;
+  }, { passive: true });
+  
+  document.addEventListener('touchend', (e) => {
+    touchEndX = e.changedTouches[0].screenX;
+    handleSwipe();
+  }, { passive: true });
+  
+  function handleSwipe() {
+    const swipeThreshold = 100;
+    const diff = touchEndX - touchStartX;
+    
+    if (Math.abs(diff) > swipeThreshold) {
+      if (diff > 0) {
+        // Swipe right - could open sidebar on mobile
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar && window.innerWidth <= 1024) {
+          sidebar.classList.add('open');
+        }
+      } else {
+        // Swipe left - could close sidebar on mobile
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar && window.innerWidth <= 1024) {
+          sidebar.classList.remove('open');
+        }
+      }
+    }
+  }
+
+  // Initialize tooltips for better UX
+  function initTooltips() {
+    const tooltipElements = document.querySelectorAll('[title]');
+    
+    tooltipElements.forEach(el => {
+      el.addEventListener('mouseenter', (e) => {
+        const tooltip = document.createElement('div');
+        tooltip.className = 'tooltip';
+        tooltip.textContent = el.getAttribute('title');
+        tooltip.style.position = 'absolute';
+        tooltip.style.zIndex = '9999';
+        
+        document.body.appendChild(tooltip);
+        
+        const rect = el.getBoundingClientRect();
+        tooltip.style.top = `${rect.top - tooltip.offsetHeight - 5}px`;
+        tooltip.style.left = `${rect.left + (rect.width - tooltip.offsetWidth) / 2}px`;
+        
+        el._tooltip = tooltip;
+      });
+      
+      el.addEventListener('mouseleave', () => {
+        if (el._tooltip) {
+          el._tooltip.remove();
+          delete el._tooltip;
+        }
+      });
+    });
+  }
+
+  // Add tooltip styles
+  const tooltipStyles = document.createElement('style');
+  tooltipStyles.textContent = `
+    .tooltip {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      padding: 0.5rem 0.75rem;
+      border-radius: var(--radius-md);
+      font-size: 0.875rem;
+      box-shadow: var(--shadow-lg);
+      pointer-events: none;
+      opacity: 0;
+      animation: tooltip-appear 0.2s forwards;
+    }
+    
+    @keyframes tooltip-appear {
+      to {
+        opacity: 1;
+        transform: translateY(-2px);
+      }
+    }
+  `;
+  document.head.appendChild(tooltipStyles);
+
+  // Initialize tooltips after DOM is ready
+  setTimeout(initTooltips, 100);
+
+  // Final initialization message
+  console.log('Aurora Audit Platform initialized successfully');
+  
+  // Check for pending updates on load
+  if (offlineQueue.length > 0) {
+    showNotification(`${offlineQueue.length} inspections pending sync`, 'info');
+  }
+
+  // Mobile-specific functionality
+  document.addEventListener('DOMContentLoaded', () => {
     // Mobile menu toggle
     const mobileMenuBtn = document.getElementById('mobile-menu-btn');
     const sidebar = document.getElementById('sidebar');
@@ -5191,6 +5190,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 100);
         });
     });
-});
-  // Close the DOMContentLoaded event listener
+  });
+  
+  // Close the main DOMContentLoaded event listener
 });
