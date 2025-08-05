@@ -1,8 +1,0 @@
-{
-  "name": "aurora-functions",
-  "version": "1.0.0",
-  "description": "Netlify Functions for Aurora Audit Platform",
-  "dependencies": {
-    "@netlify/blobs": "^7.0.0"
-  }
-}

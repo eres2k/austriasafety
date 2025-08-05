@@ -2,155 +2,645 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="format-detection" content="telephone=no">
-    <meta name="theme-color" content="#0f0f23">
+    <title>Aurora Audit</title>
     
-    <title>Aurora Audit Platform</title>
+    <!-- External Dependencies -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/3.2.4/dexie.min.js"></script>
     
-    <!-- iOS Splash Screens -->
-    <meta name="apple-mobile-web-app-title" content="Aurora Audit">
-    <link rel="apple-touch-icon" href="/icon-192.png">
-    <link rel="apple-touch-startup-image" href="/splash-2048x2732.png" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)">
-    <link rel="apple-touch-startup-image" href="/splash-1668x2388.png" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)">
-    <link rel="apple-touch-startup-image" href="/splash-1536x2048.png" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)">
-    <link rel="apple-touch-startup-image" href="/splash-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)">
-    <link rel="apple-touch-startup-image" href="/splash-1242x2688.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)">
-    <link rel="apple-touch-startup-image" href="/splash-828x1792.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)">
-    <link rel="apple-touch-startup-image" href="/splash-1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)">
-    <link rel="apple-touch-startup-image" href="/splash-1284x2778.png" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)">
-    <link rel="apple-touch-startup-image" href="/splash-1080x1920.png" media="(device-width: 360px) and (device-height: 640px) and (-webkit-device-pixel-ratio: 3)">
-    
-    <!-- External CSS Files -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    
-    <!-- Your Custom CSS File -->
-    <link rel="stylesheet" href="mystyle.css">
-    
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="/manifest.json">
+    <style>
+        /* Modern Variables */
+        :root {
+            --primary: #5B5FDE;
+            --primary-dark: #4549B8;
+            --success: #22C55E;
+            --danger: #EF4444;
+            --warning: #F59E0B;
+            --dark: #0F172A;
+            --dark-secondary: #1E293B;
+            --dark-tertiary: #334155;
+            --text: #F1F5F9;
+            --text-secondary: #94A3B8;
+            --border: #334155;
+            --radius: 12px;
+            --shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
+        }
+
+        /* Reset & Base */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--dark);
+            color: var(--text);
+            overflow-x: hidden;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Mobile App Shell */
+        .app-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: var(--dark-secondary);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 1000;
+        }
+
+        .app-title {
+            font-size: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .app-title i {
+            color: var(--primary);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .icon-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            background: var(--dark-tertiary);
+            color: var(--text);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .icon-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 70px;
+            background: var(--dark-secondary);
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .nav-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            padding: 10px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .nav-item.active {
+            color: var(--primary);
+        }
+
+        .nav-item i {
+            font-size: 24px;
+        }
+
+        .nav-item span {
+            font-size: 12px;
+        }
+
+        /* Main Content */
+        .main-content {
+            padding-top: 60px;
+            padding-bottom: 70px;
+            min-height: 100vh;
+        }
+
+        .page {
+            display: none;
+            padding: 20px;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--dark-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--dark-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: var(--dark);
+        }
+
+        select.form-control {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2394A3B8' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            padding-right: 40px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background: var(--dark-tertiary);
+            color: var(--text);
+        }
+
+        .btn-block {
+            width: 100%;
+            justify-content: center;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: var(--dark-tertiary);
+            padding: 20px;
+            border-radius: var(--radius);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+
+        /* Audit List */
+        .audit-item {
+            background: var(--dark-tertiary);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .audit-item:active {
+            transform: scale(0.98);
+        }
+
+        .audit-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .audit-title {
+            font-weight: 600;
+        }
+
+        .audit-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-completed {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--success);
+        }
+
+        .status-pending {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--warning);
+        }
+
+        .audit-meta {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        /* Question Card */
+        .question-card {
+            background: var(--dark-tertiary);
+            padding: 20px;
+            border-radius: var(--radius);
+            margin-bottom: 20px;
+        }
+
+        .question-number {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-weight: 600;
+            margin-right: 10px;
+        }
+
+        .question-text {
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .answer-options {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .answer-btn {
+            padding: 12px;
+            border: 2px solid var(--border);
+            background: transparent;
+            border-radius: 8px;
+            color: var(--text);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .answer-btn.selected {
+            border-color: var(--primary);
+            background: var(--primary);
+            color: white;
+        }
+
+        .answer-btn.pass {
+            border-color: var(--success);
+            color: var(--success);
+        }
+
+        .answer-btn.pass.selected {
+            background: var(--success);
+            color: white;
+        }
+
+        .answer-btn.fail {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .answer-btn.fail.selected {
+            background: var(--danger);
+            color: white;
+        }
+
+        /* Photo Section */
+        .photo-section {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border);
+        }
+
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .photo-thumb {
+            aspect-ratio: 1;
+            background: var(--dark);
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .photo-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .add-photo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--dark);
+            border: 2px dashed var(--border);
+            cursor: pointer;
+        }
+
+        .add-photo i {
+            font-size: 24px;
+            color: var(--text-secondary);
+        }
+
+        /* Comment Section */
+        .comment-section {
+            margin-top: 15px;
+        }
+
+        .comment-input {
+            width: 100%;
+            padding: 12px;
+            background: var(--dark);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 2000;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: var(--dark-secondary);
+            border-radius: var(--radius);
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            height: 4px;
+            background: var(--dark-tertiary);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            transition: width 0.3s;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--dark-tertiary);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (min-width: 768px) {
+            .main-content {
+                max-width: 768px;
+                margin: 0 auto;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        /* PWA Install Prompt */
+        .install-prompt {
+            position: fixed;
+            bottom: 90px;
+            left: 20px;
+            right: 20px;
+            background: var(--primary);
+            color: white;
+            padding: 16px;
+            border-radius: var(--radius);
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--shadow);
+        }
+
+        .install-prompt.show {
+            display: flex;
+        }
+
+        /* Photo Markup Canvas */
+        .markup-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .markup-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        .markup-tools {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            justify-content: center;
+        }
+
+        .tool-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: var(--dark-tertiary);
+            color: var(--text);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tool-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+    </style>
 </head>
 <body>
-    <!-- Loading Screen -->
-    <div id="loading-screen" class="loading-screen">
-        <div class="loading-content">
-            <i class="fas fa-shield-alt loading-icon"></i>
-            <h1>Aurora Audit Platform</h1>
-            <div class="loading-spinner"></div>
-            <p>Loading...</p>
-        </div>
-    </div>
-
-    <!-- Animated Aurora Background -->
-    <div class="aurora-bg"></div>
-
-    <!-- Mobile Header Bar -->
-    <header class="mobile-header">
-        <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Menu">
-            <span class="hamburger-line"></span>
-            <span class="hamburger-line"></span>
-            <span class="hamburger-line"></span>
-        </button>
-        <div class="mobile-header-title">
+    <!-- App Header -->
+    <header class="app-header">
+        <div class="app-title">
             <i class="fas fa-shield-alt"></i>
             <span>Aurora Audit</span>
         </div>
-        <button class="mobile-notification-btn" aria-label="Notifications">
-            <i class="fas fa-bell"></i>
-            <span class="notification-dot"></span>
-        </button>
-    </header>
-
-    <!-- Desktop Header Bar -->
-    <header class="header-bar desktop-only">
-        <div class="header-left">
-            <div class="logo">
-                <i class="fas fa-shield-alt"></i>
-                <span>Aurora Audit</span>
-            </div>
-            <nav class="header-nav">
-                <a class="nav-item active" id="nav-dashboard">Dashboard</a>
-                <a class="nav-item" id="nav-inspections">Inspections</a>
-                <a class="nav-item" id="nav-reports">Reports</a>
-                <a class="nav-item" id="nav-analytics">Analytics</a>
-            </nav>
-        </div>
-        <div class="header-right">
-            <div class="connection-status online">
-                <i class="fas fa-wifi"></i>
-                <span>Online</span>
-            </div>
-            <button class="notification-btn">
-                <i class="fas fa-bell"></i>
-                <span class="notification-badge">3</span>
+        <div class="header-actions">
+            <button class="icon-btn" onclick="syncData()">
+                <i class="fas fa-sync"></i>
             </button>
-            <div class="user-menu" id="user-menu">
-                <div class="user-avatar">JD</div>
-                <span class="user-text">John Doe</span>
-                <i class="fas fa-chevron-down"></i>
-            </div>
+            <button class="icon-btn" onclick="showUserMenu()">
+                <i class="fas fa-user"></i>
+            </button>
         </div>
     </header>
 
-    <!-- Mobile Bottom Navigation -->
-    <nav class="mobile-bottom-nav">
-        <button class="mobile-nav-item active" data-section="dashboard">
-            <i class="fas fa-home"></i>
-            <span>Home</span>
-        </button>
-        <button class="mobile-nav-item" data-section="inspections">
-            <i class="fas fa-clipboard-check"></i>
-            <span>Inspect</span>
-        </button>
-        <button class="mobile-nav-item mobile-nav-fab" id="mobile-new-inspection">
-            <div class="fab-icon">
-                <i class="fas fa-plus"></i>
-            </div>
-        </button>
-        <button class="mobile-nav-item" data-section="reports">
-            <i class="fas fa-file-alt"></i>
-            <span>Reports</span>
-        </button>
-        <button class="mobile-nav-item" data-section="analytics">
-            <i class="fas fa-chart-bar"></i>
-            <span>Analytics</span>
-        </button>
-    </nav>
-
-    <div class="app-container">
-        <!-- Sidebar with Mobile Overlay -->
-        <div class="sidebar-overlay" id="sidebar-overlay"></div>
-        <aside class="sidebar" id="sidebar">
-            <!-- Mobile Sidebar Header -->
-            <div class="mobile-sidebar-header">
-                <div class="mobile-user-info">
-                    <div class="user-avatar-large">JD</div>
-                    <div class="user-details">
-                        <h3>John Doe</h3>
-                        <p>john.doe@company.com</p>
-                    </div>
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Dashboard Page -->
+        <div id="dashboard-page" class="page active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="total-audits">0</div>
+                    <div class="stat-label">Total Audits</div>
                 </div>
-                <button class="close-sidebar-btn" id="close-sidebar-btn">
-                    <i class="fas fa-times"></i>
-                </button>
+                <div class="stat-card">
+                    <div class="stat-value" id="pending-audits">0</div>
+                    <div class="stat-label">Pending</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="completed-audits">0</div>
+                    <div class="stat-label">Completed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="compliance-rate">0%</div>
+                    <div class="stat-label">Compliance</div>
+                </div>
             </div>
-            
-            <div class="sidebar-header desktop-only">
-                <h2 class="sidebar-title">Inspection Hub</h2>
-                <p class="sidebar-subtitle">Manage your safety audits</p>
-            </div>
-            
-            <div class="sidebar-content">
-                <!-- Location & Type Selection -->
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Quick Start</h3>
+                </div>
                 <div class="form-group">
-                    <label class="form-label">
-                        <i class="fas fa-map-marker-alt"></i> Delivery Station
-                    </label>
-                    <select id="delivery-station-select" class="form-control mobile-select">
+                    <label class="form-label">Select Location</label>
+                    <select class="form-control" id="location-select">
                         <option>DVI1 - Vienna Distribution</option>
                         <option>DVI2 - Vienna Hub North</option>
                         <option>DVI3 - Vienna Hub South</option>
@@ -158,413 +648,840 @@
                         <option>DAP8 - Graz Distribution</option>
                     </select>
                 </div>
-
                 <div class="form-group">
-                    <label class="form-label">
-                        <i class="fas fa-clipboard-check"></i> Inspection Type
-                    </label>
-                    <select id="inspection-type-select" class="form-control mobile-select">
-                        <option>Select inspection type...</option>
-                        <!-- Dynamic options loaded via JavaScript -->
+                    <label class="form-label">Select Audit Template</label>
+                    <select class="form-control" id="template-select">
+                        <option value="">Loading templates...</option>
                     </select>
                 </div>
-
-                <button class="btn btn-primary btn-full btn-mobile bounce-in" id="start-inspection-btn">
+                <button class="btn btn-primary btn-block" onclick="startNewAudit()">
                     <i class="fas fa-plus"></i>
-                    Start New Inspection
+                    Start New Audit
                 </button>
-
-                <!-- Quick Actions -->
-                <div class="section mobile-section">
-                    <div class="section-header">
-                        <h3 class="section-title">Quick Actions</h3>
-                    </div>
-                    <div class="mobile-action-grid">
-                        <button class="mobile-action-btn" id="import-questions-btn">
-                            <i class="fas fa-upload"></i>
-                            <span>Import</span>
-                        </button>
-                        <button class="mobile-action-btn" id="export-questions-btn">
-                            <i class="fas fa-download"></i>
-                            <span>Export</span>
-                        </button>
-                        <button class="mobile-action-btn" id="export-reports-btn">
-                            <i class="fas fa-file-export"></i>
-                            <span>Reports</span>
-                        </button>
-                        <button class="mobile-action-btn" id="sync-data-btn">
-                            <i class="fas fa-sync-alt"></i>
-                            <span>Sync</span>
-                        </button>
-                        <button class="mobile-action-btn" id="settings-btn">
-                            <i class="fas fa-cog"></i>
-                            <span>Settings</span>
-                        </button>
-                        <button class="mobile-action-btn" id="help-btn">
-                            <i class="fas fa-question-circle"></i>
-                            <span>Help</span>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Pending Inspections -->
-                <div class="section mobile-section">
-                    <div class="section-header">
-                        <h3 class="section-title">
-                            <i class="fas fa-clock"></i> Pending
-                        </h3>
-                        <span class="section-badge">0</span>
-                    </div>
-                    <ul class="list mobile-list" id="pending-list">
-                        <!-- pending items will be populated dynamically -->
-                    </ul>
-                </div>
-
-                <!-- Completed Inspections -->
-                <div class="section mobile-section">
-                    <div class="section-header">
-                        <h3 class="section-title">
-                            <i class="fas fa-check-circle"></i> Completed
-                        </h3>
-                        <span class="section-badge">0</span>
-                    </div>
-                    <ul class="list mobile-list" id="completed-list">
-                        <!-- completed items will be populated dynamically -->
-                    </ul>
-                </div>
-            </div>
-        </aside>
-
-        <!-- Main Content Area -->
-        <main class="main-content fade-in">
-            <!-- Dashboard Section -->
-            <div data-section="dashboard">
-                <!-- Pull to Refresh -->
-                <div class="pull-to-refresh">
-                    <div class="ptr-preloader">
-                        <div class="ptr-spinner"></div>
-                    </div>
-                </div>
-
-                <!-- Dashboard Statistics -->
-                <div class="dashboard-grid mobile-dashboard-grid">
-                    <div class="stat-card bounce-in mobile-stat-card">
-                        <div class="stat-value">0</div>
-                        <div class="stat-label">Total Inspections</div>
-                        <div class="stat-change positive">
-                            <i class="fas fa-arrow-up"></i>
-                            <span>+0%</span>
-                        </div>
-                        <div class="stat-icon">
-                            <i class="fas fa-clipboard-list"></i>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card bounce-in mobile-stat-card" style="animation-delay: 0.1s;">
-                        <div class="stat-value">0</div>
-                        <div class="stat-label">This Month</div>
-                        <div class="stat-change positive">
-                            <i class="fas fa-arrow-up"></i>
-                            <span>+0</span>
-                        </div>
-                        <div class="stat-icon">
-                            <i class="fas fa-calendar-alt"></i>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card bounce-in mobile-stat-card" style="animation-delay: 0.2s;">
-                        <div class="stat-value">0</div>
-                        <div class="stat-label">Pending</div>
-                        <div class="stat-change">
-                            <i class="fas fa-sync-alt"></i>
-                            <span>Sync</span>
-                        </div>
-                        <div class="stat-icon">
-                            <i class="fas fa-cloud-upload-alt"></i>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card bounce-in mobile-stat-card" style="animation-delay: 0.3s;">
-                        <div class="stat-value">100%</div>
-                        <div class="stat-label">Compliance</div>
-                        <div class="stat-change positive">
-                            <i class="fas fa-arrow-up"></i>
-                            <span>+0%</span>
-                        </div>
-                        <div class="stat-icon">
-                            <i class="fas fa-chart-line"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Recent Activity -->
-                <div class="content-card mobile-card slide-up" style="animation-delay: 0.2s;">
-                    <div class="content-header mobile-content-header">
-                        <h2 class="content-title mobile-title">
-                            <i class="fas fa-history"></i>
-                            Recent Activity
-                        </h2>
-                        <button class="btn btn-secondary btn-mobile">
-                            <i class="fas fa-external-link-alt"></i>
-                            <span class="mobile-hide">View All</span>
-                        </button>
-                    </div>
-
-                    <div class="list mobile-activity-list">
-                        <p style="padding: 20px; text-align: center; color: var(--text-muted);">
-                            No recent activity yet. Start your first inspection!
-                        </p>
-                    </div>
-                </div>
             </div>
 
-            <!-- Inspection Form Section -->
-            <div data-section="inspections" style="display: none;">
-                <div class="content-card mobile-card">
-                    <div class="content-header mobile-content-header">
-                        <h2 class="content-title mobile-title" id="inspection-title">
-                            <i class="fas fa-shield-check"></i>
-                            <span>Inspection</span>
-                        </h2>
-                        <div class="content-actions mobile-actions">
-                            <button class="btn-icon" id="preview-mode-btn" aria-label="Preview">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                            <button class="btn-icon" id="save-draft-btn" aria-label="Save">
-                                <i class="fas fa-save"></i>
-                            </button>
-                            <button class="btn-icon" id="export-pdf-btn" aria-label="Export">
-                                <i class="fas fa-file-pdf"></i>
-                            </button>
-                            <button class="btn-icon btn-icon-primary" id="submit-inspection-btn" aria-label="Submit">
-                                <i class="fas fa-check-circle"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <form class="audit-form mobile-form">
-                        <!-- Auditor Information -->
-                        <div class="form-section mobile-form-section">
-                            <h3 class="form-section-title mobile-section-title">
-                                <i class="fas fa-user-check"></i>
-                                Auditor Information
-                            </h3>
-                            <div class="mobile-form-grid">
-                                <div class="form-group">
-                                    <label class="form-label">Auditor Name(s) *</label>
-                                    <input type="text" id="auditor-names" class="form-control mobile-input" placeholder="John Doe, Jane Smith">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Inspection Date *</label>
-                                    <input type="date" id="inspection-date" class="form-control mobile-input">
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Progress Indicator -->
-                        <div class="form-section mobile-form-section">
-                            <div class="mobile-progress-header">
-                                <span class="form-label">Progress</span>
-                                <span id="progress-status" class="progress-status">0 of 0 completed</span>
-                            </div>
-                            <div class="progress-bar mobile-progress-bar">
-                                <div class="progress-fill" id="progress-fill"></div>
-                            </div>
-                        </div>
-
-                        <!-- Questions Section -->
-                        <div class="form-section mobile-form-section">
-                            <h3 class="form-section-title mobile-section-title">
-                                <i class="fas fa-clipboard-question"></i>
-                                Safety Checklist
-                            </h3>
-                            <!-- Dynamically generated questions will be inserted here -->
-                            <div id="questions-section"></div>
-                        </div>
-
-                        <!-- Mobile Form Navigation -->
-                        <div class="mobile-form-navigation">
-                            <button type="button" class="btn btn-secondary btn-mobile">
-                                <i class="fas fa-arrow-left"></i>
-                                Previous
-                            </button>
-                            <div class="mobile-save-indicator">
-                                <i class="fas fa-cloud-upload-alt"></i>
-                                <span>Auto-saved</span>
-                            </div>
-                            <button type="button" class="btn btn-primary btn-mobile">
-                                Next
-                                <i class="fas fa-arrow-right"></i>
-                            </button>
-                        </div>
-                    </form>
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Recent Audits</h3>
+                </div>
+                <div id="recent-audits">
+                    <!-- Audit items will be inserted here -->
                 </div>
             </div>
+        </div>
 
-            <!-- Reports Section -->
-            <div data-section="reports" style="display: none;">
-                <div class="content-card mobile-card">
-                    <div class="content-header mobile-content-header">
-                        <h2 class="content-title mobile-title">
-                            <i class="fas fa-file-alt"></i>
-                            Reports
-                        </h2>
-                    </div>
-                    <!-- Container for generated reports list -->
-                    <div id="reports-container" class="reports-list mobile-reports-list"></div>
+        <!-- Audits Page -->
+        <div id="audits-page" class="page">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">All Audits</h3>
+                    <button class="icon-btn" onclick="filterAudits()">
+                        <i class="fas fa-filter"></i>
+                    </button>
+                </div>
+                <div id="all-audits">
+                    <!-- All audit items -->
                 </div>
             </div>
+        </div>
 
-            <!-- Analytics Section -->
-            <div data-section="analytics" style="display: none;">
-                <div class="content-card mobile-card">
-                    <div class="content-header mobile-content-header">
-                        <h2 class="content-title mobile-title">
-                            <i class="fas fa-chart-pie"></i>
-                            Analytics
-                        </h2>
-                    </div>
-                    <!-- Chart container for analytics -->
-                    <div class="mobile-chart-container">
-                        <canvas id="analytics-chart" width="400" height="200"></canvas>
-                    </div>
+        <!-- Templates Page -->
+        <div id="templates-page" class="page">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Audit Templates</h3>
+                    <button class="icon-btn" onclick="importTemplate()">
+                        <i class="fas fa-upload"></i>
+                    </button>
+                </div>
+                <div id="template-list">
+                    <!-- Template items -->
                 </div>
             </div>
+            <input type="file" id="import-file" accept=".xlsx,.xls" style="display:none" onchange="handleFileImport(event)">
+        </div>
 
-            <!-- Settings Section (dynamically created) -->
-            <div data-section="settings" style="display: none;"></div>
-        </main>
-    </div>
-
-    <!-- Floating Action Button (Desktop Only) -->
-    <button class="fab desktop-only" title="Quick Actions">
-        <i class="fas fa-plus"></i>
-    </button>
-
-    <!-- Mobile Action Sheet -->
-    <div class="mobile-action-sheet" id="mobile-action-sheet">
-        <div class="action-sheet-backdrop"></div>
-        <div class="action-sheet-content">
-            <div class="action-sheet-handle"></div>
-            <h3 class="action-sheet-title">Quick Actions</h3>
-            <div class="action-sheet-options">
-                <button class="action-sheet-option" data-action="new-inspection">
-                    <i class="fas fa-plus-circle"></i>
-                    <span>New Inspection</span>
+        <!-- Settings Page -->
+        <div id="settings-page" class="page">
+            <div class="card">
+                <h3 class="card-title">Settings</h3>
+                <div class="form-group">
+                    <label class="form-label">User Name</label>
+                    <input type="text" class="form-control" id="user-name" placeholder="Enter your name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Default Location</label>
+                    <select class="form-control" id="default-location">
+                        <option>DVI1 - Vienna Distribution</option>
+                        <option>DVI2 - Vienna Hub North</option>
+                        <option>DVI3 - Vienna Hub South</option>
+                        <option>DAP5 - Salzburg Center</option>
+                        <option>DAP8 - Graz Distribution</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary btn-block" onclick="saveSettings()">
+                    Save Settings
                 </button>
-                <button class="action-sheet-option" data-action="import">
-                    <i class="fas fa-upload"></i>
-                    <span>Import Questions</span>
-                </button>
-                <button class="action-sheet-option" data-action="export">
+            </div>
+
+            <div class="card">
+                <h3 class="card-title">Data Management</h3>
+                <button class="btn btn-secondary btn-block" onclick="exportAllData()">
                     <i class="fas fa-download"></i>
-                    <span>Export Data</span>
+                    Export All Data
                 </button>
-                <button class="action-sheet-option" data-action="sync">
-                    <i class="fas fa-sync-alt"></i>
-                    <span>Sync Now</span>
+                <button class="btn btn-secondary btn-block" onclick="clearLocalData()">
+                    <i class="fas fa-trash"></i>
+                    Clear Local Data
                 </button>
             </div>
-            <button class="action-sheet-cancel">Cancel</button>
+        </div>
+    </main>
+
+    <!-- Audit Form Modal -->
+    <div id="audit-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>New Audit</h3>
+                <button class="icon-btn" onclick="closeAuditModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="audit-progress" style="width: 0%"></div>
+                </div>
+                <div id="audit-form-content">
+                    <!-- Dynamic form content -->
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="btn btn-secondary" onclick="previousQuestion()">
+                        <i class="fas fa-arrow-left"></i>
+                        Previous
+                    </button>
+                    <button class="btn btn-primary" style="flex: 1" onclick="nextQuestion()">
+                        Next
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Third-party Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-    <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-    
-    <!-- Application Scripts (ES6 Modules) -->
-    <script type="module" src="blob-storage.js"></script>
-    <script type="module" src="app.js"></script>
+    <!-- Photo Markup Modal -->
+    <div id="markup-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Mark Photo</h3>
+                <button class="icon-btn" onclick="closeMarkupModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="markup-tools">
+                    <button class="tool-btn active" onclick="setMarkupTool('circle')">
+                        <i class="fas fa-circle"></i>
+                    </button>
+                    <button class="tool-btn" onclick="setMarkupTool('arrow')">
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                    <button class="tool-btn" onclick="setMarkupTool('text')">
+                        <i class="fas fa-font"></i>
+                    </button>
+                    <button class="tool-btn" onclick="clearMarkup()">
+                        <i class="fas fa-undo"></i>
+                    </button>
+                </div>
+                <div class="markup-container">
+                    <img id="markup-image" style="width: 100%; display: block;">
+                    <canvas id="markup-canvas" class="markup-canvas"></canvas>
+                </div>
+                <button class="btn btn-primary btn-block" onclick="saveMarkup()">
+                    Save Marked Photo
+                </button>
+            </div>
+        </div>
+    </div>
 
-    <!-- Loading Screen Handler -->
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <a class="nav-item active" onclick="showPage('dashboard')">
+            <i class="fas fa-home"></i>
+            <span>Dashboard</span>
+        </a>
+        <a class="nav-item" onclick="showPage('audits')">
+            <i class="fas fa-clipboard-list"></i>
+            <span>Audits</span>
+        </a>
+        <a class="nav-item" onclick="showPage('templates')">
+            <i class="fas fa-file-alt"></i>
+            <span>Templates</span>
+        </a>
+        <a class="nav-item" onclick="showPage('settings')">
+            <i class="fas fa-cog"></i>
+            <span>Settings</span>
+        </a>
+    </nav>
+
+    <!-- Install Prompt -->
+    <div id="install-prompt" class="install-prompt">
+        <span>Install Aurora Audit for offline use</span>
+        <button class="btn btn-secondary" onclick="installPWA()">Install</button>
+    </div>
+
     <script>
-        // Hide loading screen when app is ready
-        window.addEventListener('app-ready', function() {
-            const loadingScreen = document.getElementById('loading-screen');
-            if (loadingScreen) {
-                loadingScreen.style.opacity = '0';
+        // Initialize Dexie database
+        const db = new Dexie('AuroraAuditDB');
+        db.version(1).stores({
+            audits: '++id, location, templateId, status, date, auditor',
+            templates: '++id, name, version',
+            photos: '++id, auditId, questionId',
+            settings: 'key'
+        });
+
+        // Global state
+        let currentAudit = null;
+        let currentQuestionIndex = 0;
+        let currentTemplate = null;
+        let markupTool = 'circle';
+        let deferredPrompt = null;
+
+        // Default templates
+        const defaultTemplates = [
+            {
+                name: 'General Safety Inspection',
+                version: '1.0',
+                questions: [
+                    { id: 'q1', text: 'Are all emergency exits clearly marked and unobstructed?', type: 'passfail', required: true },
+                    { id: 'q2', text: 'Is personal protective equipment (PPE) being worn correctly?', type: 'passfail', required: true },
+                    { id: 'q3', text: 'Are fire extinguishers accessible and inspection tags current?', type: 'passfail', required: true },
+                    { id: 'q4', text: 'Are walkways and work areas free from slip/trip hazards?', type: 'passfail', required: true },
+                    { id: 'q5', text: 'Is equipment properly maintained with current inspection tags?', type: 'passfail', required: true }
+                ]
+            },
+            {
+                name: 'Fire Safety Audit',
+                version: '1.0',
+                questions: [
+                    { id: 'f1', text: 'Are fire alarm systems tested and functional?', type: 'passfail', required: true },
+                    { id: 'f2', text: 'Are sprinkler systems unobstructed?', type: 'passfail', required: true },
+                    { id: 'f3', text: 'Are flammable materials properly stored?', type: 'passfail', required: true },
+                    { id: 'f4', text: 'Are evacuation routes posted and visible?', type: 'passfail', required: true }
+                ]
+            }
+        ];
+
+        // Initialize app
+        async function initApp() {
+            // Load settings
+            const settings = await db.settings.get('user');
+            if (settings) {
+                document.getElementById('user-name').value = settings.name || '';
+                document.getElementById('default-location').value = settings.defaultLocation || '';
+                document.getElementById('location-select').value = settings.defaultLocation || '';
+            }
+
+            // Load templates
+            let templates = await db.templates.toArray();
+            if (templates.length === 0) {
+                // Insert default templates
+                for (const template of defaultTemplates) {
+                    await db.templates.add(template);
+                }
+                templates = await db.templates.toArray();
+            }
+
+            updateTemplateSelect(templates);
+            updateDashboard();
+            loadRecentAudits();
+
+            // Setup PWA
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/service-worker.js');
+            }
+
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                document.getElementById('install-prompt').classList.add('show');
+            });
+        }
+
+        // Navigation
+        function showPage(page) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(`${page}-page`).classList.add('active');
+            
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            event.target.closest('.nav-item').classList.add('active');
+
+            if (page === 'templates') {
+                loadTemplates();
+            } else if (page === 'audits') {
+                loadAllAudits();
+            }
+        }
+
+        // Dashboard functions
+        async function updateDashboard() {
+            const audits = await db.audits.toArray();
+            const total = audits.length;
+            const completed = audits.filter(a => a.status === 'completed').length;
+            const pending = audits.filter(a => a.status === 'pending').length;
+            
+            document.getElementById('total-audits').textContent = total;
+            document.getElementById('completed-audits').textContent = completed;
+            document.getElementById('pending-audits').textContent = pending;
+            
+            // Calculate compliance rate
+            if (completed > 0) {
+                let totalQuestions = 0;
+                let passedQuestions = 0;
+                
+                for (const audit of audits.filter(a => a.status === 'completed')) {
+                    if (audit.responses) {
+                        totalQuestions += Object.keys(audit.responses).length;
+                        passedQuestions += Object.values(audit.responses).filter(r => r.answer === 'pass').length;
+                    }
+                }
+                
+                const compliance = totalQuestions > 0 ? Math.round((passedQuestions / totalQuestions) * 100) : 0;
+                document.getElementById('compliance-rate').textContent = compliance + '%';
+            }
+        }
+
+        async function loadRecentAudits() {
+            const audits = await db.audits.orderBy('date').reverse().limit(5).toArray();
+            const container = document.getElementById('recent-audits');
+            
+            if (audits.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 20px;">No audits yet. Start your first audit!</p>';
+                return;
+            }
+            
+            container.innerHTML = audits.map(audit => `
+                <div class="audit-item" onclick="viewAudit(${audit.id})">
+                    <div class="audit-header">
+                        <div class="audit-title">${audit.location}</div>
+                        <div class="audit-status status-${audit.status}">${audit.status}</div>
+                    </div>
+                    <div class="audit-meta">
+                        ${new Date(audit.date).toLocaleDateString()} • ${audit.auditor || 'Unknown'}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Audit functions
+        async function startNewAudit() {
+            const templateId = document.getElementById('template-select').value;
+            if (!templateId) {
+                alert('Please select an audit template');
+                return;
+            }
+
+            const template = await db.templates.get(parseInt(templateId));
+            const location = document.getElementById('location-select').value;
+            const settings = await db.settings.get('user');
+            
+            currentTemplate = template;
+            currentAudit = {
+                location: location,
+                templateId: templateId,
+                templateName: template.name,
+                status: 'pending',
+                date: new Date().toISOString(),
+                auditor: settings?.name || 'Unknown',
+                responses: {},
+                photos: [],
+                startTime: Date.now()
+            };
+            
+            currentQuestionIndex = 0;
+            showAuditModal();
+        }
+
+        function showAuditModal() {
+            document.getElementById('audit-modal').classList.add('active');
+            renderQuestion();
+        }
+
+        function closeAuditModal() {
+            if (confirm('Are you sure? Any unsaved progress will be lost.')) {
+                document.getElementById('audit-modal').classList.remove('active');
+                currentAudit = null;
+                currentTemplate = null;
+            }
+        }
+
+        function renderQuestion() {
+            const question = currentTemplate.questions[currentQuestionIndex];
+            const progress = ((currentQuestionIndex + 1) / currentTemplate.questions.length) * 100;
+            
+            document.getElementById('audit-progress').style.width = progress + '%';
+            
+            const existingResponse = currentAudit.responses[question.id];
+            
+            document.getElementById('audit-form-content').innerHTML = `
+                <div class="question-card">
+                    <div>
+                        <span class="question-number">${currentQuestionIndex + 1}</span>
+                        <span class="question-text">${question.text}</span>
+                    </div>
+                    
+                    <div class="answer-options">
+                        <button class="answer-btn pass ${existingResponse?.answer === 'pass' ? 'selected' : ''}" 
+                                onclick="selectAnswer('${question.id}', 'pass')">
+                            <i class="fas fa-check"></i> Pass
+                        </button>
+                        <button class="answer-btn fail ${existingResponse?.answer === 'fail' ? 'selected' : ''}" 
+                                onclick="selectAnswer('${question.id}', 'fail')">
+                            <i class="fas fa-times"></i> Fail
+                        </button>
+                        <button class="answer-btn ${existingResponse?.answer === 'na' ? 'selected' : ''}" 
+                                onclick="selectAnswer('${question.id}', 'na')">
+                            N/A
+                        </button>
+                    </div>
+                    
+                    <div class="photo-section">
+                        <label class="form-label">Photos (Optional)</label>
+                        <div class="photo-grid" id="photo-grid-${question.id}">
+                            ${renderExistingPhotos(question.id)}
+                            <div class="photo-thumb add-photo" onclick="capturePhoto('${question.id}')">
+                                <i class="fas fa-camera"></i>
+                            </div>
+                        </div>
+                        <input type="file" id="photo-input-${question.id}" accept="image/*" capture="environment" 
+                               style="display:none" onchange="handlePhotoCapture(event, '${question.id}')">
+                    </div>
+                    
+                    <div class="comment-section">
+                        <label class="form-label">Comments (Optional)</label>
+                        <textarea class="comment-input" id="comment-${question.id}" 
+                                  placeholder="Add any additional notes...">${existingResponse?.comment || ''}</textarea>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderExistingPhotos(questionId) {
+            const photos = currentAudit.photos.filter(p => p.questionId === questionId);
+            return photos.map((photo, index) => `
+                <div class="photo-thumb" onclick="viewPhoto('${photo.data}')">
+                    <img src="${photo.data}" alt="Photo ${index + 1}">
+                </div>
+            `).join('');
+        }
+
+        function selectAnswer(questionId, answer) {
+            currentAudit.responses[questionId] = {
+                answer: answer,
+                timestamp: new Date().toISOString(),
+                comment: document.getElementById(`comment-${questionId}`)?.value || ''
+            };
+            
+            // Update UI
+            document.querySelectorAll('.answer-btn').forEach(btn => btn.classList.remove('selected'));
+            event.target.classList.add('selected');
+        }
+
+        function capturePhoto(questionId) {
+            document.getElementById(`photo-input-${questionId}`).click();
+        }
+
+        function handlePhotoCapture(event, questionId) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const photoData = e.target.result;
+                
+                // Add to current audit
+                currentAudit.photos.push({
+                    questionId: questionId,
+                    data: photoData,
+                    timestamp: new Date().toISOString()
+                });
+                
+                // Show markup modal
+                document.getElementById('markup-image').src = photoData;
+                document.getElementById('markup-modal').classList.add('active');
+                
+                // Setup canvas
                 setTimeout(() => {
-                    loadingScreen.style.display = 'none';
-                }, 300);
+                    const img = document.getElementById('markup-image');
+                    const canvas = document.getElementById('markup-canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                }, 100);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function previousQuestion() {
+            // Save current question data
+            const question = currentTemplate.questions[currentQuestionIndex];
+            const comment = document.getElementById(`comment-${question.id}`)?.value;
+            if (comment && currentAudit.responses[question.id]) {
+                currentAudit.responses[question.id].comment = comment;
+            }
+            
+            if (currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                renderQuestion();
+            }
+        }
+
+        async function nextQuestion() {
+            // Save current question data
+            const question = currentTemplate.questions[currentQuestionIndex];
+            const comment = document.getElementById(`comment-${question.id}`)?.value;
+            if (comment && currentAudit.responses[question.id]) {
+                currentAudit.responses[question.id].comment = comment;
+            }
+            
+            // Check if answer is required
+            if (question.required && !currentAudit.responses[question.id]) {
+                alert('Please provide an answer to this required question');
+                return;
+            }
+            
+            if (currentQuestionIndex < currentTemplate.questions.length - 1) {
+                currentQuestionIndex++;
+                renderQuestion();
+            } else {
+                // Complete audit
+                completeAudit();
+            }
+        }
+
+        async function completeAudit() {
+            currentAudit.status = 'completed';
+            currentAudit.completedTime = Date.now();
+            currentAudit.duration = currentAudit.completedTime - currentAudit.startTime;
+            
+            // Save to database
+            const id = await db.audits.add(currentAudit);
+            
+            // Save photos
+            for (const photo of currentAudit.photos) {
+                await db.photos.add({
+                    auditId: id,
+                    questionId: photo.questionId,
+                    data: photo.data,
+                    timestamp: photo.timestamp
+                });
+            }
+            
+            document.getElementById('audit-modal').classList.remove('active');
+            alert('Audit completed successfully!');
+            
+            // Refresh dashboard
+            updateDashboard();
+            loadRecentAudits();
+            
+            // Export to PDF
+            if (confirm('Would you like to export this audit as a PDF?')) {
+                exportAuditToPDF(id);
+            }
+        }
+
+        // Photo Markup
+        function setMarkupTool(tool) {
+            markupTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        function clearMarkup() {
+            const canvas = document.getElementById('markup-canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function saveMarkup() {
+            // Combine image and markup
+            const img = document.getElementById('markup-image');
+            const markupCanvas = document.getElementById('markup-canvas');
+            
+            const combinedCanvas = document.createElement('canvas');
+            combinedCanvas.width = img.width;
+            combinedCanvas.height = img.height;
+            const ctx = combinedCanvas.getContext('2d');
+            
+            ctx.drawImage(img, 0, 0);
+            ctx.drawImage(markupCanvas, 0, 0);
+            
+            // Update photo data
+            const markedPhotoData = combinedCanvas.toDataURL('image/jpeg', 0.8);
+            const lastPhoto = currentAudit.photos[currentAudit.photos.length - 1];
+            lastPhoto.data = markedPhotoData;
+            lastPhoto.marked = true;
+            
+            closeMarkupModal();
+            renderQuestion(); // Refresh to show marked photo
+        }
+
+        function closeMarkupModal() {
+            document.getElementById('markup-modal').classList.remove('active');
+        }
+
+        // Markup drawing
+        document.getElementById('markup-canvas').addEventListener('click', function(e) {
+            const canvas = this;
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            ctx.strokeStyle = '#FF0000';
+            ctx.lineWidth = 3;
+            
+            if (markupTool === 'circle') {
+                ctx.beginPath();
+                ctx.arc(x, y, 30, 0, 2 * Math.PI);
+                ctx.stroke();
+            } else if (markupTool === 'arrow') {
+                ctx.beginPath();
+                ctx.moveTo(x - 30, y);
+                ctx.lineTo(x + 30, y);
+                ctx.lineTo(x + 20, y - 10);
+                ctx.moveTo(x + 30, y);
+                ctx.lineTo(x + 20, y + 10);
+                ctx.stroke();
+            } else if (markupTool === 'text') {
+                const text = prompt('Enter text:');
+                if (text) {
+                    ctx.font = '16px Arial';
+                    ctx.fillStyle = '#FF0000';
+                    ctx.fillText(text, x, y);
+                }
             }
         });
-        
-        // Fallback: hide after 5 seconds
-        setTimeout(() => {
-            const loadingScreen = document.getElementById('loading-screen');
-            if (loadingScreen && loadingScreen.style.display !== 'none') {
-                loadingScreen.style.display = 'none';
-            }
-        }, 5000);
-    </script>
 
-    <!-- Additional Styles for Loading Screen -->
-    <style>
-        .loading-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: var(--bg-primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            transition: opacity 0.3s ease;
+        // Template Management
+        async function loadTemplates() {
+            const templates = await db.templates.toArray();
+            const container = document.getElementById('template-list');
+            
+            container.innerHTML = templates.map(template => `
+                <div class="audit-item">
+                    <div class="audit-header">
+                        <div class="audit-title">${template.name}</div>
+                        <button class="icon-btn" onclick="exportTemplate(${template.id})">
+                            <i class="fas fa-download"></i>
+                        </button>
+                    </div>
+                    <div class="audit-meta">
+                        Version ${template.version} • ${template.questions.length} questions
+                    </div>
+                </div>
+            `).join('');
         }
-        
-        .loading-content {
-            text-align: center;
+
+        function importTemplate() {
+            document.getElementById('import-file').click();
         }
-        
-        .loading-icon {
-            font-size: 4rem;
-            color: var(--primary);
-            margin-bottom: 1rem;
-            animation: pulse 2s ease-in-out infinite;
+
+        async function handleFileImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(sheet);
+                    
+                    // Parse template from Excel
+                    const template = {
+                        name: rows[0].TemplateName || 'Imported Template',
+                        version: rows[0].Version || '1.0',
+                        questions: []
+                    };
+                    
+                    rows.forEach((row, index) => {
+                        if (row.Question) {
+                            template.questions.push({
+                                id: `q${index + 1}`,
+                                text: row.Question,
+                                type: row.Type || 'passfail',
+                                required: row.Required === 'Yes' || row.Required === true
+                            });
+                        }
+                    });
+                    
+                    // Save template
+                    await db.templates.add(template);
+                    alert('Template imported successfully!');
+                    loadTemplates();
+                    
+                    // Update template select
+                    const templates = await db.templates.toArray();
+                    updateTemplateSelect(templates);
+                    
+                } catch (error) {
+                    alert('Error importing template: ' + error.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
         }
-        
-        .loading-spinner {
-            width: 40px;
-            height: 40px;
-            margin: 20px auto;
-            border: 3px solid var(--border-primary);
-            border-top-color: var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
+
+        async function exportTemplate(templateId) {
+            const template = await db.templates.get(templateId);
+            if (!template) return;
+            
+            // Create Excel data
+            const wsData = [
+                { TemplateName: template.name, Version: template.version, Question: '', Type: '', Required: '' }
+            ];
+            
+            template.questions.forEach(q => {
+                wsData.push({
+                    TemplateName: '',
+                    Version: '',
+                    Question: q.text,
+                    Type: q.type,
+                    Required: q.required ? 'Yes' : 'No'
+                });
+            });
+            
+            // Create workbook
+            const ws = XLSX.utils.json_to_sheet(wsData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Template');
+            
+            // Export
+            XLSX.writeFile(wb, `${template.name.replace(/\s+/g, '_')}_template.xlsx`);
         }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+
+        function updateTemplateSelect(templates) {
+            const select = document.getElementById('template-select');
+            select.innerHTML = '<option value="">Select a template...</option>' +
+                templates.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
         }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+
+        // Export Audit to PDF
+        async function exportAuditToPDF(auditId) {
+            const audit = await db.audits.get(auditId);
+            const template = await db.templates.get(parseInt(audit.templateId));
+            
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Header
+            doc.setFontSize(20);
+            doc.text('Safety Audit Report', 20, 20);
+            
+            doc.setFontSize(12);
+            doc.text(`Location: ${audit.location}`, 20, 35);
+            doc.text(`Date: ${new Date(audit.date).toLocaleDateString()}`, 20, 42);
+            doc.text(`Auditor: ${audit.auditor}`, 20, 49);
+            doc.text(`Template: ${audit.templateName}`, 20, 56);
+            
+            // Results
+            let yPos = 70;
+            doc.setFontSize(14);
+            doc.text('Inspection Results:', 20, yPos);
+            yPos += 10;
+            
+            doc.setFontSize(11);
+            template.questions.forEach((question, index) => {
+                const response = audit.responses[question.id];
+                if (response) {
+                    doc.text(`${index + 1}. ${question.text}`, 20, yPos);
+                    yPos += 7;
+                    
+                    const result = response.answer.toUpperCase();
+                    const color = result === 'PASS' ? [0, 128, 0] : result === 'FAIL' ? [255, 0, 0] : [128, 128, 128];
+                    doc.setTextColor(...color);
+                    doc.text(`   Result: ${result}`, 25, yPos);
+                    doc.setTextColor(0, 0, 0);
+                    
+                    if (response.comment) {
+                        yPos += 7;
+                        doc.text(`   Comment: ${response.comment}`, 25, yPos);
+                    }
+                    
+                    yPos += 10;
+                    
+                    // New page if needed
+                    if (yPos > 250) {
+                        doc.addPage();
+                        yPos = 20;
+                    }
+                }
+            });
+            
+            // Save PDF
+            doc.save(`Audit_${audit.location}_${new Date(audit.date).toISOString().split('T')[0]}.pdf`);
         }
-        
-        .connection-status {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 12px;
-            border-radius: var(--radius-full);
-            font-size: 0.875rem;
-            font-weight: 500;
-            margin-right: 16px;
+
+        // Settings
+        async function saveSettings() {
+            const settings = {
+                name: document.getElementById('user-name').value,
+                defaultLocation: document.getElementById('default-location').value
+            };
+            
+            await db.settings.put(settings, 'user');
+            alert('Settings saved successfully!');
         }
-        
-        .connection-status.online {
-            background: rgba(16, 185, 129, 0.1);
-            color: var(--success);
+
+        // Data Management
+        async function exportAllData() {
+            const audits = await db.audits.toArray();
+            const templates = await db.templates.toArray();
+            
+            const data = {
+                exportDate: new Date().toISOString(),
+                audits: audits,
+                templates: templates
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `aurora_audit_backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
         }
-        
-        .connection-status.offline {
-            background: rgba(245, 158, 11, 0.1);
-            color: var(--warning);
+
+        async function clearLocalData() {
+            if (confirm('Are you sure? This will delete all local data and cannot be undone.')) {
+                await db.audits.clear();
+                await db.templates.clear();
+                await db.photos.clear();
+                await db.settings.clear();
+                location.reload();
+            }
         }
-    </style>
+
+        // PWA
+        function installPWA() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('User accepted the install prompt');
+                    }
+                    deferredPrompt = null;
+                    document.getElementById('install-prompt').classList.remove('show');
+                });
+            }
+        }
+
+        // Sync placeholder
+        function syncData() {
+            alert('Sync functionality will be implemented with your backend API');
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', initApp);
+    </script>
 </body>
 </html>
