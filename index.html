@@ -35,6 +35,16 @@
     <link rel="manifest" href="/manifest.json">
 </head>
 <body>
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-content">
+            <i class="fas fa-shield-alt loading-icon"></i>
+            <h1>Aurora Audit Platform</h1>
+            <div class="loading-spinner"></div>
+            <p>Loading...</p>
+        </div>
+    </div>
+
     <!-- Animated Aurora Background -->
     <div class="aurora-bg"></div>
 
@@ -70,6 +80,10 @@
             </nav>
         </div>
         <div class="header-right">
+            <div class="connection-status online">
+                <i class="fas fa-wifi"></i>
+                <span>Online</span>
+            </div>
             <button class="notification-btn">
                 <i class="fas fa-bell"></i>
                 <span class="notification-badge">3</span>
@@ -150,11 +164,8 @@
                         <i class="fas fa-clipboard-check"></i> Inspection Type
                     </label>
                     <select id="inspection-type-select" class="form-control mobile-select">
-                        <option>General Safety Inspection</option>
-                        <option>Fire Safety Audit</option>
-                        <option>Equipment Check</option>
-                        <option>Emergency Procedures</option>
-                        <option>Environmental Compliance</option>
+                        <option>Select inspection type...</option>
+                        <!-- Dynamic options loaded via JavaScript -->
                     </select>
                 </div>
 
@@ -202,7 +213,7 @@
                         <h3 class="section-title">
                             <i class="fas fa-clock"></i> Pending
                         </h3>
-                        <span class="section-badge">5</span>
+                        <span class="section-badge">0</span>
                     </div>
                     <ul class="list mobile-list" id="pending-list">
                         <!-- pending items will be populated dynamically -->
@@ -215,7 +226,7 @@
                         <h3 class="section-title">
                             <i class="fas fa-check-circle"></i> Completed
                         </h3>
-                        <span class="section-badge">23</span>
+                        <span class="section-badge">0</span>
                     </div>
                     <ul class="list mobile-list" id="completed-list">
                         <!-- completed items will be populated dynamically -->
@@ -238,11 +249,11 @@
                 <!-- Dashboard Statistics -->
                 <div class="dashboard-grid mobile-dashboard-grid">
                     <div class="stat-card bounce-in mobile-stat-card">
-                        <div class="stat-value">247</div>
+                        <div class="stat-value">0</div>
                         <div class="stat-label">Total Inspections</div>
                         <div class="stat-change positive">
                             <i class="fas fa-arrow-up"></i>
-                            <span>+12%</span>
+                            <span>+0%</span>
                         </div>
                         <div class="stat-icon">
                             <i class="fas fa-clipboard-list"></i>
@@ -250,11 +261,11 @@
                     </div>
                     
                     <div class="stat-card bounce-in mobile-stat-card" style="animation-delay: 0.1s;">
-                        <div class="stat-value">28</div>
+                        <div class="stat-value">0</div>
                         <div class="stat-label">This Month</div>
                         <div class="stat-change positive">
                             <i class="fas fa-arrow-up"></i>
-                            <span>+8</span>
+                            <span>+0</span>
                         </div>
                         <div class="stat-icon">
                             <i class="fas fa-calendar-alt"></i>
@@ -262,7 +273,7 @@
                     </div>
                     
                     <div class="stat-card bounce-in mobile-stat-card" style="animation-delay: 0.2s;">
-                        <div class="stat-value">5</div>
+                        <div class="stat-value">0</div>
                         <div class="stat-label">Pending</div>
                         <div class="stat-change">
                             <i class="fas fa-sync-alt"></i>
@@ -274,11 +285,11 @@
                     </div>
                     
                     <div class="stat-card bounce-in mobile-stat-card" style="animation-delay: 0.3s;">
-                        <div class="stat-value">94%</div>
+                        <div class="stat-value">100%</div>
                         <div class="stat-label">Compliance</div>
                         <div class="stat-change positive">
                             <i class="fas fa-arrow-up"></i>
-                            <span>+2%</span>
+                            <span>+0%</span>
                         </div>
                         <div class="stat-icon">
                             <i class="fas fa-chart-line"></i>
@@ -300,59 +311,15 @@
                     </div>
 
                     <div class="list mobile-activity-list">
-                        <div class="list-item mobile-list-item touchable">
-                            <div class="list-item-header">
-                                <div class="list-item-title">DVI2 - Equipment Safety</div>
-                                <div class="status-indicator status-completed">
-                                    <i class="fas fa-check"></i>
-                                    <span class="mobile-hide">Completed</span>
-                                </div>
-                            </div>
-                            <div class="list-item-content mobile-hide">
-                                All conveyor belt safety guards verified and functional.
-                            </div>
-                            <div class="list-item-meta">
-                                <i class="fas fa-user"></i> Sarah W. • 2h ago
-                            </div>
-                        </div>
-
-                        <div class="list-item mobile-list-item touchable">
-                            <div class="list-item-header">
-                                <div class="list-item-title">DAP5 - Fire Safety</div>
-                                <div class="status-indicator status-pending">
-                                    <i class="fas fa-clock"></i>
-                                    <span class="mobile-hide">In Progress</span>
-                                </div>
-                            </div>
-                            <div class="list-item-content mobile-hide">
-                                Emergency lighting system testing in progress.
-                            </div>
-                            <div class="list-item-meta">
-                                <i class="fas fa-user"></i> Mike J. • 1d ago
-                            </div>
-                        </div>
-
-                        <div class="list-item mobile-list-item touchable">
-                            <div class="list-item-header">
-                                <div class="list-item-title">DVI3 - Environmental</div>
-                                <div class="status-indicator status-error">
-                                    <i class="fas fa-exclamation-triangle"></i>
-                                    <span class="mobile-hide">Issues</span>
-                                </div>
-                            </div>
-                            <div class="list-item-content mobile-hide">
-                                Waste segregation protocols need improvement.
-                            </div>
-                            <div class="list-item-meta">
-                                <i class="fas fa-user"></i> Lisa C. • 2d ago
-                            </div>
-                        </div>
+                        <p style="padding: 20px; text-align: center; color: var(--text-muted);">
+                            No recent activity yet. Start your first inspection!
+                        </p>
                     </div>
                 </div>
             </div>
 
             <!-- Inspection Form Section -->
-            <div data-section="inspections"  >
+            <div data-section="inspections" style="display: none;">
                 <div class="content-card mobile-card">
                     <div class="content-header mobile-content-header">
                         <h2 class="content-title mobile-title" id="inspection-title">
@@ -435,7 +402,7 @@
             </div>
 
             <!-- Reports Section -->
-            <div data-section="reports"  >
+            <div data-section="reports" style="display: none;">
                 <div class="content-card mobile-card">
                     <div class="content-header mobile-content-header">
                         <h2 class="content-title mobile-title">
@@ -449,7 +416,7 @@
             </div>
 
             <!-- Analytics Section -->
-            <div data-section="analytics"  >
+            <div data-section="analytics" style="display: none;">
                 <div class="content-card mobile-card">
                     <div class="content-header mobile-content-header">
                         <h2 class="content-title mobile-title">
@@ -465,7 +432,7 @@
             </div>
 
             <!-- Settings Section (dynamically created) -->
-            <div data-section="settings"  ></div>
+            <div data-section="settings" style="display: none;"></div>
         </main>
     </div>
 
@@ -502,77 +469,102 @@
         </div>
     </div>
 
-    <!-- Third-party and Application Scripts -->
+    <!-- Third-party Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-    <script src="app.js"></script>
+    
+    <!-- Application Scripts (ES6 Modules) -->
+    <script type="module" src="blob-storage.js"></script>
+    <script type="module" src="app.js"></script>
 
-    <!-- Dish Detail Modal -->
-<div id="dishModal" class="dish-modal">
-    <div class="dish-modal-content">
-        <button class="dish-modal-close" onclick="closeDishModal()">&times;</button>
+    <!-- Loading Screen Handler -->
+    <script>
+        // Hide loading screen when app is ready
+        window.addEventListener('app-ready', function() {
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen) {
+                loadingScreen.style.opacity = '0';
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                }, 300);
+            }
+        });
         
-        <div class="dish-modal-body">
-            <div class="dish-modal-image-section">
-                <img id="dishModalImage" src="" alt="" class="dish-modal-image">
-            </div>
-            
-            <div class="dish-modal-info-section">
-                <div class="dish-modal-header">
-                    <h2 id="dishModalName" class="dish-modal-name"></h2>
-                    <span id="dishModalPrice" class="dish-modal-price"></span>
-                </div>
-                
-                <div id="dishModalBadge" class="dish-modal-badge" style="display: none;">
-                    <span>Chef's Empfehlung</span>
-                </div>
-                
-                <div id="dishModalDescription" class="dish-modal-description"></div>
-                
-                <div id="dishModalNutrition" class="dish-modal-nutrition">
-                    <h3>Nährwerte pro Portion</h3>
-                    <table class="nutrition-table">
-                        <thead>
-                            <tr>
-                                <th>Nährstoff</th>
-                                <th>Menge</th>
-                                <th>% Tagesbedarf*</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>Energie</td>
-                                <td id="nutritionCalories">-</td>
-                                <td id="nutritionCaloriesPercent">-</td>
-                            </tr>
-                            <tr>
-                                <td>Eiweiß</td>
-                                <td id="nutritionProtein">-</td>
-                                <td id="nutritionProteinPercent">-</td>
-                            </tr>
-                            <tr>
-                                <td>Kohlenhydrate</td>
-                                <td id="nutritionCarbs">-</td>
-                                <td id="nutritionCarbsPercent">-</td>
-                            </tr>
-                            <tr>
-                                <td>Fett</td>
-                                <td id="nutritionFat">-</td>
-                                <td id="nutritionFatPercent">-</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <p class="nutrition-disclaimer">*Referenzmenge für einen durchschnittlichen Erwachsenen (8.400 kJ/2.000 kcal)</p>
-                </div>
-                
-                <div id="dishModalTags" class="dish-modal-tags"></div>
-                
-                <button class="dish-modal-reserve-btn" onclick="scrollToReservation()">
-                    Tisch reservieren
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+        // Fallback: hide after 5 seconds
+        setTimeout(() => {
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen && loadingScreen.style.display !== 'none') {
+                loadingScreen.style.display = 'none';
+            }
+        }, 5000);
+    </script>
+
+    <!-- Additional Styles for Loading Screen -->
+    <style>
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.3s ease;
+        }
+        
+        .loading-content {
+            text-align: center;
+        }
+        
+        .loading-icon {
+            font-size: 4rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            margin: 20px auto;
+            border: 3px solid var(--border-primary);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: var(--radius-full);
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-right: 16px;
+        }
+        
+        .connection-status.online {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+        
+        .connection-status.offline {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+        }
+    </style>
 </body>
 </html>

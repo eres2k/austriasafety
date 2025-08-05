@@ -1,117 +1,103 @@
-// Service Worker for Aurora Audit Platform PWA
-// Handles offline functionality, caching, and background sync
-
+// service-worker.js - Aurora Audit Platform PWA
 const CACHE_NAME = 'aurora-audit-v1';
-const STATIC_CACHE_NAME = 'aurora-static-v1';
-const DYNAMIC_CACHE_NAME = 'aurora-dynamic-v1';
+const STATIC_CACHE = 'aurora-static-v1';
+const DYNAMIC_CACHE = 'aurora-dynamic-v1';
 
-// Assets to cache on install
+// Assets to cache
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/app.js',
   '/manifest.json',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap',
-  'https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js',
-  'https://identity.netlify.com/v1/netlify-identity-widget.js'
+  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/dexie/3.2.4/dexie.min.js'
 ];
 
-// Install event - cache static assets
+// Install event
 self.addEventListener('install', event => {
+  console.log('Service Worker: Installing...');
   event.waitUntil(
-    caches.open(STATIC_CACHE_NAME)
+    caches.open(STATIC_CACHE)
       .then(cache => {
-        console.log('Caching static assets');
+        console.log('Service Worker: Caching static assets');
         return cache.addAll(STATIC_ASSETS);
       })
-      .catch(err => console.error('Failed to cache static assets:', err))
+      .catch(err => console.error('Service Worker: Cache failed', err))
   );
-  // Force activation
   self.skipWaiting();
 });
 
-// Activate event - clean up old caches
+// Activate event
 self.addEventListener('activate', event => {
+  console.log('Service Worker: Activating...');
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames
-          .filter(cacheName => cacheName.startsWith('aurora-') && cacheName !== STATIC_CACHE_NAME && cacheName !== DYNAMIC_CACHE_NAME)
-          .map(cacheName => caches.delete(cacheName))
+          .filter(name => name !== STATIC_CACHE && name !== DYNAMIC_CACHE)
+          .map(name => caches.delete(name))
       );
     })
   );
-  // Take control immediately
   self.clients.claim();
 });
 
-// Fetch event - serve from cache, fallback to network
+// Fetch event
 self.addEventListener('fetch', event => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip chrome-extension and non-HTTP(S) requests
+  // Skip non-HTTP requests
   if (!request.url.startsWith('http')) {
     return;
   }
 
-  // Handle API requests differently (network first)
-  if (url.pathname.startsWith('/.netlify/') || url.pathname.startsWith('/api/')) {
+  // Network first for API calls
+  if (url.pathname.includes('/api/') || url.pathname.includes('/.netlify/')) {
     event.respondWith(
       fetch(request)
         .then(response => {
-          // Clone the response before caching
-          const responseToCache = response.clone();
-          caches.open(DYNAMIC_CACHE_NAME)
-            .then(cache => cache.put(request, responseToCache));
+          const responseClone = response.clone();
+          caches.open(DYNAMIC_CACHE).then(cache => {
+            cache.put(request, responseClone);
+          });
           return response;
         })
-        .catch(() => {
-          // If network fails, try cache
-          return caches.match(request);
-        })
+        .catch(() => caches.match(request))
     );
     return;
   }
 
-  // For static assets, use cache first strategy
+  // Cache first for static assets
   event.respondWith(
     caches.match(request)
       .then(cachedResponse => {
         if (cachedResponse) {
-          // Return cached version and update cache in background
-          event.waitUntil(
-            fetch(request)
-              .then(response => {
-                return caches.open(DYNAMIC_CACHE_NAME)
-                  .then(cache => {
-                    cache.put(request, response.clone());
-                    return response;
-                  });
-              })
-              .catch(() => {/* Ignore errors for background update */})
-          );
+          // Update cache in background
+          fetch(request).then(response => {
+            caches.open(DYNAMIC_CACHE).then(cache => {
+              cache.put(request, response);
+            });
+          });
           return cachedResponse;
         }
 
-        // Not in cache, fetch from network
-        return fetch(request)
-          .then(response => {
-            // Don't cache non-successful responses
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
-
-            const responseToCache = response.clone();
-            caches.open(DYNAMIC_CACHE_NAME)
-              .then(cache => cache.put(request, responseToCache));
-
+        return fetch(request).then(response => {
+          if (!response || response.status !== 200 || response.type !== 'basic') {
             return response;
+          }
+
+          const responseClone = response.clone();
+          caches.open(DYNAMIC_CACHE).then(cache => {
+            cache.put(request, responseClone);
           });
+
+          return response;
+        });
       })
       .catch(() => {
-        // Offline fallback for HTML pages
+        // Offline fallback
         if (request.destination === 'document') {
           return caches.match('/index.html');
         }
@@ -119,64 +105,15 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// Background sync for pending inspections
+// Background sync
 self.addEventListener('sync', event => {
-  if (event.tag === 'sync-inspections') {
-    event.waitUntil(syncPendingInspections());
+  if (event.tag === 'sync-audits') {
+    event.waitUntil(syncAudits());
   }
 });
 
-async function syncPendingInspections() {
-  try {
-    // Get all clients
-    const clients = await self.clients.matchAll();
-    
-    // Send message to clients to trigger sync
-    clients.forEach(client => {
-      client.postMessage({
-        type: 'SYNC_STARTED'
-      });
-    });
-
-    // Note: Actual sync logic is handled in the main app
-    // as it needs access to IndexedDB and authentication
-    
-    return true;
-  } catch (error) {
-    console.error('Sync failed:', error);
-    throw error;
-  }
+async function syncAudits() {
+  // This would sync with your backend when online
+  console.log('Background sync: Syncing audits...');
+  // Implementation depends on your backend API
 }
-
-// Handle messages from the main app
-self.addEventListener('message', event => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-});
-
-// Push notifications (for future use)
-self.addEventListener('push', event => {
-  const options = {
-    body: event.data ? event.data.text() : 'New inspection update',
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
-    vibrate: [100, 50, 100],
-    data: {
-      dateOfArrival: Date.now(),
-      primaryKey: 1
-    }
-  };
-
-  event.waitUntil(
-    self.registration.showNotification('Aurora Audit', options)
-  );
-});
-
-// Notification click handler
-self.addEventListener('notificationclick', event => {
-  event.notification.close();
-  event.waitUntil(
-    clients.openWindow('/')
-  );
-});
