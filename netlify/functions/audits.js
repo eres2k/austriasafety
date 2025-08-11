@@ -1,179 +1,211 @@
-// netlify/functions/audits.js
-// This is an example Netlify Function for handling audit data
-// In production, you would connect this to a database like Supabase, FaunaDB, or PostgreSQL
+const fs = require('fs').promises;
+const path = require('path');
 
-const { createClient } = require('@supabase/supabase-js');
-
-// Initialize Supabase client (you'll need to set these environment variables in Netlify)
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-// Helper function to get user from token
-const getUserFromToken = (token) => {
-  // In production, verify the Netlify Identity token
-  // For now, we'll parse the basic info
+// Reuse token verification from auth
+function verifyToken(token) {
+  const crypto = require('crypto');
   try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const payload = JSON.parse(Buffer.from(base64, 'base64').toString());
-    return payload;
-  } catch (error) {
+    const [header, body, signature] = token.split('.');
+    const expectedSignature = crypto
+      .createHmac('sha256', process.env.JWT_SECRET || 'your-secret-key')
+      .update(`${header}.${body}`)
+      .digest('base64');
+    
+    if (signature !== expectedSignature) return null;
+    
+    return JSON.parse(Buffer.from(body, 'base64').toString());
+  } catch {
     return null;
   }
-};
+}
 
 exports.handler = async (event, context) => {
-  // Enable CORS
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Content-Type': 'application/json'
   };
 
-  // Handle preflight requests
   if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: '',
-    };
+    return { statusCode: 200, headers };
   }
 
-  // Check authentication
+  // Verify authentication
   const token = event.headers.authorization?.replace('Bearer ', '');
-  if (!token) {
-    return {
-      statusCode: 401,
-      headers,
-      body: JSON.stringify({ error: 'Unauthorized' }),
-    };
-  }
-
-  const user = getUserFromToken(token);
+  const user = verifyToken(token);
+  
   if (!user) {
     return {
       statusCode: 401,
       headers,
-      body: JSON.stringify({ error: 'Invalid token' }),
+      body: JSON.stringify({ error: 'Unauthorized' })
     };
   }
 
-  const path = event.path.replace('/.netlify/functions/audits', '');
-  const segments = path.split('/').filter(Boolean);
+  const dataDir = path.join('/tmp', 'audit-data');
+  const auditsFile = path.join(dataDir, 'audits.json');
 
+  // Initialize data directory
   try {
-    // GET /audits - List all audits for user
-    if (event.httpMethod === 'GET' && segments.length === 0) {
-      const { data, error } = await supabase
-        .from('audits')
-        .select('*')
-        .eq('user_id', user.sub)
-        .order('created_at', { ascending: false });
+    await fs.mkdir(dataDir, { recursive: true });
+  } catch (e) {}
 
-      if (error) throw error;
+  // Initialize audits file if not exists
+  try {
+    await fs.access(auditsFile);
+  } catch {
+    await fs.writeFile(auditsFile, JSON.stringify([]));
+  }
 
+  // Handle different paths
+  const pathSegments = event.path.split('/').filter(Boolean);
+  
+  if (pathSegments[pathSegments.length - 1] === 'stats') {
+    // GET /audits/stats
+    try {
+      const audits = JSON.parse(await fs.readFile(auditsFile, 'utf8'));
+      const today = new Date().toDateString();
+      const todayAudits = audits.filter(a => new Date(a.date).toDateString() === today);
+      
+      const stats = {
+        todayCount: todayAudits.length,
+        totalCount: audits.length,
+        avgScore: audits.length > 0 ? Math.round(audits.reduce((sum, a) => sum + a.score, 0) / audits.length) : 0,
+        criticalCount: audits.reduce((sum, a) => sum + a.criticalFailures, 0)
+      };
+      
       return {
         statusCode: 200,
         headers,
-        body: JSON.stringify(data),
+        body: JSON.stringify(stats)
+      };
+    } catch (error) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Server error' })
       };
     }
+  } else if (pathSegments[pathSegments.length - 1] === 'export') {
+    // GET /audits/export
+    try {
+      const audits = JSON.parse(await fs.readFile(auditsFile, 'utf8'));
+      const JSZip = require('jszip');
+      const zip = new JSZip();
+      
+      // Add JSON data
+      zip.file('audits_data.json', JSON.stringify(audits, null, 2));
+      
+      // Add individual audit files
+      audits.forEach(audit => {
+        zip.file(
+          `audit_${audit.location}_${new Date(audit.date).toISOString().split('T')[0]}_${audit.id}.json`,
+          JSON.stringify(audit, null, 2)
+        );
+      });
+      
+      const content = await zip.generateAsync({ type: 'base64' });
+      
+      return {
+        statusCode: 200,
+        headers: {
+          ...headers,
+          'Content-Type': 'application/zip',
+          'Content-Disposition': `attachment; filename=audits_export_${new Date().toISOString().split('T')[0]}.zip`
+        },
+        body: content,
+        isBase64Encoded: true
+      };
+    } catch (error) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Server error' })
+      };
+    }
+  } else if (pathSegments.length > 3) {
+    // GET /audits/:id
+    const auditId = pathSegments[pathSegments.length - 1];
+    try {
+      const audits = JSON.parse(await fs.readFile(auditsFile, 'utf8'));
+      const audit = audits.find(a => a.id === auditId);
+      
+      if (audit) {
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify(audit)
+        };
+      } else {
+        return {
+          statusCode: 404,
+          headers,
+          body: JSON.stringify({ error: 'Audit not found' })
+        };
+      }
+    } catch (error) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Server error' })
+      };
+    }
+  }
 
-    // GET /audits/:id - Get specific audit
-    if (event.httpMethod === 'GET' && segments.length === 1) {
-      const { data, error } = await supabase
-        .from('audits')
-        .select('*')
-        .eq('id', segments[0])
-        .eq('user_id', user.sub)
-        .single();
-
-      if (error) throw error;
-
+  if (event.httpMethod === 'GET') {
+    // GET /audits
+    try {
+      const audits = JSON.parse(await fs.readFile(auditsFile, 'utf8'));
+      const limit = event.queryStringParameters?.limit ? parseInt(event.queryStringParameters.limit) : null;
+      
+      let result = audits;
+      if (limit) {
+        result = audits.slice(-limit).reverse();
+      }
+      
       return {
         statusCode: 200,
         headers,
-        body: JSON.stringify(data),
+        body: JSON.stringify(result)
+      };
+    } catch (error) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Server error' })
       };
     }
-
-    // POST /audits - Create new audit
-    if (event.httpMethod === 'POST' && segments.length === 0) {
-      const body = JSON.parse(event.body);
-      const { data, error } = await supabase
-        .from('audits')
-        .insert({
-          ...body,
-          user_id: user.sub,
-          auditor: user.email,
-          created_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
+  } else if (event.httpMethod === 'POST') {
+    // POST /audits
+    try {
+      const audits = JSON.parse(await fs.readFile(auditsFile, 'utf8'));
+      const newAudit = JSON.parse(event.body);
+      
+      // Add server timestamp
+      newAudit.serverDate = new Date().toISOString();
+      newAudit.uploadedBy = user.username;
+      
+      audits.push(newAudit);
+      await fs.writeFile(auditsFile, JSON.stringify(audits));
+      
       return {
         statusCode: 201,
         headers,
-        body: JSON.stringify(data),
+        body: JSON.stringify(newAudit)
       };
-    }
-
-    // PUT /audits/:id - Update audit
-    if (event.httpMethod === 'PUT' && segments.length === 1) {
-      const body = JSON.parse(event.body);
-      const { data, error } = await supabase
-        .from('audits')
-        .update({
-          ...body,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', segments[0])
-        .eq('user_id', user.sub)
-        .select()
-        .single();
-
-      if (error) throw error;
-
+    } catch (error) {
       return {
-        statusCode: 200,
+        statusCode: 500,
         headers,
-        body: JSON.stringify(data),
+        body: JSON.stringify({ error: 'Server error' })
       };
     }
-
-    // DELETE /audits/:id - Delete audit
-    if (event.httpMethod === 'DELETE' && segments.length === 1) {
-      const { error } = await supabase
-        .from('audits')
-        .delete()
-        .eq('id', segments[0])
-        .eq('user_id', user.sub);
-
-      if (error) throw error;
-
-      return {
-        statusCode: 204,
-        headers,
-        body: '',
-      };
-    }
-
-    // Method not allowed
-    return {
-      statusCode: 405,
-      headers,
-      body: JSON.stringify({ error: 'Method not allowed' }),
-    };
-
-  } catch (error) {
-    console.error('Error:', error);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: error.message }),
-    };
   }
+
+  return {
+    statusCode: 405,
+    headers,
+    body: JSON.stringify({ error: 'Method not allowed' })
+  };
 };

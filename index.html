@@ -1,0 +1,1868 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#ff9900">
+    <title>WHS Safety Audit - Amazon Austria</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --primary: #ff9900;
+            --primary-dark: #e88b00;
+            --secondary: #232f3e;
+            --success: #00d97e;
+            --danger: #dc3545;
+            --warning: #ffc107;
+            --info: #17a2b8;
+            --light: #f8f9fa;
+            --dark: #343a40;
+            --gray: #6c757d;
+            --white: #ffffff;
+            --shadow: 0 2px 8px rgba(0,0,0,0.1);
+            --shadow-lg: 0 4px 16px rgba(0,0,0,0.15);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--light);
+            color: var(--dark);
+            line-height: 1.5;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            touch-action: pan-y;
+        }
+
+        /* App Container */
+        .app {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Header */
+        .app-header {
+            background: var(--white);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: var(--shadow);
+        }
+
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            height: 60px;
+        }
+
+        .header-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--secondary);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            padding: 0.5rem;
+            cursor: pointer;
+            border-radius: 50%;
+            color: var(--gray);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+        }
+
+        .icon-btn:hover {
+            background-color: var(--light);
+        }
+
+        .icon-btn.primary {
+            color: var(--primary);
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--white);
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: flex;
+            justify-content: space-around;
+            padding: 0.5rem 0;
+        }
+
+        .nav-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0.5rem;
+            cursor: pointer;
+            color: var(--gray);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .nav-item.active {
+            color: var(--primary);
+        }
+
+        .nav-icon {
+            width: 24px;
+            height: 24px;
+            margin-bottom: 0.25rem;
+        }
+
+        .nav-label {
+            font-size: 0.75rem;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            padding-bottom: 70px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Login Screen */
+        .login-screen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 2rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+        }
+
+        .login-card {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .login-logo {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .login-logo h1 {
+            color: var(--secondary);
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .login-logo p {
+            color: var(--gray);
+            font-size: 0.875rem;
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--dark);
+            font-size: 0.875rem;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid #e1e4e8;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.2s;
+            background-color: var(--white);
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(255, 153, 0, 0.1);
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            width: 100%;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: var(--white);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+
+        .btn-secondary {
+            background-color: var(--light);
+            color: var(--dark);
+        }
+
+        .btn-secondary:hover {
+            background-color: #e9ecef;
+        }
+
+        .btn-success {
+            background-color: var(--success);
+            color: var(--white);
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+            color: var(--white);
+        }
+
+        .btn-sm {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: var(--shadow);
+            transition: all 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .card-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .card-subtitle {
+            font-size: 0.875rem;
+            color: var(--gray);
+            margin-top: 0.25rem;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin: 1rem;
+        }
+
+        .stat-card {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 1.25rem;
+            text-align: center;
+            box-shadow: var(--shadow);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary);
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--gray);
+            margin-top: 0.5rem;
+        }
+
+        /* Audit Questions */
+        .question-container {
+            padding: 1rem;
+        }
+
+        .section-header {
+            background: var(--light);
+            padding: 1rem;
+            margin: -1rem -1rem 1rem -1rem;
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .section-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .question-card {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            box-shadow: var(--shadow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .question-card.critical {
+            border-left: 4px solid var(--danger);
+        }
+
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .question-number {
+            font-weight: 600;
+            color: var(--primary);
+            font-size: 0.875rem;
+        }
+
+        .critical-badge {
+            background: var(--danger);
+            color: var(--white);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .question-text {
+            color: var(--dark);
+            margin-bottom: 1rem;
+            line-height: 1.6;
+        }
+
+        .basis-text {
+            font-size: 0.75rem;
+            color: var(--gray);
+            font-style: italic;
+            margin-bottom: 1rem;
+        }
+
+        .answer-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+        }
+
+        .answer-btn {
+            padding: 0.75rem;
+            border: 2px solid #e1e4e8;
+            background: var(--white);
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .answer-btn:hover {
+            border-color: var(--primary);
+            background: var(--light);
+        }
+
+        .answer-btn.selected {
+            border-color: var(--primary);
+            background: var(--primary);
+            color: var(--white);
+        }
+
+        .answer-btn.selected.no {
+            border-color: var(--danger);
+            background: var(--danger);
+        }
+
+        .answer-btn.selected.na {
+            border-color: var(--gray);
+            background: var(--gray);
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            position: sticky;
+            top: 60px;
+            background: var(--white);
+            padding: 1rem;
+            z-index: 100;
+            box-shadow: var(--shadow);
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--gray);
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: var(--light);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            transition: width 0.3s ease;
+            border-radius: 4px;
+        }
+
+        /* FAB */
+        .fab {
+            position: fixed;
+            bottom: 80px;
+            right: 1rem;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: var(--white);
+            border: none;
+            box-shadow: var(--shadow-lg);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            z-index: 100;
+        }
+
+        .fab:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+        }
+
+        /* Audit List */
+        .audit-list {
+            padding: 1rem;
+        }
+
+        .audit-item {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .audit-item:active {
+            transform: scale(0.98);
+        }
+
+        .audit-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .audit-score {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .audit-meta {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.875rem;
+            color: var(--gray);
+        }
+
+        /* Loading States */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 3rem;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--light);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .alert-success {
+            background: rgba(0, 217, 126, 0.1);
+            color: var(--success);
+        }
+
+        .alert-danger {
+            background: rgba(220, 53, 69, 0.1);
+            color: var(--danger);
+        }
+
+        /* Modal */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            padding: 1rem;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+
+        .modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 2rem;
+            max-width: 400px;
+            width: 100%;
+            transform: translateY(20px);
+            transition: transform 0.3s;
+        }
+
+        .modal.active .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-header {
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+        }
+
+        /* Responsive */
+        @media (min-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+            
+            .answer-buttons {
+                display: flex;
+                justify-content: flex-start;
+                gap: 1rem;
+            }
+            
+            .answer-btn {
+                width: auto;
+                padding: 0.75rem 2rem;
+            }
+        }
+
+        /* Icons */
+        .icon {
+            width: 24px;
+            height: 24px;
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        /* Utility Classes */
+        .text-center { text-align: center; }
+        .mt-1 { margin-top: 0.5rem; }
+        .mt-2 { margin-top: 1rem; }
+        .mb-1 { margin-bottom: 0.5rem; }
+        .mb-2 { margin-bottom: 1rem; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- Login Screen -->
+        <div id="loginScreen" class="login-screen">
+            <div class="login-card">
+                <div class="login-logo">
+                    <h1>WHS Safety Audit</h1>
+                    <p>Amazon Austria</p>
+                </div>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label class="form-label" for="username">Benutzername</label>
+                        <input type="text" id="username" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="password">Passwort</label>
+                        <input type="password" id="password" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        Anmelden
+                    </button>
+                </form>
+                <div id="loginError" class="alert alert-danger mt-2 hidden"></div>
+            </div>
+        </div>
+
+        <!-- Main App -->
+        <div id="mainApp" class="hidden">
+            <!-- Header -->
+            <header class="app-header">
+                <div class="header-content">
+                    <h1 class="header-title" id="pageTitle">Dashboard</h1>
+                    <div class="header-actions">
+                        <button class="icon-btn" onclick="syncData()">
+                            <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                        </button>
+                        <button class="icon-btn" onclick="showUserMenu()">
+                            <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Content -->
+            <main class="main-content" id="mainContent">
+                <!-- Dashboard -->
+                <div id="dashboardPage" class="page">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="todayAudits">0</div>
+                            <div class="stat-label">Heute</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="avgScore">0%</div>
+                            <div class="stat-label">Ø Score</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="criticalCount">0</div>
+                            <div class="stat-label">Kritisch</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="totalAudits">0</div>
+                            <div class="stat-label">Gesamt</div>
+                        </div>
+                    </div>
+
+                    <div style="padding: 1rem;">
+                        <h2 style="margin-bottom: 1rem;">Letzte Audits</h2>
+                        <div id="recentAudits"></div>
+                    </div>
+
+                    <button class="fab" onclick="startNewAudit()">
+                        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- New Audit Form -->
+                <div id="newAuditPage" class="page hidden">
+                    <div style="padding: 1rem;">
+                        <h2 class="mb-2">Neues Audit</h2>
+                        <form id="auditForm">
+                            <div class="form-group">
+                                <label class="form-label" for="location">Location</label>
+                                <select id="location" class="form-control" required>
+                                    <option value="DVI1">DVI1</option>
+                                    <option value="DVI2">DVI2</option>
+                                    <option value="DVI3">DVI3</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="area">Bereich</label>
+                                <input type="text" id="area" class="form-control" placeholder="z.B. Versand, Lager">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="shift">Schicht</label>
+                                <select id="shift" class="form-control" required>
+                                    <option value="Frühschicht">Frühschicht</option>
+                                    <option value="Spätschicht">Spätschicht</option>
+                                    <option value="Nachtschicht">Nachtschicht</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                Audit starten
+                            </button>
+                            <button type="button" class="btn btn-secondary mt-1" onclick="showPage('dashboard')">
+                                Abbrechen
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Audit Questions -->
+                <div id="questionsPage" class="page hidden">
+                    <div class="progress-container">
+                        <div class="progress-info">
+                            <span id="progressText">0 von 0 beantwortet</span>
+                            <span id="progressPercent">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="question-container" id="questionContainer"></div>
+                    <div style="padding: 1rem;">
+                        <button class="btn btn-primary" onclick="completeAudit()">
+                            Audit abschließen
+                        </button>
+                        <button class="btn btn-secondary mt-1" onclick="cancelAudit()">
+                            Abbrechen
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Audits List -->
+                <div id="auditsPage" class="page hidden">
+                    <div class="audit-list" id="auditList"></div>
+                </div>
+
+                <!-- Settings -->
+                <div id="settingsPage" class="page hidden">
+                    <div style="padding: 1rem;">
+                        <h2 class="mb-2">Einstellungen</h2>
+                        
+                        <div class="card">
+                            <h3 class="card-title">Benutzer</h3>
+                            <p class="card-subtitle" id="userInfo"></p>
+                        </div>
+
+                        <div class="card">
+                            <h3 class="card-title">Daten Export</h3>
+                            <button class="btn btn-secondary btn-sm" onclick="exportQuestions()">
+                                Fragen exportieren (JSON)
+                            </button>
+                            <button class="btn btn-secondary btn-sm mt-1" onclick="exportAllAudits()">
+                                Alle Audits exportieren (ZIP)
+                            </button>
+                        </div>
+
+                        <div class="card">
+                            <h3 class="card-title">Fragen Import</h3>
+                            <input type="file" id="importFile" accept=".json" onchange="importQuestions(event)" style="margin-bottom: 0.5rem;">
+                            <div id="importMessage"></div>
+                        </div>
+
+                        <button class="btn btn-danger" onclick="logout()">
+                            Abmelden
+                        </button>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Bottom Navigation -->
+            <nav class="bottom-nav">
+                <a href="#" class="nav-item active" onclick="showPage('dashboard')">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                    </svg>
+                    <span class="nav-label">Start</span>
+                </a>
+                <a href="#" class="nav-item" onclick="showPage('audits')">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                    </svg>
+                    <span class="nav-label">Audits</span>
+                </a>
+                <a href="#" class="nav-item" onclick="showPage('settings')">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <span class="nav-label">Mehr</span>
+                </a>
+            </nav>
+        </div>
+
+        <!-- Modal -->
+        <div id="modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title" id="modalTitle">Titel</h3>
+                </div>
+                <div id="modalBody"></div>
+                <div class="modal-actions" id="modalActions"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const API_BASE = '/.netlify/functions';
+        
+        // Audit Questions
+        const auditQuestions = {
+            "1": {
+                "title": "ALLGEMEINE SICHERHEIT",
+                "subsections": {
+                    "Notfallausstattung": [
+                        {
+                            "id": "1.1",
+                            "question": "Sind Sicherheitshinweise und Fluchtwegpläne deutlich sichtbar?",
+                            "critical": true,
+                            "basis": "AStV § 19"
+                        },
+                        {
+                            "id": "1.2",
+                            "question": "Sind alle Notausgänge frei und gut gekennzeichnet?",
+                            "critical": true,
+                            "basis": "AStV § 20"
+                        },
+                        {
+                            "id": "1.3",
+                            "question": "Ist die Erste-Hilfe-Ausstattung vollständig und erreichbar?",
+                            "critical": true,
+                            "basis": "ASchG § 26"
+                        },
+                        {
+                            "id": "1.4",
+                            "question": "Ist die Notfallausrüstung (Augenspülung, Feuerlöscher) zugänglich?",
+                            "critical": true,
+                            "basis": null
+                        }
+                    ],
+                    "Persönliche Schutzausrüstung": [
+                        {
+                            "id": "1.5",
+                            "question": "Tragen alle Mitarbeiter die korrekte PSA?",
+                            "critical": false,
+                            "basis": "ASchG § 71"
+                        },
+                        {
+                            "id": "1.6",
+                            "question": "Sind alle Mitarbeiter-Badges sichtbar?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "1.7",
+                            "question": "Entsprechen Frisur/Kleidung den Sicherheitsvorschriften? (max. Schulterhöhe)",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "1.8",
+                            "question": "Sind aktuelle Arbeitsanweisungen verfügbar?",
+                            "critical": false,
+                            "basis": "ASchG § 12"
+                        }
+                    ]
+                }
+            },
+            "2": {
+                "title": "ARBEITSPLATZ UND UMGEBUNG",
+                "subsections": {
+                    "Ordnung und Sauberkeit": [
+                        {
+                            "id": "2.1",
+                            "question": "Ist die Lagerhalle sauber und aufgeräumt?",
+                            "critical": false,
+                            "basis": "AStV § 4"
+                        },
+                        {
+                            "id": "2.2",
+                            "question": "Sind die Böden rutschfest und eben?",
+                            "critical": true,
+                            "basis": "AStV § 5"
+                        },
+                        {
+                            "id": "2.3",
+                            "question": "Ist ausreichend Bewegungsfreiheit vorhanden? (min. 1,5 m² pro Person)",
+                            "critical": false,
+                            "basis": null
+                        }
+                    ],
+                    "Arbeitsumgebung": [
+                        {
+                            "id": "2.4",
+                            "question": "Entspricht die Beleuchtung den Anforderungen? (min. 200 Lux)",
+                            "critical": false,
+                            "basis": "AStV § 22"
+                        },
+                        {
+                            "id": "2.5",
+                            "question": "Ist die Raumtemperatur angemessen? (18-25°C)",
+                            "critical": false,
+                            "basis": "AStV § 23"
+                        },
+                        {
+                            "id": "2.6",
+                            "question": "Ist die Lüftung ausreichend?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "2.7",
+                            "question": "Liegt der Lärmpegel im zulässigen Bereich? (≤ 85 dB(A))",
+                            "critical": false,
+                            "basis": null
+                        }
+                    ],
+                    "Ergonomie": [
+                        {
+                            "id": "2.8",
+                            "question": "Sind die Arbeitsplätze ergonomisch gestaltet?",
+                            "critical": false,
+                            "basis": "AStV § 21"
+                        }
+                    ]
+                }
+            },
+            "3": {
+                "title": "LAGERUNG UND TRANSPORT",
+                "subsections": {
+                    "Lagerbereiche": [
+                        {
+                            "id": "3.1",
+                            "question": "Werden die 5S-Markierungen respektiert?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "3.2",
+                            "question": "Sind die Lagerbereiche sicher organisiert?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "3.3",
+                            "question": "Werden Lagerungen über Kopf vermieden?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "3.4",
+                            "question": "Sind Regale ordnungsgemäß befestigt?",
+                            "critical": true,
+                            "basis": null
+                        },
+                        {
+                            "id": "3.5",
+                            "question": "Sind die maximalen Stapelhöhen eingehalten?",
+                            "critical": false,
+                            "basis": null
+                        }
+                    ],
+                    "Transportwege": [
+                        {
+                            "id": "3.6",
+                            "question": "Sind Fußgängerwege klar gekennzeichnet? (min. 1,2 m breit)",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "3.7",
+                            "question": "Sind alle Transportwege frei von Hindernissen?",
+                            "critical": true,
+                            "basis": null
+                        },
+                        {
+                            "id": "3.8",
+                            "question": "Sind Gefahrenbereiche deutlich markiert?",
+                            "critical": false,
+                            "basis": null
+                        }
+                    ],
+                    "Flurförderzeuge": [
+                        {
+                            "id": "3.9",
+                            "question": "Sind alle Flurförderzeuge in gutem Zustand?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "3.10",
+                            "question": "Sind die Wartungsprotokolle aktuell? (jährliche Prüfung)",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "3.11",
+                            "question": "Sind Ladehilfsmittel unbeschädigt?",
+                            "critical": false,
+                            "basis": null
+                        }
+                    ]
+                }
+            },
+            "4": {
+                "title": "GEFAHRSTOFFE",
+                "subsections": {
+                    "": [
+                        {
+                            "id": "4.1",
+                            "question": "Sind Gefahrstoffe korrekt gelagert?",
+                            "critical": true,
+                            "basis": "ChemG"
+                        },
+                        {
+                            "id": "4.2",
+                            "question": "Sind alle Gefahrstoffe ordnungsgemäß gekennzeichnet?",
+                            "critical": true,
+                            "basis": null
+                        },
+                        {
+                            "id": "4.3",
+                            "question": "Sind Sicherheitsdatenblätter verfügbar?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "4.4",
+                            "question": "Sind Gefahrstoffbereiche abgesperrt?",
+                            "critical": true,
+                            "basis": null
+                        }
+                    ]
+                }
+            },
+            "5": {
+                "title": "ERGONOMIE UND ARBEITSVERHALTEN",
+                "subsections": {
+                    "": [
+                        {
+                            "id": "5.1",
+                            "question": "Vermeiden Mitarbeiter ungünstige Körperhaltungen?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "5.2",
+                            "question": "Werden Transportwagen kontrolliert bewegt?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "5.3",
+                            "question": "Werden Handläufe verwendet (wo vorhanden)?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "5.4",
+                            "question": "Werden Hebehilfen bei schweren Lasten eingesetzt? (ab 25 kg Männer, 15 kg Frauen)",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "5.5",
+                            "question": "Werden Pausenzeiten eingehalten?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "5.6",
+                            "question": "Ist der Arbeitsrhythmus angemessen?",
+                            "critical": false,
+                            "basis": null
+                        }
+                    ]
+                }
+            },
+            "6": {
+                "title": "NOTFALLVORSORGE",
+                "subsections": {
+                    "Personal": [
+                        {
+                            "id": "6.1",
+                            "question": "Sind genügend Ersthelfer verfügbar? (1 pro 19 Mitarbeiter)",
+                            "critical": true,
+                            "basis": null
+                        },
+                        {
+                            "id": "6.2",
+                            "question": "Sind Brandschutzwarte ernannt und geschult?",
+                            "critical": true,
+                            "basis": null
+                        },
+                        {
+                            "id": "6.3",
+                            "question": "Sind die Notfallpläne aktuell und bekannt?",
+                            "critical": false,
+                            "basis": null
+                        }
+                    ],
+                    "Übungen": [
+                        {
+                            "id": "6.4",
+                            "question": "Werden regelmäßig Notfallübungen durchgeführt?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "6.5",
+                            "question": "Sind Sammelplätze bekannt und gekennzeichnet?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "6.6",
+                            "question": "Funktioniert das Alarmsystem ordnungsgemäß?",
+                            "critical": true,
+                            "basis": null
+                        }
+                    ]
+                }
+            },
+            "7": {
+                "title": "WARTUNG UND INSTANDHALTUNG",
+                "subsections": {
+                    "": [
+                        {
+                            "id": "7.1",
+                            "question": "Werden Wartungsintervalle bei Toren eingehalten?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "7.2",
+                            "question": "Sind Feuerlöscher-Prüffristen aktuell? (alle 2 Jahre)",
+                            "critical": true,
+                            "basis": null
+                        },
+                        {
+                            "id": "7.3",
+                            "question": "Sind elektrische Anlagen ordnungsgemäß geprüft?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "7.4",
+                            "question": "Erfolgt regelmäßige Wartung der Lüftungsanlagen?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "7.5",
+                            "question": "Sind alle Wartungsprotokolle verfügbar?",
+                            "critical": false,
+                            "basis": null
+                        }
+                    ]
+                }
+            },
+            "8": {
+                "title": "HÖHENARBEITEN (falls zutreffend)",
+                "subsections": {
+                    "": [
+                        {
+                            "id": "8.1",
+                            "question": "Sind Absturzsicherungen vorhanden?",
+                            "critical": true,
+                            "basis": null
+                        },
+                        {
+                            "id": "8.2",
+                            "question": "Ist spezielle Schutzausrüstung verfügbar?",
+                            "critical": false,
+                            "basis": null
+                        },
+                        {
+                            "id": "8.3",
+                            "question": "Sind Arbeiten in der Höhe genehmigt?",
+                            "critical": false,
+                            "basis": null
+                        }
+                    ]
+                }
+            }
+        };
+
+        // State
+        let currentUser = null;
+        let currentAudit = null;
+        let isOnline = navigator.onLine;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+            setupEventListeners();
+            
+            // Check online status
+            window.addEventListener('online', () => {
+                isOnline = true;
+                syncData();
+            });
+            
+            window.addEventListener('offline', () => {
+                isOnline = false;
+                showNotification('Offline-Modus aktiv');
+            });
+        });
+
+        // Event Listeners
+        function setupEventListeners() {
+            document.getElementById('loginForm').addEventListener('submit', handleLogin);
+            document.getElementById('auditForm').addEventListener('submit', handleAuditForm);
+        }
+
+        // Authentication
+        async function checkAuth() {
+            const token = localStorage.getItem('authToken');
+            if (token) {
+                try {
+                    const response = await apiCall('/auth', 'GET');
+                    if (response.ok) {
+                        currentUser = await response.json();
+                        showApp();
+                    } else {
+                        showLogin();
+                    }
+                } catch (error) {
+                    // Offline mode - check local storage
+                    const savedUser = localStorage.getItem('currentUser');
+                    if (savedUser) {
+                        currentUser = JSON.parse(savedUser);
+                        showApp();
+                    } else {
+                        showLogin();
+                    }
+                }
+            } else {
+                showLogin();
+            }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const response = await apiCall('/auth', 'POST', { username, password });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    localStorage.setItem('authToken', data.token);
+                    localStorage.setItem('currentUser', JSON.stringify(data.user));
+                    currentUser = data.user;
+                    showApp();
+                } else {
+                    showError('Ungültige Anmeldedaten');
+                }
+            } catch (error) {
+                // Fallback to local auth for demo
+                if (username === 'admin' && password === 'admin123') {
+                    currentUser = { username: 'admin', role: 'admin' };
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    showApp();
+                } else if (username === 'user' && password === 'user123') {
+                    currentUser = { username: 'user', role: 'user' };
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    showApp();
+                } else {
+                    showError('Ungültige Anmeldedaten');
+                }
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+            currentUser = null;
+            showLogin();
+        }
+
+        // UI Functions
+        function showLogin() {
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('mainApp').classList.add('hidden');
+        }
+
+        function showApp() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('mainApp').classList.remove('hidden');
+            document.getElementById('userInfo').textContent = `${currentUser.username} (${currentUser.role})`;
+            loadDashboard();
+        }
+
+        function showPage(pageName) {
+            // Hide all pages
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.add('hidden');
+            });
+            
+            // Show selected page
+            document.getElementById(pageName + 'Page').classList.remove('hidden');
+            
+            // Update navigation
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Update header title
+            const titles = {
+                dashboard: 'Dashboard',
+                newAudit: 'Neues Audit',
+                questions: 'Audit durchführen',
+                audits: 'Audit Liste',
+                settings: 'Einstellungen'
+            };
+            
+            document.getElementById('pageTitle').textContent = titles[pageName] || 'WHS Safety Audit';
+            
+            // Load page data
+            if (pageName === 'dashboard') {
+                loadDashboard();
+            } else if (pageName === 'audits') {
+                loadAuditList();
+            }
+        }
+
+        // Dashboard
+        async function loadDashboard() {
+            try {
+                const response = await apiCall('/audits/stats', 'GET');
+                const stats = await response.json();
+                
+                document.getElementById('todayAudits').textContent = stats.todayCount || 0;
+                document.getElementById('avgScore').textContent = `${stats.avgScore || 0}%`;
+                document.getElementById('criticalCount').textContent = stats.criticalCount || 0;
+                document.getElementById('totalAudits').textContent = stats.totalCount || 0;
+                
+                // Load recent audits
+                const auditsResponse = await apiCall('/audits?limit=5', 'GET');
+                const recentAudits = await auditsResponse.json();
+                displayRecentAudits(recentAudits);
+                
+            } catch (error) {
+                // Offline mode - load from local storage
+                const audits = JSON.parse(localStorage.getItem('localAudits') || '[]');
+                const today = new Date().toDateString();
+                const todayAudits = audits.filter(a => new Date(a.date).toDateString() === today);
+                
+                document.getElementById('todayAudits').textContent = todayAudits.length;
+                document.getElementById('totalAudits').textContent = audits.length;
+                
+                if (audits.length > 0) {
+                    const avgScore = Math.round(audits.reduce((sum, a) => sum + a.score, 0) / audits.length);
+                    document.getElementById('avgScore').textContent = `${avgScore}%`;
+                    
+                    const criticalCount = audits.reduce((sum, a) => sum + a.criticalFailures, 0);
+                    document.getElementById('criticalCount').textContent = criticalCount;
+                }
+                
+                displayRecentAudits(audits.slice(-5).reverse());
+            }
+        }
+
+        function displayRecentAudits(audits) {
+            const container = document.getElementById('recentAudits');
+            container.innerHTML = '';
+            
+            if (audits.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--gray);">Keine Audits vorhanden</p>';
+                return;
+            }
+            
+            audits.forEach(audit => {
+                const item = document.createElement('div');
+                item.className = 'audit-item';
+                item.onclick = () => viewAudit(audit.id);
+                
+                item.innerHTML = `
+                    <div class="audit-header">
+                        <div>
+                            <div style="font-weight: 600;">${audit.location} - ${audit.area || 'N/A'}</div>
+                            <div class="audit-meta">
+                                <span>${new Date(audit.date).toLocaleDateString('de-AT')}</span>
+                                <span>${audit.shift}</span>
+                            </div>
+                        </div>
+                        <div class="audit-score">${audit.score}%</div>
+                    </div>
+                `;
+                
+                container.appendChild(item);
+            });
+        }
+
+        // New Audit
+        function startNewAudit() {
+            showPage('newAudit');
+        }
+
+        async function handleAuditForm(e) {
+            e.preventDefault();
+            
+            currentAudit = {
+                id: Date.now().toString(),
+                date: new Date().toISOString(),
+                location: document.getElementById('location').value,
+                area: document.getElementById('area').value || 'N/A',
+                shift: document.getElementById('shift').value,
+                auditor: currentUser.username,
+                answers: {},
+                status: 'in_progress'
+            };
+            
+            displayQuestions();
+            showPage('questions');
+        }
+
+        // Questions
+        function displayQuestions() {
+            const container = document.getElementById('questionContainer');
+            container.innerHTML = '';
+            
+            Object.keys(auditQuestions).forEach(sectionKey => {
+                const section = auditQuestions[sectionKey];
+                
+                // Section header
+                const sectionHeader = document.createElement('div');
+                sectionHeader.className = 'section-header';
+                sectionHeader.innerHTML = `<h3 class="section-title">${sectionKey}. ${section.title}</h3>`;
+                container.appendChild(sectionHeader);
+                
+                // Questions
+                Object.keys(section.subsections).forEach(subsectionKey => {
+                    if (subsectionKey) {
+                        const subsectionTitle = document.createElement('h4');
+                        subsectionTitle.style.padding = '0 1rem';
+                        subsectionTitle.style.marginBottom = '1rem';
+                        subsectionTitle.textContent = subsectionKey;
+                        container.appendChild(subsectionTitle);
+                    }
+                    
+                    section.subsections[subsectionKey].forEach(question => {
+                        const questionCard = document.createElement('div');
+                        questionCard.className = `question-card ${question.critical ? 'critical' : ''}`;
+                        
+                        questionCard.innerHTML = `
+                            <div class="question-header">
+                                <span class="question-number">${question.id}</span>
+                                ${question.critical ? '<span class="critical-badge">KRITISCH</span>' : ''}
+                            </div>
+                            <div class="question-text">${question.question}</div>
+                            ${question.basis ? `<div class="basis-text">Basis: ${question.basis}</div>` : ''}
+                            <div class="answer-buttons">
+                                <button class="answer-btn" onclick="selectAnswer('${question.id}', 'YES', this)">JA</button>
+                                <button class="answer-btn no" onclick="selectAnswer('${question.id}', 'NO', this)">NEIN</button>
+                                <button class="answer-btn na" onclick="selectAnswer('${question.id}', 'NA', this)">N/A</button>
+                            </div>
+                        `;
+                        
+                        container.appendChild(questionCard);
+                    });
+                });
+            });
+            
+            updateProgress();
+        }
+
+        function selectAnswer(questionId, answer, button) {
+            currentAudit.answers[questionId] = answer;
+            
+            // Update button styling
+            const buttons = button.parentElement.querySelectorAll('.answer-btn');
+            buttons.forEach(btn => btn.classList.remove('selected'));
+            button.classList.add('selected');
+            
+            updateProgress();
+        }
+
+        function updateProgress() {
+            const totalQuestions = 46;
+            const answeredQuestions = Object.keys(currentAudit.answers).length;
+            const percentage = Math.round((answeredQuestions / totalQuestions) * 100);
+            
+            document.getElementById('progressText').textContent = `${answeredQuestions} von ${totalQuestions} beantwortet`;
+            document.getElementById('progressPercent').textContent = `${percentage}%`;
+            document.getElementById('progressFill').style.width = `${percentage}%`;
+        }
+
+        async function completeAudit() {
+            if (Object.keys(currentAudit.answers).length === 0) {
+                showModal('Fehler', 'Bitte beantworten Sie mindestens eine Frage.');
+                return;
+            }
+            
+            // Calculate results
+            let totalQuestions = 0;
+            let passedQuestions = 0;
+            let criticalFailures = 0;
+            
+            Object.values(auditQuestions).forEach(section => {
+                Object.values(section.subsections).forEach(subsection => {
+                    subsection.forEach(question => {
+                        if (currentAudit.answers[question.id]) {
+                            totalQuestions++;
+                            if (currentAudit.answers[question.id] === 'YES') {
+                                passedQuestions++;
+                            } else if (currentAudit.answers[question.id] === 'NO' && question.critical) {
+                                criticalFailures++;
+                            }
+                        }
+                    });
+                });
+            });
+            
+            currentAudit.score = Math.round((passedQuestions / totalQuestions) * 100);
+            currentAudit.itemsPassed = passedQuestions;
+            currentAudit.totalItems = totalQuestions;
+            currentAudit.criticalFailures = criticalFailures;
+            currentAudit.status = 'completed';
+            currentAudit.overallCondition = currentAudit.score >= 80 ? 'Gut' : 'Verbesserungsbedürftig';
+            currentAudit.overallResult = criticalFailures === 0 ? 'Keine Beanstandungen' : 'Kritische Mängel festgestellt';
+            
+            // Save audit
+            try {
+                await apiCall('/audits', 'POST', currentAudit);
+                showNotification('Audit erfolgreich gespeichert');
+            } catch (error) {
+                // Save locally if offline
+                const localAudits = JSON.parse(localStorage.getItem('localAudits') || '[]');
+                localAudits.push(currentAudit);
+                localStorage.setItem('localAudits', JSON.stringify(localAudits));
+                localStorage.setItem('pendingSync', 'true');
+                showNotification('Audit lokal gespeichert (wird synchronisiert)');
+            }
+            
+            // Generate PDF
+            generatePDF(currentAudit);
+            
+            currentAudit = null;
+            showPage('dashboard');
+        }
+
+        function cancelAudit() {
+            if (confirm('Möchten Sie das Audit wirklich abbrechen? Alle Daten gehen verloren.')) {
+                currentAudit = null;
+                showPage('dashboard');
+            }
+        }
+
+        // Audit List
+        async function loadAuditList() {
+            const container = document.getElementById('auditList');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+            
+            try {
+                const response = await apiCall('/audits', 'GET');
+                const audits = await response.json();
+                displayAuditList(audits);
+            } catch (error) {
+                // Load from local storage
+                const audits = JSON.parse(localStorage.getItem('localAudits') || '[]');
+                displayAuditList(audits);
+            }
+        }
+
+        function displayAuditList(audits) {
+            const container = document.getElementById('auditList');
+            container.innerHTML = '';
+            
+            if (audits.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--gray); padding: 3rem;">Keine Audits vorhanden</p>';
+                return;
+            }
+            
+            audits.reverse().forEach(audit => {
+                const item = document.createElement('div');
+                item.className = 'audit-item';
+                item.onclick = () => viewAudit(audit.id);
+                
+                item.innerHTML = `
+                    <div class="audit-header">
+                        <div>
+                            <div style="font-weight: 600;">${audit.location} - ${audit.area}</div>
+                            <div class="audit-meta">
+                                <span>${new Date(audit.date).toLocaleDateString('de-AT')}</span>
+                                <span>${audit.shift}</span>
+                                <span>${audit.auditor}</span>
+                            </div>
+                        </div>
+                        <div class="audit-score">${audit.score}%</div>
+                    </div>
+                `;
+                
+                container.appendChild(item);
+            });
+        }
+
+        async function viewAudit(auditId) {
+            try {
+                const response = await apiCall(`/audits/${auditId}`, 'GET');
+                const audit = await response.json();
+                generatePDF(audit);
+            } catch (error) {
+                // Load from local storage
+                const audits = JSON.parse(localStorage.getItem('localAudits') || '[]');
+                const audit = audits.find(a => a.id === auditId);
+                if (audit) {
+                    generatePDF(audit);
+                }
+            }
+        }
+
+        // PDF Generation
+        function generatePDF(audit) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Header
+            doc.setFontSize(20);
+            doc.text('AMAZON AUSTRIA', 20, 20);
+            doc.setFontSize(16);
+            doc.text('Workplace Health & Safety', 20, 30);
+            doc.setFontSize(18);
+            doc.text('SAFETY AUDIT REPORT', 20, 40);
+            
+            // Audit Information
+            doc.setFontSize(12);
+            doc.text('AUDIT INFORMATION', 20, 60);
+            doc.setFontSize(10);
+            doc.text(`Date/Time: ${new Date(audit.date).toLocaleString('de-AT')}`, 20, 70);
+            doc.text(`Location: ${audit.location}`, 20, 75);
+            doc.text(`Area: ${audit.area}`, 20, 80);
+            doc.text(`Shift: ${audit.shift}`, 20, 85);
+            doc.text(`Auditor: ${audit.auditor}`, 20, 90);
+            doc.text(`Status: ${audit.status}`, 20, 95);
+            
+            // Score Summary
+            doc.setFontSize(12);
+            doc.text('AUDIT SCORE SUMMARY', 20, 110);
+            doc.setFontSize(10);
+            doc.text(`Overall Score: ${audit.score}%`, 20, 120);
+            doc.text(`Items Passed: ${audit.itemsPassed}/${audit.totalItems}`, 20, 125);
+            doc.text(`Critical Failures: ${audit.criticalFailures}`, 20, 130);
+            
+            // Overall Assessment
+            doc.text('OVERALL ASSESSMENT', 20, 145);
+            doc.text(`Workplace Condition: ${audit.overallCondition}`, 20, 155);
+            doc.text(`Overall Result: ${audit.overallResult}`, 20, 160);
+            
+            // Save PDF
+            doc.save(`audit_${audit.location}_${new Date(audit.date).toISOString().split('T')[0]}.pdf`);
+        }
+
+        // API Helper
+        async function apiCall(endpoint, method = 'GET', body = null) {
+            const token = localStorage.getItem('authToken');
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : ''
+                }
+            };
+            
+            if (body) {
+                options.body = JSON.stringify(body);
+            }
+            
+            const response = await fetch(API_BASE + endpoint, options);
+            
+            if (!response.ok && response.status === 401) {
+                logout();
+                throw new Error('Unauthorized');
+            }
+            
+            return response;
+        }
+
+        // Data Sync
+        async function syncData() {
+            if (!isOnline) return;
+            
+            const pendingSync = localStorage.getItem('pendingSync');
+            if (pendingSync) {
+                const localAudits = JSON.parse(localStorage.getItem('localAudits') || '[]');
+                
+                for (const audit of localAudits) {
+                    try {
+                        await apiCall('/audits', 'POST', audit);
+                    } catch (error) {
+                        console.error('Sync failed for audit:', audit.id);
+                    }
+                }
+                
+                localStorage.removeItem('pendingSync');
+                localStorage.removeItem('localAudits');
+                showNotification('Daten erfolgreich synchronisiert');
+                loadDashboard();
+            }
+        }
+
+        // Export Functions
+        function exportQuestions() {
+            const blob = new Blob([JSON.stringify(auditQuestions, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'audit_questions.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importQuestions(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const questions = JSON.parse(e.target.result);
+                    // Validate and save questions
+                    showNotification('Fragen erfolgreich importiert');
+                } catch (error) {
+                    showError('Fehler beim Importieren der Datei');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        async function exportAllAudits() {
+            try {
+                const response = await apiCall('/audits/export', 'GET');
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `audits_export_${new Date().toISOString().split('T')[0]}.zip`;
+                a.click();
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                showError('Export fehlgeschlagen');
+            }
+        }
+
+        // UI Helpers
+        function showModal(title, content, actions = []) {
+            const modal = document.getElementById('modal');
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalBody').innerHTML = content;
+            
+            const actionsContainer = document.getElementById('modalActions');
+            actionsContainer.innerHTML = '';
+            
+            if (actions.length === 0) {
+                actions = [{ text: 'OK', onclick: () => hideModal() }];
+            }
+            
+            actions.forEach(action => {
+                const button = document.createElement('button');
+                button.className = `btn ${action.class || 'btn-primary'}`;
+                button.textContent = action.text;
+                button.onclick = action.onclick;
+                actionsContainer.appendChild(button);
+            });
+            
+            modal.classList.add('active');
+        }
+
+        function hideModal() {
+            document.getElementById('modal').classList.remove('active');
+        }
+
+        function showNotification(message, type = 'success') {
+            // You can implement a toast notification here
+            console.log(`${type}: ${message}`);
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('loginError');
+            if (errorDiv) {
+                errorDiv.textContent = message;
+                errorDiv.classList.remove('hidden');
+                setTimeout(() => errorDiv.classList.add('hidden'), 5000);
+            } else {
+                showModal('Fehler', message);
+            }
+        }
+
+        function showUserMenu() {
+            showModal('Benutzer', `
+                <p><strong>${currentUser.username}</strong></p>
+                <p>Rolle: ${currentUser.role}</p>
+            `, [
+                { text: 'Abmelden', onclick: logout, class: 'btn-danger' },
+                { text: 'Schließen', onclick: hideModal, class: 'btn-secondary' }
+            ]);
+        }
+    </script>
+</body>
+</html>
