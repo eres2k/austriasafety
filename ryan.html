@@ -17,6 +17,14 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
             overflow-x: hidden;
             position: relative;
+            perspective: 1000px;
+        }
+
+        /* 3D Scene Container */
+        .scene-3d {
+            transform-style: preserve-3d;
+            transition: transform 0.1s ease-out;
+            position: relative;
         }
 
         /* Loading Screen */
@@ -57,21 +65,21 @@
             position: relative;
             height: 100vh;
             overflow: hidden;
+            transform-style: preserve-3d;
         }
 
         .hero-image {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: -10%;
+            left: -10%;
+            width: 120%;
+            height: 120%;
             background-image: url('ryan.png');
             background-size: cover;
             background-position: center;
-            background-attachment: fixed;
             filter: contrast(1.2) brightness(0.8);
-            transform: scale(1.1);
-            transition: transform 10s ease;
+            transform: translateZ(-100px) scale(1.2);
+            transition: transform 0.1s ease-out;
         }
 
         .hero-image::before {
@@ -100,6 +108,28 @@
             background: linear-gradient(to top, #000 0%, transparent 100%);
         }
 
+        /* Depth Layers */
+        .depth-layer {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .depth-layer.back {
+            transform: translateZ(-200px);
+            opacity: 0.3;
+        }
+
+        .depth-layer.mid {
+            transform: translateZ(-50px);
+            opacity: 0.6;
+        }
+
+        .depth-layer.front {
+            transform: translateZ(50px);
+        }
+
         /* Audio Visualizer */
         .visualizer {
             position: absolute;
@@ -108,6 +138,7 @@
             width: 100%;
             height: 300px;
             z-index: 10;
+            transform: translateZ(20px);
         }
 
         .visualizer canvas {
@@ -120,9 +151,10 @@
             position: absolute;
             top: 50%;
             left: 50%;
-            transform: translate(-50%, -50%);
+            transform: translate(-50%, -50%) translateZ(100px);
             text-align: center;
             z-index: 20;
+            transition: transform 0.1s ease-out;
         }
 
         .hero-title {
@@ -135,6 +167,9 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             animation: glitch 3s infinite;
+            text-shadow: 
+                2px 2px 20px rgba(0,212,255,0.5),
+                -2px -2px 20px rgba(255,0,110,0.5);
         }
 
         @keyframes glitch {
@@ -151,6 +186,60 @@
             letter-spacing: 4px;
         }
 
+        /* Gyro Indicator */
+        .gyro-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px);
+        }
+
+        .gyro-dot {
+            width: 20px;
+            height: 20px;
+            background: radial-gradient(circle at center, #ff006e 0%, #00d4ff 100%);
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(255,0,102,0.8);
+            transition: transform 0.1s ease-out;
+        }
+
+        /* Permission Request */
+        .permission-request {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(45deg, #00d4ff, #ff006e);
+            padding: 15px 30px;
+            border-radius: 30px;
+            text-align: center;
+            animation: slideUp 0.5s ease-out;
+            z-index: 1000;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 10px 30px rgba(0,212,255,0.5);
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateX(-50%) translateY(100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(-50%) translateY(0);
+                opacity: 1;
+            }
+        }
+
         /* Audio Controls */
         .audio-controls {
             position: fixed;
@@ -165,6 +254,7 @@
             border-radius: 50px;
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255,255,255,0.1);
+            transform: translateZ(50px);
         }
 
         .play-btn {
@@ -224,6 +314,7 @@
             background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%);
             backdrop-filter: blur(10px);
             transition: all 0.3s ease;
+            transform: translateZ(80px);
         }
 
         .nav.scrolled {
@@ -283,6 +374,8 @@
             padding: 100px 50px;
             max-width: 1400px;
             margin: 0 auto;
+            position: relative;
+            transform: translateZ(0);
         }
 
         .section-title {
@@ -310,6 +403,7 @@
             cursor: pointer;
             position: relative;
             overflow: hidden;
+            transform: translateZ(0);
         }
 
         .track-card::before {
@@ -325,7 +419,7 @@
         }
 
         .track-card:hover {
-            transform: translateY(-5px);
+            transform: translateY(-5px) translateZ(20px);
             border-color: #00d4ff;
         }
 
@@ -348,11 +442,12 @@
             background: rgba(255,255,255,0.05);
             border-radius: 10px;
             transition: all 0.3s ease;
+            transform: translateZ(0);
         }
 
         .tour-date:hover {
             background: rgba(255,255,255,0.1);
-            transform: translateX(10px);
+            transform: translateX(10px) translateZ(10px);
         }
 
         .date-info {
@@ -422,7 +517,7 @@
 
         .social-link:hover {
             background: linear-gradient(45deg, #00d4ff, #ff006e);
-            transform: translateY(-5px);
+            transform: translateY(-5px) translateZ(10px);
             box-shadow: 0 10px 30px rgba(0,212,255,0.3);
         }
 
@@ -460,6 +555,7 @@
             height: 100%;
             pointer-events: none;
             z-index: 1;
+            transform: translateZ(-150px);
         }
 
         .particle {
@@ -490,6 +586,22 @@
                 transform: translateY(0) scale(0);
             }
         }
+
+        /* 3D Grid Background */
+        .grid-3d {
+            position: fixed;
+            width: 200%;
+            height: 200%;
+            top: -50%;
+            left: -50%;
+            background-image: 
+                linear-gradient(rgba(0,212,255,0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,0,110,0.1) 1px, transparent 1px);
+            background-size: 100px 100px;
+            transform: translateZ(-300px) rotateX(60deg);
+            opacity: 0.2;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -501,137 +613,148 @@
         </div>
     </div>
 
-    <!-- Particles -->
-    <div class="particles" id="particles"></div>
+    <!-- 3D Scene Container -->
+    <div class="scene-3d" id="scene3d">
+        <!-- 3D Grid Background -->
+        <div class="grid-3d" id="grid3d"></div>
 
-    <!-- Navigation -->
-    <nav class="nav" id="nav">
-        <div class="nav-content">
-            <div class="logo">DJ McRyan</div>
-            <div class="nav-links">
-                <a href="#home">Home</a>
-                <a href="#music">Music</a>
-                <a href="#tour">Tour</a>
-                <a href="#about">About</a>
-                <a href="#contact">Contact</a>
+        <!-- Particles -->
+        <div class="particles" id="particles"></div>
+
+        <!-- Navigation -->
+        <nav class="nav" id="nav">
+            <div class="nav-content">
+                <div class="logo">DJ McRyan</div>
+                <div class="nav-links">
+                    <a href="#home">Home</a>
+                    <a href="#music">Music</a>
+                    <a href="#tour">Tour</a>
+                    <a href="#about">About</a>
+                    <a href="#contact">Contact</a>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Hero Section -->
+        <section class="hero" id="home">
+            <div class="hero-image" id="heroImage"></div>
+            <div class="visualizer">
+                <canvas id="visualizer"></canvas>
+            </div>
+            <div class="hero-content" id="heroContent">
+                <h1 class="hero-title">McRyan</h1>
+                <p class="hero-subtitle">ELECTRONIC MUSIC PRODUCER</p>
+            </div>
+        </section>
+
+        <!-- Audio Controls -->
+        <div class="audio-controls">
+            <button class="play-btn" id="playBtn" onclick="togglePlay()"></button>
+            <div class="track-info">
+                <div class="track-name" id="trackName">Quantum Dreams</div>
+                <div class="track-time" id="trackTime">0:00 / 3:45</div>
             </div>
         </div>
-    </nav>
 
-    <!-- Hero Section -->
-    <section class="hero" id="home">
-        <div class="hero-image" id="heroImage"></div>
-        <div class="visualizer">
-            <canvas id="visualizer"></canvas>
+        <!-- Gyro Indicator -->
+        <div class="gyro-indicator">
+            <div class="gyro-dot" id="gyroDot"></div>
         </div>
-        <div class="hero-content">
-            <h1 class="hero-title">McRyan</h1>
-            <p class="hero-subtitle">ELECTRONIC MUSIC PRODUCER</p>
-        </div>
-    </section>
 
-    <!-- Audio Controls -->
-    <div class="audio-controls">
-        <button class="play-btn" id="playBtn" onclick="togglePlay()"></button>
-        <div class="track-info">
-            <div class="track-name" id="trackName">Quantum Dreams</div>
-            <div class="track-time" id="trackTime">0:00 / 3:45</div>
-        </div>
+        <!-- Music Section -->
+        <section class="section" id="music">
+            <h2 class="section-title">Latest Releases</h2>
+            <div class="music-grid">
+                <div class="track-card" onclick="playTrack(0)">
+                    <h3>Quantum Dreams</h3>
+                    <p style="color: rgba(255,255,255,0.6); margin: 10px 0;">Electronic / Progressive</p>
+                    <p style="font-size: 14px;">The latest single featuring atmospheric synths and driving basslines.</p>
+                </div>
+                <div class="track-card" onclick="playTrack(1)">
+                    <h3>Neon Nights</h3>
+                    <p style="color: rgba(255,255,255,0.6); margin: 10px 0;">House / Tech House</p>
+                    <p style="font-size: 14px;">A journey through the underground club scene.</p>
+                </div>
+                <div class="track-card" onclick="playTrack(2)">
+                    <h3>Digital Soul</h3>
+                    <p style="color: rgba(255,255,255,0.6); margin: 10px 0;">Ambient / Experimental</p>
+                    <p style="font-size: 14px;">Exploring the intersection of human emotion and technology.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tour Section -->
+        <section class="section" id="tour">
+            <h2 class="section-title">Upcoming Shows</h2>
+            <div class="tour-dates">
+                <div class="tour-date">
+                    <div class="date-info">
+                        <div class="date-number">15</div>
+                        <div class="venue-info">
+                            <h3>Electric Dreams Festival</h3>
+                            <p>Miami, FL • August 2025</p>
+                        </div>
+                    </div>
+                    <button class="ticket-btn">Get Tickets</button>
+                </div>
+                <div class="tour-date">
+                    <div class="date-info">
+                        <div class="date-number">22</div>
+                        <div class="venue-info">
+                            <h3>Underground NYC</h3>
+                            <p>New York, NY • August 2025</p>
+                        </div>
+                    </div>
+                    <button class="ticket-btn">Get Tickets</button>
+                </div>
+                <div class="tour-date">
+                    <div class="date-info">
+                        <div class="date-number">05</div>
+                        <div class="venue-info">
+                            <h3>Warehouse Project</h3>
+                            <p>Los Angeles, CA • September 2025</p>
+                        </div>
+                    </div>
+                    <button class="ticket-btn">Get Tickets</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- About Section -->
+        <section class="section" id="about">
+            <h2 class="section-title">About</h2>
+            <div style="max-width: 800px; margin: 0 auto; text-align: center; line-height: 1.8;">
+                <p style="font-size: 18px; margin-bottom: 20px;">
+                    DJ McRyan is a visionary electronic music producer known for pushing the boundaries of sound and technology. 
+                    With a unique blend of progressive house, techno, and experimental electronica, McRyan creates immersive 
+                    sonic experiences that transport listeners to new dimensions.
+                </p>
+                <p style="color: rgba(255,255,255,0.7);">
+                    From underground clubs to major festivals, McRyan's performances are legendary for their energy, 
+                    innovation, and connection with the audience. Each set is a journey through sound, emotion, and pure electronic bliss.
+                </p>
+            </div>
+        </section>
+
+        <!-- Contact Section -->
+        <section class="section" id="contact">
+            <h2 class="section-title">Connect</h2>
+            <div class="contact-content">
+                <p style="font-size: 18px; margin-bottom: 20px;">
+                    For bookings, collaborations, and inquiries
+                </p>
+                <p style="color: #00d4ff; font-size: 24px; margin-bottom: 40px;">
+                    management@djmcryan.com
+                </p>
+                <div class="social-links">
+                    <a href="#" class="social-link">📧</a>
+                    <a href="#" class="social-link">🎵</a>
+                    <a href="#" class="social-link">📷</a>
+                    <a href="#" class="social-link">🐦</a>
+                </div>
+            </div>
+        </section>
     </div>
-
-    <!-- Music Section -->
-    <section class="section" id="music">
-        <h2 class="section-title">Latest Releases</h2>
-        <div class="music-grid">
-            <div class="track-card" onclick="playTrack(0)">
-                <h3>Quantum Dreams</h3>
-                <p style="color: rgba(255,255,255,0.6); margin: 10px 0;">Electronic / Progressive</p>
-                <p style="font-size: 14px;">The latest single featuring atmospheric synths and driving basslines.</p>
-            </div>
-            <div class="track-card" onclick="playTrack(1)">
-                <h3>Neon Nights</h3>
-                <p style="color: rgba(255,255,255,0.6); margin: 10px 0;">House / Tech House</p>
-                <p style="font-size: 14px;">A journey through the underground club scene.</p>
-            </div>
-            <div class="track-card" onclick="playTrack(2)">
-                <h3>Digital Soul</h3>
-                <p style="color: rgba(255,255,255,0.6); margin: 10px 0;">Ambient / Experimental</p>
-                <p style="font-size: 14px;">Exploring the intersection of human emotion and technology.</p>
-            </div>
-        </div>
-    </section>
-
-    <!-- Tour Section -->
-    <section class="section" id="tour">
-        <h2 class="section-title">Upcoming Shows</h2>
-        <div class="tour-dates">
-            <div class="tour-date">
-                <div class="date-info">
-                    <div class="date-number">15</div>
-                    <div class="venue-info">
-                        <h3>Electric Dreams Festival</h3>
-                        <p>Miami, FL • August 2025</p>
-                    </div>
-                </div>
-                <button class="ticket-btn">Get Tickets</button>
-            </div>
-            <div class="tour-date">
-                <div class="date-info">
-                    <div class="date-number">22</div>
-                    <div class="venue-info">
-                        <h3>Underground NYC</h3>
-                        <p>New York, NY • August 2025</p>
-                    </div>
-                </div>
-                <button class="ticket-btn">Get Tickets</button>
-            </div>
-            <div class="tour-date">
-                <div class="date-info">
-                    <div class="date-number">05</div>
-                    <div class="venue-info">
-                        <h3>Warehouse Project</h3>
-                        <p>Los Angeles, CA • September 2025</p>
-                    </div>
-                </div>
-                <button class="ticket-btn">Get Tickets</button>
-            </div>
-        </div>
-    </section>
-
-    <!-- About Section -->
-    <section class="section" id="about">
-        <h2 class="section-title">About</h2>
-        <div style="max-width: 800px; margin: 0 auto; text-align: center; line-height: 1.8;">
-            <p style="font-size: 18px; margin-bottom: 20px;">
-                DJ McRyan is a visionary electronic music producer known for pushing the boundaries of sound and technology. 
-                With a unique blend of progressive house, techno, and experimental electronica, McRyan creates immersive 
-                sonic experiences that transport listeners to new dimensions.
-            </p>
-            <p style="color: rgba(255,255,255,0.7);">
-                From underground clubs to major festivals, McRyan's performances are legendary for their energy, 
-                innovation, and connection with the audience. Each set is a journey through sound, emotion, and pure electronic bliss.
-            </p>
-        </div>
-    </section>
-
-    <!-- Contact Section -->
-    <section class="section" id="contact">
-        <h2 class="section-title">Connect</h2>
-        <div class="contact-content">
-            <p style="font-size: 18px; margin-bottom: 20px;">
-                For bookings, collaborations, and inquiries
-            </p>
-            <p style="color: #00d4ff; font-size: 24px; margin-bottom: 40px;">
-                management@djmcryan.com
-            </p>
-            <div class="social-links">
-                <a href="#" class="social-link">📧</a>
-                <a href="#" class="social-link">🎵</a>
-                <a href="#" class="social-link">📷</a>
-                <a href="#" class="social-link">🐦</a>
-            </div>
-        </div>
-    </section>
 
     <!-- Hidden Audio Element -->
     <audio id="audioPlayer" loop>
@@ -649,6 +772,11 @@
         const audioPlayer = document.getElementById('audioPlayer');
         const canvas = document.getElementById('visualizer');
         const ctx = canvas.getContext('2d');
+
+        // Gyroscope variables
+        let hasGyroPermission = false;
+        let gyroX = 0, gyroY = 0;
+        let targetGyroX = 0, targetGyroY = 0;
 
         // Sample tracks (replace with actual MP3 URLs)
         const tracks = [
@@ -669,6 +797,8 @@
             setupCanvas();
             createParticles();
             setupScrollEffects();
+            setupGyroscope();
+            animateGyro();
             
             // Try to autoplay (may be blocked by browser)
             setTimeout(() => {
@@ -683,6 +813,111 @@
         }
 
         window.addEventListener('resize', setupCanvas);
+
+        // Gyroscope setup
+        function setupGyroscope() {
+            if (window.DeviceOrientationEvent) {
+                // Check if we need permission (iOS 13+)
+                if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    const permBtn = document.createElement('div');
+                    permBtn.className = 'permission-request';
+                    permBtn.innerHTML = 'Enable 3D Motion Experience';
+                    permBtn.onclick = requestGyroPermission;
+                    document.body.appendChild(permBtn);
+                } else {
+                    // No permission needed
+                    window.addEventListener('deviceorientation', handleOrientation);
+                    hasGyroPermission = true;
+                }
+            }
+        }
+
+        async function requestGyroPermission() {
+            try {
+                const permission = await DeviceOrientationEvent.requestPermission();
+                if (permission === 'granted') {
+                    window.addEventListener('deviceorientation', handleOrientation);
+                    hasGyroPermission = true;
+                    document.querySelector('.permission-request').remove();
+                    showNotification('3D Motion Enabled!');
+                }
+            } catch (error) {
+                console.error('Gyroscope permission error:', error);
+            }
+        }
+
+        function handleOrientation(event) {
+            // Normalize values
+            const tiltX = event.beta;  // -180 to 180 (front-back tilt)
+            const tiltY = event.gamma; // -90 to 90 (left-right tilt)
+            
+            // Convert to normalized values
+            targetGyroX = (tiltX / 180) * 0.3; // Limit the effect
+            targetGyroY = (tiltY / 90) * 0.3;
+        }
+
+        function animateGyro() {
+            // Smooth the gyro values
+            gyroX += (targetGyroX - gyroX) * 0.1;
+            gyroY += (targetGyroY - gyroY) * 0.1;
+            
+            applyGyroEffects();
+            requestAnimationFrame(animateGyro);
+        }
+
+        function applyGyroEffects() {
+            const maxRotation = 15;
+            const rotX = gyroX * maxRotation;
+            const rotY = gyroY * maxRotation;
+            
+            // Apply to scene
+            const scene = document.getElementById('scene3d');
+            scene.style.transform = `rotateX(${-rotX}deg) rotateY(${rotY}deg)`;
+            
+            // Parallax on hero image
+            const heroImage = document.getElementById('heroImage');
+            heroImage.style.transform = `translateZ(-100px) scale(1.2) translateX(${rotY * 3}px) translateY(${rotX * 3}px)`;
+            
+            // Hero content depth
+            const heroContent = document.getElementById('heroContent');
+            heroContent.style.transform = `translate(-50%, -50%) translateZ(100px) translateX(${rotY * 5}px) translateY(${rotX * 5}px)`;
+            
+            // 3D grid movement
+            const grid = document.getElementById('grid3d');
+            if (grid) {
+                grid.style.transform = `translateZ(-300px) rotateX(${60 + rotX}deg) translateX(${rotY * 50}px)`;
+            }
+            
+            // Update gyro indicator
+            const dot = document.getElementById('gyroDot');
+            dot.style.transform = `translate(${rotY * 20}px, ${rotX * 20}px)`;
+            
+            // Particle depth
+            const particles = document.getElementById('particles');
+            particles.style.transform = `translateZ(-150px) translateX(${rotY * 10}px) translateY(${rotX * 10}px)`;
+        }
+
+        // Show notification
+        function showNotification(message) {
+            const notif = document.createElement('div');
+            notif.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: linear-gradient(45deg, #00d4ff, #ff006e);
+                color: #fff;
+                padding: 20px 40px;
+                border-radius: 30px;
+                font-weight: bold;
+                z-index: 9999;
+                animation: notificationPop 0.3s ease-out;
+            `;
+            notif.textContent = message;
+            document.body.appendChild(notif);
+            
+            setTimeout(() => notif.remove(), 2000);
+        }
 
         // Initialize Audio Context
         function initAudio() {
@@ -724,8 +959,6 @@
         function playTrack(index) {
             const track = tracks[index];
             document.getElementById('trackName').textContent = track.name;
-            // In real implementation, change audio source
-            // audioPlayer.src = track.url;
             if (!isPlaying) {
                 togglePlay();
             }
@@ -798,13 +1031,9 @@
         // Scroll effects
         function setupScrollEffects() {
             const nav = document.getElementById('nav');
-            const heroImage = document.getElementById('heroImage');
             
             window.addEventListener('scroll', () => {
                 const scrolled = window.pageYOffset;
-                
-                // Parallax effect on hero image
-                heroImage.style.transform = `scale(1.1) translateY(${scrolled * 0.5}px)`;
                 
                 // Nav background on scroll
                 if (scrolled > 100) {
@@ -812,6 +1041,10 @@
                 } else {
                     nav.classList.remove('scrolled');
                 }
+                
+                // Parallax depth on scroll
+                const scrollEffect = scrolled * 0.001;
+                targetGyroX = Math.sin(scrollEffect) * 0.1;
             });
         }
 
@@ -829,16 +1062,52 @@
             });
         });
 
-        // Mouse move effect on hero
+        // Mouse move effect (desktop fallback)
         document.addEventListener('mousemove', (e) => {
-            const x = e.clientX / window.innerWidth;
-            const y = e.clientY / window.innerHeight;
-            
-            const heroContent = document.querySelector('.hero-content');
-            if (heroContent) {
-                heroContent.style.transform = `translate(-${50 + x * 2}%, -${50 + y * 2}%)`;
+            if (!hasGyroPermission) {
+                const x = (e.clientX / window.innerWidth - 0.5) * 2;
+                const y = (e.clientY / window.innerHeight - 0.5) * 2;
+                
+                targetGyroY = x * 0.3;
+                targetGyroX = y * 0.3;
             }
         });
+
+        // Keyboard controls for testing
+        document.addEventListener('keydown', (e) => {
+            if (!hasGyroPermission) {
+                switch(e.key) {
+                    case 'ArrowUp':
+                        targetGyroX = Math.max(-0.3, targetGyroX - 0.05);
+                        break;
+                    case 'ArrowDown':
+                        targetGyroX = Math.min(0.3, targetGyroX + 0.05);
+                        break;
+                    case 'ArrowLeft':
+                        targetGyroY = Math.max(-0.3, targetGyroY - 0.05);
+                        break;
+                    case 'ArrowRight':
+                        targetGyroY = Math.min(0.3, targetGyroY + 0.05);
+                        break;
+                }
+            }
+        });
+
+        // Add CSS animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes notificationPop {
+                from {
+                    transform: translate(-50%, -50%) scale(0);
+                    opacity: 0;
+                }
+                to {
+                    transform: translate(-50%, -50%) scale(1);
+                    opacity: 1;
+                }
+            }
+        `;
+        document.head.appendChild(style);
     </script>
 </body>
 </html>
